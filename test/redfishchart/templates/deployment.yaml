@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-redfish-mockup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: redfish-mockup
+    {{- include "redfish-mockup.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: redfish-mockup
+      {{- include "redfish-mockup.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: redfish-mockup
+        {{- include "redfish-mockup.selectorLabels" . | nindent 8 }}
+      {{- if .Values.underlayMultusCNI }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ .Values.underlayMultusCNI }}
+      {{- end }}
+    spec:
+      {{- if .Values.nodeName }}
+      nodeName: {{ .Values.nodeName }}
+      {{- end }}
+      containers:
+      - name: redfish-mockup
+        image: "{{ .Values.images.redfishMockup.repository }}:{{ .Values.images.redfishMockup.tag }}"
+        imagePullPolicy: {{ .Values.images.redfishMockup.pullPolicy }}
+        ports:
+        - containerPort: 8000
+          name: http
+        {{- with .Values.resources.redfishMockup }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      - name: dhcp
+        image: "{{ .Values.images.tools.repository }}:{{ .Values.images.tools.tag }}"
+        imagePullPolicy: {{ .Values.images.tools.pullPolicy }}
+        securityContext:
+          privileged: true
+        command:
+        - /bin/bash
+        args:
+        - -c
+        - |-
+          # Update package list and install required packages
+          set -o errexit
+          set -o pipefail
+          set -o nounset
+          echo "flush ip on {{ .Values.networkInterface }}"
+          ip a 
+          sleep 2
+          (
+              ip addr flush dev {{ .Values.networkInterface }} || true          
+              ipAddr="{{ .Values.staticIp }}/{{ .Values.staticMask }}"
+              if [ -n "{{ .Values.staticIp }}" ] ; then
+                echo "set ip on {{ .Values.networkInterface }} to ${ipAddr}"
+                ip a a ${ipAddr} dev {{ .Values.networkInterface }}
+                touch /tmp/ready
+                ip a
+              else
+                echo " renew dhcpClient on {{ .Values.networkInterface }}" 
+                while true ; do
+                    dhclient -v {{ .Values.networkInterface }}
+                    echo "finish dhcpClient on {{ .Values.networkInterface }}"
+                    touch /tmp/ready
+                    ip a
+                    sleep 60
+                done
+              fi
+          )&
+          sleep 5
+          echo "test redfish server"
+          IP=$(ip addr show dev {{ .Values.networkInterface }} | grep "inet " | awk '{ print $2 }' | cut -d/ -f1)
+          curl http://${IP}:8000/redfish/v1
+          sleep infinity
+        readinessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/ready
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 100
+        {{- with .Values.resources.tools }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
