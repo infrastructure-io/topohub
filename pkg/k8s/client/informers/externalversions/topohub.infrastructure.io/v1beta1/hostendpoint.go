@@ -9,10 +9,10 @@ import (
 	context "context"
 	time "time"
 
-	apisbmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	apistopohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	versioned "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned"
 	internalinterfaces "github.com/infrastructure-io/topohub/pkg/k8s/client/informers/externalversions/internalinterfaces"
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/listers/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/listers/topohub.infrastructure.io/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -23,7 +23,7 @@ import (
 // HostEndpoints.
 type HostEndpointInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() bmcspidernetiov1beta1.HostEndpointLister
+	Lister() topohubinfrastructureiov1beta1.HostEndpointLister
 }
 
 type hostEndpointInformer struct {
@@ -48,16 +48,16 @@ func NewFilteredHostEndpointInformer(client versioned.Interface, resyncPeriod ti
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BmcV1beta1().HostEndpoints().List(context.TODO(), options)
+				return client.TopohubV1beta1().HostEndpoints().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BmcV1beta1().HostEndpoints().Watch(context.TODO(), options)
+				return client.TopohubV1beta1().HostEndpoints().Watch(context.TODO(), options)
 			},
 		},
-		&apisbmcspidernetiov1beta1.HostEndpoint{},
+		&apistopohubinfrastructureiov1beta1.HostEndpoint{},
 		resyncPeriod,
 		indexers,
 	)
@@ -68,9 +68,9 @@ func (f *hostEndpointInformer) defaultInformer(client versioned.Interface, resyn
 }
 
 func (f *hostEndpointInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisbmcspidernetiov1beta1.HostEndpoint{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistopohubinfrastructureiov1beta1.HostEndpoint{}, f.defaultInformer)
 }
 
-func (f *hostEndpointInformer) Lister() bmcspidernetiov1beta1.HostEndpointLister {
-	return bmcspidernetiov1beta1.NewHostEndpointLister(f.Informer().GetIndexer())
+func (f *hostEndpointInformer) Lister() topohubinfrastructureiov1beta1.HostEndpointLister {
+	return topohubinfrastructureiov1beta1.NewHostEndpointLister(f.Informer().GetIndexer())
 }

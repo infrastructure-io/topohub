@@ -6,7 +6,7 @@
 package v1beta1
 
 import (
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
@@ -17,19 +17,19 @@ import (
 type HostOperationLister interface {
 	// List lists all HostOperations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*bmcspidernetiov1beta1.HostOperation, err error)
+	List(selector labels.Selector) (ret []*topohubinfrastructureiov1beta1.HostOperation, err error)
 	// Get retrieves the HostOperation from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*bmcspidernetiov1beta1.HostOperation, error)
+	Get(name string) (*topohubinfrastructureiov1beta1.HostOperation, error)
 	HostOperationListerExpansion
 }
 
 // hostOperationLister implements the HostOperationLister interface.
 type hostOperationLister struct {
-	listers.ResourceIndexer[*bmcspidernetiov1beta1.HostOperation]
+	listers.ResourceIndexer[*topohubinfrastructureiov1beta1.HostOperation]
 }
 
 // NewHostOperationLister returns a new HostOperationLister.
 func NewHostOperationLister(indexer cache.Indexer) HostOperationLister {
-	return &hostOperationLister{listers.New[*bmcspidernetiov1beta1.HostOperation](indexer, bmcspidernetiov1beta1.Resource("hostoperation"))}
+	return &hostOperationLister{listers.New[*topohubinfrastructureiov1beta1.HostOperation](indexer, topohubinfrastructureiov1beta1.Resource("hostoperation"))}
 }

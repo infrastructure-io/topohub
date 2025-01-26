@@ -9,10 +9,10 @@ import (
 	context "context"
 	time "time"
 
-	apisbmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	apistopohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	versioned "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned"
 	internalinterfaces "github.com/infrastructure-io/topohub/pkg/k8s/client/informers/externalversions/internalinterfaces"
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/listers/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/listers/topohub.infrastructure.io/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -23,7 +23,7 @@ import (
 // ClusterAgents.
 type ClusterAgentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() bmcspidernetiov1beta1.ClusterAgentLister
+	Lister() topohubinfrastructureiov1beta1.ClusterAgentLister
 }
 
 type clusterAgentInformer struct {
@@ -48,16 +48,16 @@ func NewFilteredClusterAgentInformer(client versioned.Interface, resyncPeriod ti
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BmcV1beta1().ClusterAgents().List(context.TODO(), options)
+				return client.TopohubV1beta1().ClusterAgents().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BmcV1beta1().ClusterAgents().Watch(context.TODO(), options)
+				return client.TopohubV1beta1().ClusterAgents().Watch(context.TODO(), options)
 			},
 		},
-		&apisbmcspidernetiov1beta1.ClusterAgent{},
+		&apistopohubinfrastructureiov1beta1.ClusterAgent{},
 		resyncPeriod,
 		indexers,
 	)
@@ -68,9 +68,9 @@ func (f *clusterAgentInformer) defaultInformer(client versioned.Interface, resyn
 }
 
 func (f *clusterAgentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisbmcspidernetiov1beta1.ClusterAgent{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistopohubinfrastructureiov1beta1.ClusterAgent{}, f.defaultInformer)
 }
 
-func (f *clusterAgentInformer) Lister() bmcspidernetiov1beta1.ClusterAgentLister {
-	return bmcspidernetiov1beta1.NewClusterAgentLister(f.Informer().GetIndexer())
+func (f *clusterAgentInformer) Lister() topohubinfrastructureiov1beta1.ClusterAgentLister {
+	return topohubinfrastructureiov1beta1.NewClusterAgentLister(f.Informer().GetIndexer())
 }

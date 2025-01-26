@@ -7,17 +7,17 @@ package fake
 
 import (
 	v1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeHostEndpoints implements HostEndpointInterface
 type fakeHostEndpoints struct {
 	*gentype.FakeClientWithList[*v1beta1.HostEndpoint, *v1beta1.HostEndpointList]
-	Fake *FakeBmcV1beta1
+	Fake *FakeTopohubV1beta1
 }
 
-func newFakeHostEndpoints(fake *FakeBmcV1beta1) bmcspidernetiov1beta1.HostEndpointInterface {
+func newFakeHostEndpoints(fake *FakeTopohubV1beta1) topohubinfrastructureiov1beta1.HostEndpointInterface {
 	return &fakeHostEndpoints{
 		gentype.NewFakeClientWithList[*v1beta1.HostEndpoint, *v1beta1.HostEndpointList](
 			fake.Fake,

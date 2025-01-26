@@ -211,7 +211,7 @@ func main() {
 }
 
 // initClients initializes Kubernetes clients
-func initClients() (*kubernetes.Clientset, *crdclientset.BmcV1beta1Client, error) {
+func initClients() (*kubernetes.Clientset, *crdclientset.TopohubV1beta1Client, error) {
 	var config *rest.Config
 	var err error
 

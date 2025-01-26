@@ -11,8 +11,8 @@ import (
 	time "time"
 
 	versioned "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned"
-	bmcspidernetio "github.com/infrastructure-io/topohub/pkg/k8s/client/informers/externalversions/topohub.infrastructure.io"
 	internalinterfaces "github.com/infrastructure-io/topohub/pkg/k8s/client/informers/externalversions/internalinterfaces"
+	topohubinfrastructureio "github.com/infrastructure-io/topohub/pkg/k8s/client/informers/externalversions/topohub.infrastructure.io"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -241,9 +241,9 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
-	Bmc() bmcspidernetio.Interface
+	Topohub() topohubinfrastructureio.Interface
 }
 
-func (f *sharedInformerFactory) Bmc() bmcspidernetio.Interface {
-	return bmcspidernetio.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Topohub() topohubinfrastructureio.Interface {
+	return topohubinfrastructureio.New(f, f.namespace, f.tweakListOptions)
 }

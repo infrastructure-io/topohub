@@ -7,17 +7,17 @@ package fake
 
 import (
 	v1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeClusterAgents implements ClusterAgentInterface
 type fakeClusterAgents struct {
 	*gentype.FakeClientWithList[*v1beta1.ClusterAgent, *v1beta1.ClusterAgentList]
-	Fake *FakeBmcV1beta1
+	Fake *FakeTopohubV1beta1
 }
 
-func newFakeClusterAgents(fake *FakeBmcV1beta1) bmcspidernetiov1beta1.ClusterAgentInterface {
+func newFakeClusterAgents(fake *FakeTopohubV1beta1) topohubinfrastructureiov1beta1.ClusterAgentInterface {
 	return &fakeClusterAgents{
 		gentype.NewFakeClientWithList[*v1beta1.ClusterAgent, *v1beta1.ClusterAgentList](
 			fake.Fake,

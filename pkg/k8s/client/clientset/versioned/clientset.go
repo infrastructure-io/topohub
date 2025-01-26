@@ -9,7 +9,7 @@ import (
 	fmt "fmt"
 	http "net/http"
 
-	bmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -17,18 +17,18 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	BmcV1beta1() bmcv1beta1.BmcV1beta1Interface
+	TopohubV1beta1() topohubv1beta1.TopohubV1beta1Interface
 }
 
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	bmcV1beta1 *bmcv1beta1.BmcV1beta1Client
+	topohubV1beta1 *topohubv1beta1.TopohubV1beta1Client
 }
 
-// BmcV1beta1 retrieves the BmcV1beta1Client
-func (c *Clientset) BmcV1beta1() bmcv1beta1.BmcV1beta1Interface {
-	return c.bmcV1beta1
+// TopohubV1beta1 retrieves the TopohubV1beta1Client
+func (c *Clientset) TopohubV1beta1() topohubv1beta1.TopohubV1beta1Interface {
+	return c.topohubV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -75,7 +75,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.bmcV1beta1, err = bmcv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.topohubV1beta1, err = topohubv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.bmcV1beta1 = bmcv1beta1.New(c)
+	cs.topohubV1beta1 = topohubv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

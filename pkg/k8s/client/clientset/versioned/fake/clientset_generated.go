@@ -7,8 +7,8 @@ package fake
 
 import (
 	clientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned"
-	bmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
-	fakebmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1/fake"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
+	faketopohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -70,7 +70,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// BmcV1beta1 retrieves the BmcV1beta1Client
-func (c *Clientset) BmcV1beta1() bmcv1beta1.BmcV1beta1Interface {
-	return &fakebmcv1beta1.FakeBmcV1beta1{Fake: &c.Fake}
+// TopohubV1beta1 retrieves the TopohubV1beta1Client
+func (c *Clientset) TopohubV1beta1() topohubv1beta1.TopohubV1beta1Interface {
+	return &faketopohubv1beta1.FakeTopohubV1beta1{Fake: &c.Fake}
 }

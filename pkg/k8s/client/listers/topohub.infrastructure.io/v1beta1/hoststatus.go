@@ -6,7 +6,7 @@
 package v1beta1
 
 import (
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
@@ -17,19 +17,19 @@ import (
 type HostStatusLister interface {
 	// List lists all HostStatuses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*bmcspidernetiov1beta1.HostStatus, err error)
+	List(selector labels.Selector) (ret []*topohubinfrastructureiov1beta1.HostStatus, err error)
 	// Get retrieves the HostStatus from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*bmcspidernetiov1beta1.HostStatus, error)
+	Get(name string) (*topohubinfrastructureiov1beta1.HostStatus, error)
 	HostStatusListerExpansion
 }
 
 // hostStatusLister implements the HostStatusLister interface.
 type hostStatusLister struct {
-	listers.ResourceIndexer[*bmcspidernetiov1beta1.HostStatus]
+	listers.ResourceIndexer[*topohubinfrastructureiov1beta1.HostStatus]
 }
 
 // NewHostStatusLister returns a new HostStatusLister.
 func NewHostStatusLister(indexer cache.Indexer) HostStatusLister {
-	return &hostStatusLister{listers.New[*bmcspidernetiov1beta1.HostStatus](indexer, bmcspidernetiov1beta1.Resource("hoststatus"))}
+	return &hostStatusLister{listers.New[*topohubinfrastructureiov1beta1.HostStatus](indexer, topohubinfrastructureiov1beta1.Resource("hoststatus"))}
 }

@@ -11,29 +11,29 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeBmcV1beta1 struct {
+type FakeTopohubV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeBmcV1beta1) ClusterAgents() v1beta1.ClusterAgentInterface {
+func (c *FakeTopohubV1beta1) ClusterAgents() v1beta1.ClusterAgentInterface {
 	return newFakeClusterAgents(c)
 }
 
-func (c *FakeBmcV1beta1) HostEndpoints() v1beta1.HostEndpointInterface {
+func (c *FakeTopohubV1beta1) HostEndpoints() v1beta1.HostEndpointInterface {
 	return newFakeHostEndpoints(c)
 }
 
-func (c *FakeBmcV1beta1) HostOperations() v1beta1.HostOperationInterface {
+func (c *FakeTopohubV1beta1) HostOperations() v1beta1.HostOperationInterface {
 	return newFakeHostOperations(c)
 }
 
-func (c *FakeBmcV1beta1) HostStatuses() v1beta1.HostStatusInterface {
+func (c *FakeTopohubV1beta1) HostStatuses() v1beta1.HostStatusInterface {
 	return newFakeHostStatuses(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBmcV1beta1) RESTClient() rest.Interface {
+func (c *FakeTopohubV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

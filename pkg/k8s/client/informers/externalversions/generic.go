@@ -41,13 +41,13 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	switch resource {
 	// Group=topohub.infrastructure.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("clusteragents"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Bmc().V1beta1().ClusterAgents().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().ClusterAgents().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("hostendpoints"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Bmc().V1beta1().HostEndpoints().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostEndpoints().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("hostoperations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Bmc().V1beta1().HostOperations().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostOperations().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("hoststatuses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Bmc().V1beta1().HostStatuses().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostStatuses().Informer()}, nil
 
 	}
 

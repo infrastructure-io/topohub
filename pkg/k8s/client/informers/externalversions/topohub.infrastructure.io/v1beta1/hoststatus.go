@@ -9,10 +9,10 @@ import (
 	context "context"
 	time "time"
 
-	apisbmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	apistopohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	versioned "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned"
 	internalinterfaces "github.com/infrastructure-io/topohub/pkg/k8s/client/informers/externalversions/internalinterfaces"
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/listers/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/client/listers/topohub.infrastructure.io/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -23,7 +23,7 @@ import (
 // HostStatuses.
 type HostStatusInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() bmcspidernetiov1beta1.HostStatusLister
+	Lister() topohubinfrastructureiov1beta1.HostStatusLister
 }
 
 type hostStatusInformer struct {
@@ -48,16 +48,16 @@ func NewFilteredHostStatusInformer(client versioned.Interface, resyncPeriod time
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BmcV1beta1().HostStatuses().List(context.TODO(), options)
+				return client.TopohubV1beta1().HostStatuses().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BmcV1beta1().HostStatuses().Watch(context.TODO(), options)
+				return client.TopohubV1beta1().HostStatuses().Watch(context.TODO(), options)
 			},
 		},
-		&apisbmcspidernetiov1beta1.HostStatus{},
+		&apistopohubinfrastructureiov1beta1.HostStatus{},
 		resyncPeriod,
 		indexers,
 	)
@@ -68,9 +68,9 @@ func (f *hostStatusInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *hostStatusInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisbmcspidernetiov1beta1.HostStatus{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistopohubinfrastructureiov1beta1.HostStatus{}, f.defaultInformer)
 }
 
-func (f *hostStatusInformer) Lister() bmcspidernetiov1beta1.HostStatusLister {
-	return bmcspidernetiov1beta1.NewHostStatusLister(f.Informer().GetIndexer())
+func (f *hostStatusInformer) Lister() topohubinfrastructureiov1beta1.HostStatusLister {
+	return topohubinfrastructureiov1beta1.NewHostStatusLister(f.Informer().GetIndexer())
 }

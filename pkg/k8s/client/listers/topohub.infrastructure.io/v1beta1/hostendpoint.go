@@ -6,7 +6,7 @@
 package v1beta1
 
 import (
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
@@ -17,19 +17,19 @@ import (
 type HostEndpointLister interface {
 	// List lists all HostEndpoints in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*bmcspidernetiov1beta1.HostEndpoint, err error)
+	List(selector labels.Selector) (ret []*topohubinfrastructureiov1beta1.HostEndpoint, err error)
 	// Get retrieves the HostEndpoint from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*bmcspidernetiov1beta1.HostEndpoint, error)
+	Get(name string) (*topohubinfrastructureiov1beta1.HostEndpoint, error)
 	HostEndpointListerExpansion
 }
 
 // hostEndpointLister implements the HostEndpointLister interface.
 type hostEndpointLister struct {
-	listers.ResourceIndexer[*bmcspidernetiov1beta1.HostEndpoint]
+	listers.ResourceIndexer[*topohubinfrastructureiov1beta1.HostEndpoint]
 }
 
 // NewHostEndpointLister returns a new HostEndpointLister.
 func NewHostEndpointLister(indexer cache.Indexer) HostEndpointLister {
-	return &hostEndpointLister{listers.New[*bmcspidernetiov1beta1.HostEndpoint](indexer, bmcspidernetiov1beta1.Resource("hostendpoint"))}
+	return &hostEndpointLister{listers.New[*topohubinfrastructureiov1beta1.HostEndpoint](indexer, topohubinfrastructureiov1beta1.Resource("hostendpoint"))}
 }

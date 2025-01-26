@@ -6,7 +6,7 @@
 package v1beta1
 
 import (
-	bmcspidernetiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubinfrastructureiov1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
@@ -17,19 +17,19 @@ import (
 type ClusterAgentLister interface {
 	// List lists all ClusterAgents in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*bmcspidernetiov1beta1.ClusterAgent, err error)
+	List(selector labels.Selector) (ret []*topohubinfrastructureiov1beta1.ClusterAgent, err error)
 	// Get retrieves the ClusterAgent from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*bmcspidernetiov1beta1.ClusterAgent, error)
+	Get(name string) (*topohubinfrastructureiov1beta1.ClusterAgent, error)
 	ClusterAgentListerExpansion
 }
 
 // clusterAgentLister implements the ClusterAgentLister interface.
 type clusterAgentLister struct {
-	listers.ResourceIndexer[*bmcspidernetiov1beta1.ClusterAgent]
+	listers.ResourceIndexer[*topohubinfrastructureiov1beta1.ClusterAgent]
 }
 
 // NewClusterAgentLister returns a new ClusterAgentLister.
 func NewClusterAgentLister(indexer cache.Indexer) ClusterAgentLister {
-	return &clusterAgentLister{listers.New[*bmcspidernetiov1beta1.ClusterAgent](indexer, bmcspidernetiov1beta1.Resource("clusteragent"))}
+	return &clusterAgentLister{listers.New[*topohubinfrastructureiov1beta1.ClusterAgent](indexer, topohubinfrastructureiov1beta1.Resource("clusteragent"))}
 }

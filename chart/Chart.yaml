@@ -1,12 +1,12 @@
 apiVersion: v2
-name: bmc-operator
-description: A Helm chart for BMC Operator
+name: topohub
+description: A Helm chart for Topohub Operator
 
 # This is the chart version, which will be taken from VERSION file
-version: 0.5.0
+version: 0.1.0
 
 # This is the version number of the application being deployed, which will be taken from VERSION file
-appVersion: "0.5.0"
+appVersion: "0.1.0"
 
 type: application
 
@@ -16,6 +16,8 @@ maintainers:
 
 keywords:
   - kubernetes
-  - operator
   - bmc
   - server
+  - infrastructure
+  - switch
+  - network
