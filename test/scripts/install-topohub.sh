@@ -28,20 +28,20 @@ echo "run topo on worker nodes"
 kubectl label node ${CLUSTER_NAME}-worker topohub=true
 kubectl label node ${CLUSTER_NAME}-worker2 topohub=true
 
-echo <<EOF > /tmp/topo.yaml
-replicaCount:2
+cat <<EOF >/tmp/topo.yaml
+replicaCount: 2
 logLevel: "debug"
 image:
-    tag: ${IMAGE_VERSION}
+  tag: ${IMAGE_VERSION}
 
 defaultConfig:
-    redfish:
-        https:false
-        port: 8000
-        username: ""
-        password: ""
-    dhcpServer:
-        interface: "eth0"
+  redfish:
+    https: false
+    port: 8000
+    username: ""
+    password: ""
+  dhcpServer:
+    interface: "eth0"
 
 storage:
     type: "pvc"
@@ -55,6 +55,7 @@ nodeAffinity:
         values:
         - true
 EOF
+
 		# --set clusterAgent.feature.dhcpServerConfig.subnet="192.168.0.0/24" \
 		# --set clusterAgent.feature.dhcpServerConfig.ipRange="192.168.0.100-192.168.0.200" \
 		# --set clusterAgent.feature.dhcpServerConfig.gateway="192.168.0.1" \

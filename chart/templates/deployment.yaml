@@ -34,7 +34,7 @@ spec:
       {{- end }}
       containers:
       - name: {{ .Chart.Name }}
-        image: {{ include "topohub.image" . }}
+        image: {{ include "topohub.image" . | quote }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
           capabilities:
