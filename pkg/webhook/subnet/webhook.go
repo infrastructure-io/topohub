@@ -39,21 +39,6 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 
 	log.Logger.Infof("Setting initial values for nil fields in Subnet %s", subnet.Name)
 
-	// Set default values for Feature if not specified
-	if subnet.Spec.Feature == nil {
-		subnet.Spec.Feature = &topohubv1beta1.FeatureSpec{
-			EnableBindDhcpIP:        false,
-			EnableReserveNoneDhcpIP: false,
-			EnablePxe:               false,
-			EnableZtp:               false,
-			EnableSyncEndpoint: &topohubv1beta1.EnableSyncEndpointSpec{
-				DhcpClient:   true,
-				ScanEndpoint: false,
-				EndpointType: "hoststatus",
-			},
-		}
-	}
-
 	return nil
 }
 
@@ -105,7 +90,7 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 	}
 
 	// Validate IP ranges are within subnet
-	if err := ValidateIPRange(subnet.Spec.IPv4Subnet.IpRange, ipNet); err != nil {
+	if err := ValidateIPRange(subnet.Spec.IPv4Subnet.IPRange, ipNet); err != nil {
 		return fmt.Errorf("invalid IP range: %v", err)
 	}
 
@@ -139,12 +124,12 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 // validateInterface validates the InterfaceSpec
 func (w *SubnetWebhook) validateInterface(iface *topohubv1beta1.InterfaceSpec, subnet *net.IPNet) error {
 	// Validate interface name format
-	if !IsValidInterfaceName(iface.Name) {
-		return fmt.Errorf("invalid interface name format: %s", iface.Name)
+	if !IsValidInterfaceName(iface.Interface) {
+		return fmt.Errorf("invalid interface name format: %s", iface.Interface)
 	}
 
 	// Validate interface exists on the system
-	if err := ValidateInterfaceExists(iface.Name); err != nil {
+	if err := ValidateInterfaceExists(iface.Interface); err != nil {
 		return err
 	}
 
