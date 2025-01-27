@@ -59,6 +59,8 @@ spec:
                     description: ActiveDhcpClient specifies this host is an active
                       dhcp client when type is dhcp
                     type: boolean
+                  clusterName:
+                    type: string
                   https:
                     type: boolean
                   ipAddr:
@@ -73,8 +75,12 @@ spec:
                   secretNamespace:
                     type: string
                   type:
+                    enum:
+                    - dhcp
+                    - hostendpoint
                     type: string
                 required:
+                - clusterName
                 - https
                 - ipAddr
                 - port
@@ -82,8 +88,6 @@ spec:
                 - secretNamespace
                 - type
                 type: object
-              clusterName:
-                type: string
               healthy:
                 type: boolean
               info:
@@ -126,7 +130,6 @@ spec:
                 type: object
             required:
             - basic
-            - clusterName
             - healthy
             - info
             - lastUpdateTime

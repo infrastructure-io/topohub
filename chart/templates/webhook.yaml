@@ -20,28 +20,11 @@ data:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: {{ include "topohub.fullname" . }}-webhook
+  name: {{ include "topohub.fullname" . }}-validating-webhook-configuration
   labels:
     {{- include "topohub.labels" . | nindent 4 }}
 webhooks:
-- name: validate.subnet.topohub.infrastructure.io
-  admissionReviewVersions: ["v1"]
-  sideEffects: None
-  timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
-  failurePolicy: {{ .Values.webhook.failurePolicy }}
-  clientConfig:
-    service:
-      name: {{ include "topohub.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /validate-topohub-infrastructure-io-v1beta1-subnet
-      port: {{ .Values.webhook.webhookPort }}
-    caBundle: {{ $ca.Cert | b64enc }}
-  rules:
-  - apiGroups: ["topohub.infrastructure.io"]
-    apiVersions: ["v1beta1"]
-    operations: ["CREATE", "UPDATE"]
-    resources: ["subnets"]
-- name: hostendpoints.topohub.infrastructure.io
+- name: subnet.topohub.infrastructure.io
   admissionReviewVersions: ["v1"]
   sideEffects: None
   timeoutSeconds: 5
@@ -50,7 +33,25 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-topohub-infrastructure-io-v1beta1-hostendpoint
+      path: /validate-bmc-infrastructure-io-v1beta1-subnet
+      port: {{ .Values.webhook.webhookPort }}
+    caBundle: {{ $ca.Cert | b64enc }}
+  rules:
+  - apiGroups: ["topohub.infrastructure.io"]
+    apiVersions: ["v1beta1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["subnets"]
+    scope: "Cluster"
+- name: hostendpoint.topohub.infrastructure.io
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      name: {{ include "topohub.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-bmc-infrastructure-io-v1beta1-hostendpoint
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -59,7 +60,7 @@ webhooks:
     operations: ["CREATE", "UPDATE"]
     resources: ["hostendpoints"]
     scope: "Cluster"
-- name: hostoperations.topohub.infrastructure.io
+- name: hostoperation.topohub.infrastructure.io
   admissionReviewVersions: ["v1"]
   sideEffects: None
   timeoutSeconds: 5
@@ -68,7 +69,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-topohub-infrastructure-io-v1beta1-hostoperation
+      path: /validate-bmc-infrastructure-io-v1beta1-hostoperation
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -76,16 +77,34 @@ webhooks:
     apiVersions: ["v1beta1"]
     operations: ["CREATE", "UPDATE"]
     resources: ["hostoperations"]
-    scope: "Cluster"    
+    scope: "Cluster"
+- name: hoststatus.topohub.infrastructure.io
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      name: {{ include "topohub.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-topohub-infrastructure-io-v1beta1-hoststatus
+      port: {{ .Values.webhook.webhookPort }}
+    caBundle: {{ $ca.Cert | b64enc }}
+  rules:
+  - apiGroups: ["topohub.infrastructure.io"]
+    apiVersions: ["v1beta1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["hoststatuses"]
+    scope: "Cluster"
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ include "topohub.fullname" . }}-mutating-webhook-configuration
   labels:
-    app: {{ include "topohub.fullname" . }}-webhook
+    {{- include "topohub.labels" . | nindent 4 }}
 webhooks:
-- name: subnets.topohub.infrastructure.io
+- name: hostendpoint.topohub.infrastructure.io
   admissionReviewVersions: ["v1"]
   sideEffects: None
   timeoutSeconds: 5
@@ -94,25 +113,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-topohub-infrastructure-io-v1beta1-subnet
-      port: {{ .Values.webhook.webhookPort }}
-    caBundle: {{ $ca.Cert | b64enc }}
-  rules:
-  - apiGroups: ["topohub.infrastructure.io"]
-    apiVersions: ["v1beta1"]
-    operations: ["CREATE", "UPDATE"]
-    resources: ["subnets"]
-    scope: "Cluster"
-- name: hostendpoints.topohub.infrastructure.io
-  admissionReviewVersions: ["v1"]
-  sideEffects: None
-  timeoutSeconds: 5
-  failurePolicy: Fail
-  clientConfig:
-    service:
-      name: {{ include "topohub.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /mutate-topohub-infrastructure-io-v1beta1-hostendpoint
+      path: /mutate-bmc-infrastructure-io-v1beta1-hostendpoint
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -121,7 +122,7 @@ webhooks:
     operations: ["CREATE", "UPDATE"]
     resources: ["hostendpoints"]
     scope: "Cluster"
-- name: hostoperations.topohub.infrastructure.io
+- name: hostoperation.topohub.infrastructure.io
   admissionReviewVersions: ["v1"]
   sideEffects: None
   timeoutSeconds: 5
@@ -130,7 +131,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-topohub-infrastructure-io-v1beta1-hostoperation
+      path: /mutate-bmc-infrastructure-io-v1beta1-hostoperation
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -138,4 +139,40 @@ webhooks:
     apiVersions: ["v1beta1"]
     operations: ["CREATE", "UPDATE"]
     resources: ["hostoperations"]
+    scope: "Cluster"
+- name: subnet.topohub.infrastructure.io
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      name: {{ include "topohub.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-bmc-infrastructure-io-v1beta1-subnet
+      port: {{ .Values.webhook.webhookPort }}
+    caBundle: {{ $ca.Cert | b64enc }}
+  rules:
+  - apiGroups: ["topohub.infrastructure.io"]
+    apiVersions: ["v1beta1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["subnets"]
+    scope: "Cluster"
+- name: hoststatus.topohub.infrastructure.io
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      name: {{ include "topohub.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-topohub-infrastructure-io-v1beta1-hoststatus
+      port: {{ .Values.webhook.webhookPort }}
+    caBundle: {{ $ca.Cert | b64enc }}
+  rules:
+  - apiGroups: ["topohub.infrastructure.io"]
+    apiVersions: ["v1beta1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["hoststatuses"]
     scope: "Cluster"

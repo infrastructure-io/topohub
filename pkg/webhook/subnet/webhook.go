@@ -38,7 +38,19 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 		return fmt.Errorf("object is not a Subnet")
 	}
 
-	log.Logger.Infof("Setting initial values for nil fields in Subnet %s", subnet.Name)
+	log.Logger.Debugf("Setting initial values for nil fields in Subnet %s", subnet.Name)
+
+	if subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName != nil && *subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName != "" {
+		if subnet.ObjectMeta.Labels == nil {
+			subnet.ObjectMeta.Labels = make(map[string]string)
+		}
+		subnet.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = *subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName
+	} else {
+		if subnet.ObjectMeta.Labels == nil {
+			subnet.ObjectMeta.Labels = make(map[string]string)
+		}
+		subnet.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = ""
+	}
 
 	return nil
 }
@@ -47,7 +59,9 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 func (w *SubnetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	subnet, ok := obj.(*topohubv1beta1.Subnet)
 	if !ok {
-		return nil, fmt.Errorf("object is not a Subnet")
+		err := fmt.Errorf("object is not a Subnet")
+		log.Logger.Error(err.Error())
+		return nil, err
 	}
 
 	log.Logger.Infof("Validating creation of Subnet %s", subnet.Name)
@@ -64,7 +78,9 @@ func (w *SubnetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) 
 func (w *SubnetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	subnet, ok := newObj.(*topohubv1beta1.Subnet)
 	if !ok {
-		return nil, fmt.Errorf("object is not a Subnet")
+		err := fmt.Errorf("object is not a Subnet")
+		log.Logger.Error(err.Error())
+		return nil, err
 	}
 
 	log.Logger.Infof("Validating update of Subnet %s", subnet.Name)

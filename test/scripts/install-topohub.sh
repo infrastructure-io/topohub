@@ -29,7 +29,7 @@ kubectl label node ${CLUSTER_NAME}-worker topohub=true
 kubectl label node ${CLUSTER_NAME}-worker2 topohub=true
 
 cat <<EOF >/tmp/topo.yaml
-replicaCount: 2
+replicaCount: 1
 logLevel: "debug"
 image:
   tag: ${IMAGE_VERSION}

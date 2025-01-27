@@ -60,6 +60,18 @@ func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) e
 		hostEndpoint.Spec.SecretNamespace = &w.config.RedfishSecretNamespace
 	}
 
+	if hostEndpoint.Spec.ClusterName != nil && *hostEndpoint.Spec.ClusterName != "" {
+		if hostEndpoint.ObjectMeta.Labels == nil {
+			hostEndpoint.ObjectMeta.Labels = make(map[string]string)
+		}
+		hostEndpoint.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = *hostEndpoint.Spec.ClusterName
+	} else {
+		if hostEndpoint.ObjectMeta.Labels == nil {
+			hostEndpoint.ObjectMeta.Labels = make(map[string]string)
+		}
+		hostEndpoint.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = ""
+	}
+
 	return nil
 }
 
@@ -67,7 +79,9 @@ func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) e
 func (w *HostEndpointWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	hostEndpoint, ok := obj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
-		return nil, fmt.Errorf("object is not a HostEndpoint")
+		err := fmt.Errorf("object is not a HostEndpoint")
+		log.Logger.Error(err.Error())
+		return nil, err
 	}
 
 	log.Logger.Infof("Validating creation of HostEndpoint %s", hostEndpoint.Name)
@@ -84,7 +98,9 @@ func (w *HostEndpointWebhook) ValidateCreate(ctx context.Context, obj runtime.Ob
 func (w *HostEndpointWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	hostEndpoint, ok := newObj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
-		return nil, fmt.Errorf("object is not a HostEndpoint")
+		err := fmt.Errorf("object is not a HostEndpoint")
+		log.Logger.Error(err.Error())
+		return nil, err
 	}
 
 	log.Logger.Infof("Rejecting update of HostEndpoint %s: updates are not allowed", hostEndpoint.Name)

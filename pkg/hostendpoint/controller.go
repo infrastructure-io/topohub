@@ -159,6 +159,7 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 	if hostEndpoint.Spec.ClusterName != nil {
 		clusterName = *hostEndpoint.Spec.ClusterName
 	}
+
 	hostStatus.Status = topohubv1beta1.HostStatusStatus{
 		Healthy:        false,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),

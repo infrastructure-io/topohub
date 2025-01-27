@@ -20,7 +20,12 @@ type AgentConfig struct {
 	WebhookCertDir string
 
 	// storage path
-	StoragePath string
+	StoragePath           string
+	StoragePathDhcpLease  string
+	StoragePathDhcpConfig string
+	StoragePathZtp        string
+	StoragePathSftp       string
+	StoragePathHttp       string
 
 	// dnsmasq config template path
 	DhcpConfigTemplatePath string
@@ -113,6 +118,34 @@ func (c *AgentConfig) ensureStoragePath() error {
 	if err := os.MkdirAll(c.StoragePath, 0755); err != nil {
 		return fmt.Errorf("failed to create storage path %s: %v", c.StoragePath, err)
 	}
+	return nil
+}
+
+func (c *AgentConfig) initStorageDirectory() error {
+	// Check if main storage directory exists
+	if _, err := os.Stat(c.StoragePath); err != nil {
+		return fmt.Errorf("did not exist storage path %s: %v", c.StoragePath, err)
+	}
+
+	c.StoragePathDhcpLease = filepath.Join(c.StoragePath, "dhcpLease")
+	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcpConfig")
+	c.StoragePathZtp = filepath.Join(c.StoragePath, "ztp")
+	c.StoragePathSftp = filepath.Join(c.StoragePath, "sftp")
+	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
+
+	// List of required subdirectories
+	subdirs := []string{c.StoragePathDhcpLease, c.StoragePathDhcpConfig, c.StoragePathZtp, c.StoragePathSftp, c.StoragePathHttp}
+
+	// Check and create each subdirectory if it doesn't exist
+	for _, dir := range subdirs {
+		subPath := filepath.Join(c.StoragePath, dir)
+		if _, err := os.Stat(subPath); os.IsNotExist(err) {
+			if err := os.MkdirAll(subPath, 0755); err != nil {
+				return fmt.Errorf("failed to create subdirectory %s: %v", subPath, err)
+			}
+		}
+	}
+
 	return nil
 }
 

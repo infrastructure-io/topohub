@@ -28,6 +28,7 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/secret"
 	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
 	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
+	hoststatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/hoststatus"
 	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -116,6 +117,12 @@ func main() {
 	// Setup DhcpSubnet webhook
 	if err = (&subnetwebhook.SubnetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
 		log.Logger.Errorf("unable to create webhook %s: %v", "DhcpSubnet", err)
+		os.Exit(1)
+	}
+
+	// Setup HostStatus webhook
+	if err = (&hoststatuswebhook.HostStatusWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+		log.Logger.Errorf("unable to create webhook %s: %v", "HostStatus", err)
 		os.Exit(1)
 	}
 
