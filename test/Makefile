@@ -26,7 +26,6 @@ installDepsRedfish:
 	chmod +x scripts/install-redfish-dhcp.sh
 	chmod +x scripts/install-redfish-static.sh
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME)  UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
-			STATIC_IP="192.168.0.50/24"  \
 			./scripts/install-redfish-static.sh  ; ./scripts/hostendpoint.sh
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			./scripts/install-redfish-dhcp.sh

@@ -84,12 +84,22 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 		updated := existing.DeepCopy()
 		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		updated.Status.Basic = topohubv1beta1.BasicInfo{
-			Type:            topohubv1beta1.HostTypeEndpoint,
-			IpAddr:          hostEndpoint.Spec.IPAddr,
-			SecretName:      *hostEndpoint.Spec.SecretName,
-			SecretNamespace: *hostEndpoint.Spec.SecretNamespace,
-			Https:           *hostEndpoint.Spec.HTTPS,
-			Port:            *hostEndpoint.Spec.Port,
+			Type:   topohubv1beta1.HostTypeEndpoint,
+			IpAddr: hostEndpoint.Spec.IPAddr,
+			Https:  true,
+			Port:   443,
+		}
+		if hostEndpoint.Spec.SecretName != nil {
+			updated.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
+		}
+		if hostEndpoint.Spec.SecretNamespace != nil {
+			updated.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
+		}
+		if hostEndpoint.Spec.HTTPS != nil {
+			updated.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
+		}
+		if hostEndpoint.Spec.Port != nil {
+			updated.Status.Basic.Port = *hostEndpoint.Spec.Port
 		}
 
 		if err := r.client.Update(ctx, updated); err != nil {
@@ -164,13 +174,11 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 		Healthy:        false,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
 		Basic: topohubv1beta1.BasicInfo{
-			Type:            topohubv1beta1.HostTypeEndpoint,
-			IpAddr:          hostEndpoint.Spec.IPAddr,
-			SecretName:      *hostEndpoint.Spec.SecretName,
-			SecretNamespace: *hostEndpoint.Spec.SecretNamespace,
-			Https:           *hostEndpoint.Spec.HTTPS,
-			Port:            *hostEndpoint.Spec.Port,
-			ClusterName:     clusterName,
+			Type:        topohubv1beta1.HostTypeEndpoint,
+			IpAddr:      hostEndpoint.Spec.IPAddr,
+			Https:       true,
+			Port:        443,
+			ClusterName: clusterName,
 		},
 		Info: map[string]string{},
 		Log: topohubv1beta1.LogStruct{
@@ -179,6 +187,18 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 			LastestLog:        nil,
 			LastestWarningLog: nil,
 		},
+	}
+	if hostEndpoint.Spec.SecretName != nil {
+		hostStatus.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
+	}
+	if hostEndpoint.Spec.SecretNamespace != nil {
+		hostStatus.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
+	}
+	if hostEndpoint.Spec.HTTPS != nil {
+		hostStatus.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
+	}
+	if hostEndpoint.Spec.Port != nil {
+		hostStatus.Status.Basic.Port = *hostEndpoint.Spec.Port
 	}
 
 	if err := r.client.Status().Update(ctx, hostStatus); err != nil {

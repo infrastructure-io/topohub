@@ -23,9 +23,9 @@ spec:
               matchLabels:
                 {{- include "topohub.selectorLabels" . | nindent 16 }}
             topologyKey: kubernetes.io/hostname
-        {{- if .NodeAffinity }}
+        {{- with .Values.nodeAffinity }}
         nodeAffinity:
-          {{- toYaml .NodeAffinity | nindent 10 }}
+          {{- toYaml . | nindent 10 }}
         {{- end }}
       hostNetwork: true
       {{- with .Values.tolerations }}

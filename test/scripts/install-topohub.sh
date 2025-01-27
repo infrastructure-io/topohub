@@ -53,7 +53,7 @@ nodeAffinity:
       - key: topohub
         operator: In
         values:
-        - true
+        - "true"
 EOF
 
 		# --set clusterAgent.feature.dhcpServerConfig.subnet="192.168.0.0/24" \

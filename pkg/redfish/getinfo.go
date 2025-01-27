@@ -174,8 +174,11 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	cs, err := service.Chassis()
 	if err != nil {
 		c.logger.Errorf("failed to get chassis: %+v", err)
-		return nil, err
+		if len(cs) == 0 {
+			return nil, fmt.Errorf("failed to get chassis")
+		}
 	}
+
 	c.logger.Debugf("chassis amount: %d", len(cs))
 	for count, chassis := range cs {
 		pcieList, err := chassis.PCIeDevices()

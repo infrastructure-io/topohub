@@ -25,6 +25,16 @@ for IMAGE in $IMAGES; do
     kind load docker-image $IMAGE --name ${E2E_CLUSTER_NAME}
 done
 
+
+echo "get the eth0 subnet of node"
+NODE_ID=`docker ps | grep ${E2E_CLUSTER_NAME}-control-plane  | awk '{print $1}' `
+INTERFACE_MASK=` docker exec ${NODE_ID} ip a s eth0  | grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}/[0-9]+' | awk -F'/' '{print $2}' `
+# INTERFACE_IP="172.18.0.3"
+NODE_INTERFACE_IP=` docker exec ${NODE_ID} ip a s eth0  |  grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}' `
+# INTERFACE_IP="172.18.0.13"
+NEW_INTERFACE_IP=$(echo ${NODE_INTERFACE_IP} | awk -F. '{print $1"."$2"."$3"."$4+10}')
+
+
 echo "install redfish"
 helm uninstall static-redfish -n  redfish || true 
 helm install static-redfish ${CURRENT_DIR_PATH}/../redfishchart \
@@ -35,6 +45,6 @@ helm install static-redfish ${CURRENT_DIR_PATH}/../redfishchart \
   --set replicaCount=1  \
   --set networkInterface=net1  \
   --set underlayMultusCNI="${UNDERLAY_CNI}" \
-  --set staticIp="${STATIC_IP%/*}" \
-  --set staticMask="${STATIC_IP#*/}" \
+  --set staticIp="${NEW_INTERFACE_IP}" \
+  --set staticMask="${INTERFACE_MASK}" \
   --set nodeName="${NODE_NAME}"

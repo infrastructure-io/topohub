@@ -20,7 +20,7 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="CLUSTERAGENT",type="string",JSONPath=".status.clusterAgent"
+// +kubebuilder:printcolumn:name="CLUSTERNAME",type="string",JSONPath=".status.basic.clusterName"
 // +kubebuilder:printcolumn:name="HEALTHY",type="boolean",JSONPath=".status.healthy"
 // +kubebuilder:printcolumn:name="IPADDR",type="string",JSONPath=".status.basic.ipAddr"
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".status.basic.type"

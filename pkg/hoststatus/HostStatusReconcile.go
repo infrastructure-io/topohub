@@ -255,17 +255,23 @@ func (c *hostStatusController) processHostStatus(hostStatus *topohubv1beta1.Host
 		hostStatus.Status.Healthy)
 
 	// cache the hostStatus data to local
-	username, password, err := c.getSecretData(
-		hostStatus.Status.Basic.SecretName,
-		hostStatus.Status.Basic.SecretNamespace,
-	)
-	if err != nil {
-		logger.Errorf("Failed to get secret data for HostStatus %s: %v", hostStatus.Name, err)
-		return err
+	username := ""
+	password := ""
+	var err error
+	if len(hostStatus.Status.Basic.SecretName) > 0 && len(hostStatus.Status.Basic.SecretNamespace) > 0 {
+		username, password, err = c.getSecretData(
+			hostStatus.Status.Basic.SecretName,
+			hostStatus.Status.Basic.SecretNamespace,
+		)
+		if err != nil {
+			logger.Errorf("Failed to get secret data for HostStatus %s: %v", hostStatus.Name, err)
+			return err
+		}
+		logger.Debugf("Adding/Updating HostStatus %s in cache with username: %s",
+			hostStatus.Name, username)
+	} else {
+		logger.Debugf("Adding/Updating HostStatus %s in cache with empty username", hostStatus.Name)
 	}
-
-	logger.Debugf("Adding/Updating HostStatus %s in cache with username: %s",
-		hostStatus.Name, username)
 
 	hoststatusdata.HostCacheDatabase.Add(hostStatus.Name, hoststatusdata.HostConnectCon{
 		Info:     &hostStatus.Status.Basic,

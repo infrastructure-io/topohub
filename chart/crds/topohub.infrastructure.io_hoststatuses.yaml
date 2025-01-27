@@ -15,8 +15,8 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.clusterAgent
-      name: CLUSTERAGENT
+    - jsonPath: .status.basic.clusterName
+      name: CLUSTERNAME
       type: string
     - jsonPath: .status.healthy
       name: HEALTHY
