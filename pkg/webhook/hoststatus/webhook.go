@@ -65,12 +65,7 @@ func (w *HostStatusWebhook) ValidateCreate(ctx context.Context, obj runtime.Obje
 		return nil, err
 	}
 
-	log.Logger.Infof("Validating creation of HostStatus %s", hoststatus.Name)
-
-	if err := w.validateHostStatus(ctx, hoststatus); err != nil {
-		log.Logger.Errorf("Failed to validate HostStatus %s: %v", hoststatus.Name, err)
-		return nil, err
-	}
+	log.Logger.Debugf("Validating creation of HostStatus %s", hoststatus.Name)
 
 	return nil, nil
 }
@@ -84,12 +79,7 @@ func (w *HostStatusWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj r
 		return nil, err
 	}
 
-	log.Logger.Infof("Validating update of HostStatus %s", hoststatus.Name)
-
-	if err := w.validateHostStatus(ctx, hoststatus); err != nil {
-		log.Logger.Errorf("Failed to validate HostStatus %s: %v", hoststatus.Name, err)
-		return nil, err
-	}
+	log.Logger.Debugf("Validating update of HostStatus %s", hoststatus.Name)
 
 	return nil, nil
 }
@@ -97,32 +87,4 @@ func (w *HostStatusWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj r
 // ValidateDelete implements webhook.Validator
 func (w *HostStatusWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	return nil, nil
-}
-
-// validateHostStatus performs validation of the HostStatus resource
-func (w *HostStatusWebhook) validateHostStatus(ctx context.Context, hoststatus *topohubv1beta1.HostStatus) error {
-	// Validate type field
-	if hoststatus.Status.Basic.Type != topohubv1beta1.HostTypeDHCP && hoststatus.Status.Basic.Type != topohubv1beta1.HostTypeEndpoint {
-		return fmt.Errorf("invalid host type: %s, must be either %s or %s", hoststatus.Status.Basic.Type, topohubv1beta1.HostTypeDHCP, topohubv1beta1.HostTypeEndpoint)
-	}
-
-	// Validate port range
-	if hoststatus.Status.Basic.Port < 1 || hoststatus.Status.Basic.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d, must be between 1 and 65535", hoststatus.Status.Basic.Port)
-	}
-
-	// Validate IP address format
-	if hoststatus.Status.Basic.IpAddr == "" {
-		return fmt.Errorf("ipAddr cannot be empty")
-	}
-
-	// Validate required fields
-	if hoststatus.Status.Basic.SecretName == "" {
-		return fmt.Errorf("secretName cannot be empty")
-	}
-	if hoststatus.Status.Basic.SecretNamespace == "" {
-		return fmt.Errorf("secretNamespace cannot be empty")
-	}
-
-	return nil
 }

@@ -29,7 +29,7 @@ func (h *HostOperationWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/mutate-bmc-infrastructure-io-v1beta1-hostoperation,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=mhostoperation.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-topohub-infrastructure-io-v1beta1-hostoperation,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=mhostoperation.kb.io,admissionReviewVersions=v1
 
 func (h *HostOperationWebhook) Default(ctx context.Context, obj runtime.Object) error {
 	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
@@ -45,7 +45,7 @@ func (h *HostOperationWebhook) Default(ctx context.Context, obj runtime.Object) 
 	return nil
 }
 
-// +kubebuilder:webhook:path=/validate-bmc-infrastructure-io-v1beta1-hostoperation,mutating=false,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=vhostoperation.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-topohub-infrastructure-io-v1beta1-hostoperation,mutating=false,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=vhostoperation.kb.io,admissionReviewVersions=v1
 
 func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	hostOp, ok := obj.(*topohubv1beta1.HostOperation)

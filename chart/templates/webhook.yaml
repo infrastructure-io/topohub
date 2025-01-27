@@ -33,7 +33,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /validate-bmc-infrastructure-io-v1beta1-subnet
+      path: /validate-topohub-infrastructure-io-v1beta1-subnet
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -51,7 +51,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /validate-bmc-infrastructure-io-v1beta1-hostendpoint
+      path: /validate-topohub-infrastructure-io-v1beta1-hostendpoint
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -69,7 +69,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /validate-bmc-infrastructure-io-v1beta1-hostoperation
+      path: /validate-topohub-infrastructure-io-v1beta1-hostoperation
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -113,7 +113,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-bmc-infrastructure-io-v1beta1-hostendpoint
+      path: /mutate-topohub-infrastructure-io-v1beta1-hostendpoint
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -131,7 +131,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-bmc-infrastructure-io-v1beta1-hostoperation
+      path: /mutate-topohub-infrastructure-io-v1beta1-hostoperation
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:
@@ -149,7 +149,7 @@ webhooks:
     service:
       name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-bmc-infrastructure-io-v1beta1-subnet
+      path: /mutate-topohub-infrastructure-io-v1beta1-subnet
       port: {{ .Values.webhook.webhookPort }}
     caBundle: {{ $ca.Cert | b64enc }}
   rules:

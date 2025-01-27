@@ -57,8 +57,7 @@ type LogEntry struct {
 }
 
 type BasicInfo struct {
-	ClusterName string `json:"clusterName"`
-	// +kubebuilder:validation:Enum=dhcp;hostendpoint
+	ClusterName     string `json:"clusterName"`
 	Type            string `json:"type"`
 	IpAddr          string `json:"ipAddr"`
 	SecretName      string `json:"secretName"`

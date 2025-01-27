@@ -15,7 +15,7 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
-// +kubebuilder:webhook:path=/validate-bmc-infrastructure-io-v1beta1-subnet,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=subnets,verbs=create;update,versions=v1beta1,name=vsubnet.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-topohub-infrastructure-io-v1beta1-subnet,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=subnets,verbs=create;update,versions=v1beta1,name=vsubnet.kb.io,admissionReviewVersions=v1
 
 // SubnetWebhook validates Subnet resources
 type SubnetWebhook struct {

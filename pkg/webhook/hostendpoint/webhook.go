@@ -16,7 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// +kubebuilder:webhook:path=/validate-bmc-infrastructure-io-v1beta1-hostendpoint,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostendpoints,verbs=create;update,versions=v1beta1,name=vhostendpoint.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-topohub-infrastructure-io-v1beta1-hostendpoint,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostendpoints,verbs=create;update,versions=v1beta1,name=vhostendpoint.kb.io,admissionReviewVersions=v1
 
 // HostEndpointWebhook validates HostEndpoint resources
 type HostEndpointWebhook struct {
@@ -56,8 +56,10 @@ func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) e
 	}
 
 	if (hostEndpoint.Spec.SecretName == nil || *hostEndpoint.Spec.SecretName == "") && (hostEndpoint.Spec.SecretNamespace == nil || *hostEndpoint.Spec.SecretNamespace == "") {
-		hostEndpoint.Spec.SecretName = &w.config.RedfishSecretName
-		hostEndpoint.Spec.SecretNamespace = &w.config.RedfishSecretNamespace
+		if hostEndpoint.Spec.HTTPS != nil && *hostEndpoint.Spec.HTTPS {
+			hostEndpoint.Spec.SecretName = &w.config.RedfishSecretName
+			hostEndpoint.Spec.SecretNamespace = &w.config.RedfishSecretNamespace
+		}
 	}
 
 	if hostEndpoint.Spec.ClusterName != nil && *hostEndpoint.Spec.ClusterName != "" {
