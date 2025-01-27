@@ -44,7 +44,7 @@ defaultConfig:
     interface: "eth0"
 
 storage:
-    type: "pvc"
+    type: "hostPath"
 
 nodeAffinity:
   requiredDuringSchedulingIgnoredDuringExecution:

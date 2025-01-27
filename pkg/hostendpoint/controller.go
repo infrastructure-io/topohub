@@ -155,9 +155,12 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 	// }
 
 	// Now update the status using the latest version
+	clusterName := ""
+	if hostEndpoint.Spec.ClusterName != nil {
+		clusterName = *hostEndpoint.Spec.ClusterName
+	}
 	hostStatus.Status = topohubv1beta1.HostStatusStatus{
 		Healthy:        false,
-		ClusterName:    *hostEndpoint.Spec.ClusterName,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
 		Basic: topohubv1beta1.BasicInfo{
 			Type:            topohubv1beta1.HostTypeEndpoint,
@@ -166,6 +169,7 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 			SecretNamespace: *hostEndpoint.Spec.SecretNamespace,
 			Https:           *hostEndpoint.Spec.HTTPS,
 			Port:            *hostEndpoint.Spec.Port,
+			ClusterName:     clusterName,
 		},
 		Info: map[string]string{},
 		Log: topohubv1beta1.LogStruct{
@@ -192,11 +196,17 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 
 // specEqual checks if the HostStatus basic info matches the HostEndpoint spec
 func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
+	clusterName := ""
+	if spec.ClusterName != nil {
+		clusterName = *spec.ClusterName
+	}
+
 	return basic.IpAddr == spec.IPAddr &&
 		basic.SecretName == *spec.SecretName &&
 		basic.SecretNamespace == *spec.SecretNamespace &&
 		basic.Https == *spec.HTTPS &&
-		basic.Port == *spec.Port
+		basic.Port == *spec.Port &&
+		basic.ClusterName == clusterName
 }
 
 // SetupWithManager sets up the controller with the Manager

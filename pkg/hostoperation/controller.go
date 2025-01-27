@@ -65,7 +65,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		// 更新状态
 		hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
 		hostOp.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		hostOp.Status.ClusterName = hostStatus.Status.ClusterName
+		hostOp.Status.ClusterName = hostStatus.Status.Basic.ClusterName
 		hostOp.Status.IpAddr = hostStatus.Status.Basic.IpAddr
 
 		// 调用 redfish 接口 完成操作

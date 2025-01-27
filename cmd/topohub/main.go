@@ -74,7 +74,7 @@ func main() {
 	}
 
 	log.Logger.Info("configuration loaded and validated successfully")
-	log.Logger.Debug("configuration details: %+v", agentConfig)
+	log.Logger.Debugf("configuration details: %+v", agentConfig)
 
 	// Create manager
 	webhookPortInt, err := strconv.Atoi(*webhookPort)
@@ -193,9 +193,10 @@ func main() {
 	}()
 
 	go func() {
+		log.Logger.Infof("waiting for leader elected")
 		select {
 		case <-mgr.Elected():
-			log.Logger.Infof("Leader elected")
+			log.Logger.Infof("I am elected as the Leader")
 		}
 	}()
 

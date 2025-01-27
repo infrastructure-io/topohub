@@ -114,6 +114,7 @@ e2e:
 	$(MAKE) -C test installSpiderpool
 	$(MAKE) -C test installDepsRedfish
 	@echo "E2E environment setup completed"
+	$(MAKE) -C test show
 
 # Clean up E2E environment
 e2e-clean:

@@ -23,7 +23,7 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
   tools:
-    repository: ghcr.io/infrastructure-io/topohub-tools
+    repository: ghcr.io/infrastructure-io/tools
     tag: "latest"
     pullPolicy: IfNotPresent
 

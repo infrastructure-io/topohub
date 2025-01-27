@@ -42,12 +42,6 @@ func compareHostStatus(a, b topohubv1beta1.HostStatusStatus, logger *zap.Sugared
 		}
 		return false
 	}
-	if a.ClusterName != b.ClusterName {
-		if logger != nil {
-			logger.Debugf("compareHostStatus ClusterName changed: %v -> %v", b.ClusterName, a.ClusterName)
-		}
-		return false
-	}
 	if a.LastUpdateTime != b.LastUpdateTime {
 		if logger != nil {
 			logger.Debugf("compareHostStatus LastUpdateTime changed: %v -> %v", b.LastUpdateTime, a.LastUpdateTime)
@@ -101,6 +95,12 @@ func compareHostStatus(a, b topohubv1beta1.HostStatusStatus, logger *zap.Sugared
 	if a.Basic.ActiveDhcpClient != b.Basic.ActiveDhcpClient {
 		if logger != nil {
 			logger.Debugf("compareHostStatus Basic.ActiveDhcpClient changed: %v -> %v", b.Basic.ActiveDhcpClient, a.Basic.ActiveDhcpClient)
+		}
+		return false
+	}
+	if a.Basic.ClusterName != b.Basic.ClusterName {
+		if logger != nil {
+			logger.Debugf("compareHostStatus Basic.ClusterName changed: %v -> %v", b.Basic.ClusterName, a.Basic.ClusterName)
 		}
 		return false
 	}

@@ -35,7 +35,6 @@ type HostStatus struct {
 
 type HostStatusStatus struct {
 	Healthy        bool              `json:"healthy"`
-	ClusterName    string            `json:"clusterName"`
 	LastUpdateTime string            `json:"lastUpdateTime"`
 	Basic          BasicInfo         `json:"basic"`
 	Info           map[string]string `json:"info"`
@@ -58,6 +57,7 @@ type LogEntry struct {
 }
 
 type BasicInfo struct {
+	ClusterName string `json:"clusterName"`
 	// +kubebuilder:validation:Enum=dhcp;hostendpoint
 	Type            string `json:"type"`
 	IpAddr          string `json:"ipAddr"`

@@ -1,7 +1,7 @@
 # Include common definitions
 include ../Makefile.def
 
-.PHONY: init installSpiderpool deployTopohub installDepsRedfish clean
+.PHONY: init installSpiderpool deployTopohub installDepsRedfish clean show
 
 # Kind cluster configuration
 KIND_CLUSTER_NAME ?= topohub
@@ -25,12 +25,11 @@ installDepsRedfish:
 	@echo "Installing redfish..."
 	chmod +x scripts/install-redfish-dhcp.sh
 	chmod +x scripts/install-redfish-static.sh
-	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
-			./scripts/install-redfish-dhcp.sh
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME)  UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			STATIC_IP="192.168.0.50/24"  \
-			./scripts/install-redfish-static.sh
-	./scripts/hostendpoint.sh
+			./scripts/install-redfish-static.sh  ; ./scripts/hostendpoint.sh
+	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
+			./scripts/install-redfish-dhcp.sh
 
 # Deploy application to kind cluster
 deployTopohub:
@@ -59,6 +58,16 @@ deployTopohub:
 	# 	--set clusterAgent.endpoint.username="test" \
 	# 	--set clusterAgent.endpoint.password="abc" \
 	# 	--set clusterAgent.endpoint.port=8000
+
+show:
+	@echo "" ; echo "kubectl get hostendpoints -o wide" ; \
+		kubectl get hostendpoints -o wide 
+	@echo "" ; echo "kubectl get hostoperations -o wide" ; \
+		kubectl get hostoperations -o wide
+	@echo "" ; echo "kubectl get subnets -o wide" ; \
+		kubectl get subnets -o wide
+	@echo "" ; echo "kubectl get hoststatuses -o wide" ; \
+		kubectl get hoststatuses -o wide
 
 # Clean up kind cluster
 clean:

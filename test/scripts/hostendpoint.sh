@@ -21,7 +21,7 @@ spec:
   # The IP address of the host endpoint (required)
   ipAddr: "${IP_ADDR}"
   # The cluster agent this host endpoint belongs to (optional)
-  #clusterAgent: "topohub-clusteragent"
+  clusterName: "cluster-test"
   # Credentials for accessing the host endpoint (optional)
   secretName: "${NAME}-secret"
   secretNamespace: "topohub"
@@ -55,7 +55,7 @@ spec:
   # The IP address of the host endpoint (required)
   ipAddr: "${IP_ADDR}"
   # The cluster agent this host endpoint belongs to (optional)
-  #clusterAgent: "topohub-clusteragent"
+  clusterName: "cluster-test"
   # Credentials for accessing the host endpoint (optional)
   secretName: "${NAME}-secret"
   secretNamespace: "topohub"

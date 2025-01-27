@@ -134,7 +134,6 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	hostStatus.Status = topohubv1beta1.HostStatusStatus{
 		Healthy:        false,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
-		ClusterName:    client.ClusterName,
 		Basic: topohubv1beta1.BasicInfo{
 			Type:             topohubv1beta1.HostTypeDHCP,
 			IpAddr:           client.IP,
@@ -142,6 +141,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 			Port:             int32(c.config.RedfishPort),
 			Https:            c.config.RedfishHttps,
 			ActiveDhcpClient: true,
+			ClusterName:      client.ClusterName,
 		},
 		Info: map[string]string{},
 		Log: topohubv1beta1.LogStruct{
