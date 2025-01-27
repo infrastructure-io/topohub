@@ -1,18 +1,19 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-webhook-service
+  name: {{ include "topohub.fullname" . }}-webhook-service
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "bmc-operator.labels" . | nindent 4 }}
+    {{- include "topohub.labels" . | nindent 4 }}
 spec:
+  type: ClusterIP
   ports:
     - port: {{ .Values.webhook.webhookPort }}
       targetPort: webhook
       protocol: TCP
       name: webhook
   selector:
-    {{- include "bmc-operator.selectorLabels" . | nindent 4 }}
+    {{- include "topohub.selectorLabels" . | nindent 4 }}
 ---
 apiVersion: v1
 kind: Service
@@ -20,7 +21,7 @@ metadata:
   name: {{ .Release.Name }}-webhook-metrics-service
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "bmc-operator.labels" . | nindent 4 }}
+    {{- include "topohub.labels" . | nindent 4 }}
 spec:
   ports:
     - port: {{ .Values.webhook.metricsPort }}
@@ -28,4 +29,4 @@ spec:
       protocol: TCP
       name: metrics
   selector:
-    {{- include "bmc-operator.selectorLabels" . | nindent 4 }}
+    {{- include "topohub.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-feature
+  labels:
+    {{- include "topohub.labels" . | nindent 4 }}
+data:
+  redfishPort: {{ .Values.defaultConfig.redfish.port }}
+  redfishHttps: {{ .Values.defaultConfig.redfish.https }}
+  redfishSecretname: {{ .Release.Name }}-redfish-auth
+  redfishSecretNamespace: {{ .Release.Namespace }}
+  redfishHostStatusUpdateInterval: {{ .Values.defaultConfig.redfish.hostStatusUpdateInterval }}

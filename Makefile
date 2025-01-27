@@ -7,27 +7,19 @@ all: images
 
 # Build targets
 .PHONY: build-binaries
-build-binaries: build-controller build-agent
+build-binaries: build-topohub
 
-.PHONY: build-controller
-build-controller:
-	$(GO_BUILD) -o $(BIN_DIR)/controller cmd/controller/main.go
-
-.PHONY: build-agent
-build-agent:
-	$(GO_BUILD) -o $(BIN_DIR)/agent cmd/agent/main.go
+.PHONY: build-topohub
+build-topohub:
+	$(GO_BUILD) -o $(BIN_DIR)/topohub cmd/topohub/main.go
 
 # Image targets
 .PHONY: images
-images: controller-image agent-image tools-image
+images: topohub-image tools-image
 
-.PHONY: controller-image
-controller-image:
-	docker build $(DOCKER_BUILD_FLAGS) -t $(CONTROLLER_IMAGE_REF) -f image/controller/Dockerfile .
-
-.PHONY: agent-image
-agent-image:
-	docker build $(DOCKER_BUILD_FLAGS) -t $(AGENT_IMAGE_REF) -f image/agent/Dockerfile .
+.PHONY: topohub-image
+topohub-image:
+	docker build $(DOCKER_BUILD_FLAGS) -t $(TOPOHUB_IMAGE_REF) -f image/topohub/Dockerfile .
 
 .PHONY: tools-image
 tools-image: build-tools-image
@@ -163,11 +155,9 @@ usage:
 	@echo "Available targets:"
 	@echo "  all             - Build binaries, container images, and Helm chart"
 	@echo "  build-binaries  - Build controller and agent binaries"
-	@echo "  build-controller - Build controller binary"
-	@echo "  build-agent     - Build agent binary"
+	@echo "  build-topohub   - Build topohub binary"
 	@echo "  images          - Build container images"
-	@echo "  controller-image - Build controller container image"
-	@echo "  agent-image     - Build agent container image"
+	@echo "  topohub-image   - Build topohub container image"
 	@echo "  tools-image     - Build tools container image"
 	@echo "  chart           - Package Helm chart"
 	@echo "  e2e             - Run E2E tests"

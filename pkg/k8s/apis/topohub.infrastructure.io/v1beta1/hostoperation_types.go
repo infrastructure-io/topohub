@@ -37,7 +37,7 @@ const (
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="ACTION",type="string",JSONPath=".spec.action"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.status"
-// +kubebuilder:printcolumn:name="CLUSTERAGENT",type="string",JSONPath=".status.clusterAgent"
+// +kubebuilder:printcolumn:name="CLUSTERNAME",type="string",JSONPath=".status.clusterName"
 // +kubebuilder:printcolumn:name="HOSTIP",type="string",JSONPath=".status.ipAddr"
 
 type HostOperation struct {
@@ -65,7 +65,7 @@ type HostOperationStatus struct {
 
 	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
 
-	ClusterAgent string `json:"clusterAgent,omitempty"`
+	ClusterName string `json:"clusterName,omitempty"`
 
 	IpAddr string `json:"ipAddr,omitempty"`
 }

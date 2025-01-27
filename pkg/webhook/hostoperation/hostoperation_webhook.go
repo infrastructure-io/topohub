@@ -10,7 +10,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	bmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -23,7 +23,7 @@ func (h *HostOperationWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	h.Client = mgr.GetClient()
 	log.Logger.Info("Setting up HostOperation webhook")
 	return ctrl.NewWebhookManagedBy(mgr).
-		For(&bmcv1beta1.HostOperation{}).
+		For(&topohubv1beta1.HostOperation{}).
 		WithValidator(h).
 		WithDefaulter(h).
 		Complete()
@@ -32,7 +32,7 @@ func (h *HostOperationWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:webhook:path=/mutate-bmc-infrastructure-io-v1beta1-hostoperation,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=mhostoperation.kb.io,admissionReviewVersions=v1
 
 func (h *HostOperationWebhook) Default(ctx context.Context, obj runtime.Object) error {
-	hostOp, ok := obj.(*bmcv1beta1.HostOperation)
+	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", obj)
 		log.Logger.Error(err.Error())
@@ -48,7 +48,7 @@ func (h *HostOperationWebhook) Default(ctx context.Context, obj runtime.Object) 
 // +kubebuilder:webhook:path=/validate-bmc-infrastructure-io-v1beta1-hostoperation,mutating=false,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=vhostoperation.kb.io,admissionReviewVersions=v1
 
 func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hostOp, ok := obj.(*bmcv1beta1.HostOperation)
+	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", obj)
 		log.Logger.Error(err.Error())
@@ -58,7 +58,7 @@ func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.O
 	log.Logger.Debugf("Processing ValidateCreate webhook for HostOperation %s", hostOp.Name)
 
 	// 验证 hostStatusName 对应的 HostStatus 是否存在且健康
-	var hostStatus bmcv1beta1.HostStatus
+	var hostStatus topohubv1beta1.HostStatus
 	if err := h.Client.Get(ctx, client.ObjectKey{Name: hostOp.Spec.HostStatusName}, &hostStatus); err != nil {
 		err = fmt.Errorf("hostStatus %s not found: %v", hostOp.Spec.HostStatusName, err)
 		log.Logger.Errorf(err.Error())
@@ -76,7 +76,7 @@ func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.O
 }
 
 func (h *HostOperationWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	hostOp, ok := oldObj.(*bmcv1beta1.HostOperation)
+	hostOp, ok := oldObj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", oldObj)
 		log.Logger.Error(err.Error())
@@ -87,7 +87,7 @@ func (h *HostOperationWebhook) ValidateUpdate(ctx context.Context, oldObj, newOb
 }
 
 func (h *HostOperationWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hostOp, ok := obj.(*bmcv1beta1.HostOperation)
+	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", obj)
 		log.Logger.Error(err.Error())

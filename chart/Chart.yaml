@@ -1,6 +1,6 @@
 apiVersion: v2
 name: topohub
-description: A Helm chart for Topohub Operator
+description: A Helm chart for Topohub
 
 # This is the chart version, which will be taken from VERSION file
 version: 0.1.0

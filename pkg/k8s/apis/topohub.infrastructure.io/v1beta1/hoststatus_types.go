@@ -8,6 +8,8 @@ const (
 	LabelIPAddr       = GroupName + "/ipAddr"
 	LabelClientMode   = GroupName + "/mode"
 	LabelClientActive = GroupName + "/dhcp-ip-active"
+	LabelClusterName  = GroupName + "/cluster-name"
+	LabelSubnet       = GroupName + "/subnet"
 )
 
 // +genclient
@@ -30,7 +32,7 @@ type HostStatus struct {
 
 type HostStatusStatus struct {
 	Healthy        bool              `json:"healthy"`
-	ClusterAgent   string            `json:"clusterAgent"`
+	ClusterName    string            `json:"clusterName"`
 	LastUpdateTime string            `json:"lastUpdateTime"`
 	Basic          BasicInfo         `json:"basic"`
 	Info           map[string]string `json:"info"`

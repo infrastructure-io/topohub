@@ -10,7 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	bmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	"github.com/infrastructure-io/topohub/pkg/config"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -20,12 +21,14 @@ import (
 // HostEndpointWebhook validates HostEndpoint resources
 type HostEndpointWebhook struct {
 	Client client.Client
+	config *config.AgentConfig
 }
 
-func (w *HostEndpointWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (w *HostEndpointWebhook) SetupWebhookWithManager(mgr ctrl.Manager, config config.AgentConfig) error {
 	w.Client = mgr.GetClient()
+	w.config = &config
 	return ctrl.NewWebhookManagedBy(mgr).
-		For(&bmcv1beta1.HostEndpoint{}).
+		For(&topohubv1beta1.HostEndpoint{}).
 		WithValidator(w).
 		WithDefaulter(w).
 		Complete()
@@ -33,28 +36,12 @@ func (w *HostEndpointWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // Default implements webhook.Defaulter
 func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) error {
-	hostEndpoint, ok := obj.(*bmcv1beta1.HostEndpoint)
+	hostEndpoint, ok := obj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
 		return fmt.Errorf("object is not a HostEndpoint")
 	}
 
 	log.Logger.Infof("Setting initial values for nil fields in HostEndpoint %s", hostEndpoint.Name)
-
-	var clusterAgent *bmcv1beta1.ClusterAgent
-
-	// Set default values
-	if hostEndpoint.Spec.ClusterAgent == "" {
-		// Try to set it to the only clusterAgent if there's only one
-		var clusterAgentList bmcv1beta1.ClusterAgentList
-		if err := w.Client.List(ctx, &clusterAgentList); err != nil {
-			return fmt.Errorf("failed to list clusterAgents: %v", err)
-		}
-		if len(clusterAgentList.Items) == 1 {
-			clusterAgent = &clusterAgentList.Items[0]
-			hostEndpoint.Spec.ClusterAgent = clusterAgentList.Items[0].Name
-			log.Logger.Infof("Setting default clusterAgent to %s for HostEndpoint %s", hostEndpoint.Spec.ClusterAgent, hostEndpoint.Name)
-		}
-	}
 
 	if hostEndpoint.Spec.HTTPS == nil {
 		defaultHTTPS := true
@@ -69,20 +56,8 @@ func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) e
 	}
 
 	if (hostEndpoint.Spec.SecretName == nil || *hostEndpoint.Spec.SecretName == "") && (hostEndpoint.Spec.SecretNamespace == nil || *hostEndpoint.Spec.SecretNamespace == "") {
-		var name, ns string
-		if clusterAgent != nil {
-			name = clusterAgent.Spec.Endpoint.SecretName
-			ns = clusterAgent.Spec.Endpoint.SecretNamespace
-		} else {
-			err := w.Client.Get(ctx, client.ObjectKey{Name: hostEndpoint.Spec.ClusterAgent}, clusterAgent)
-			if err != nil {
-				return fmt.Errorf("failed to get clusterAgent: %v", err)
-			}
-			name = clusterAgent.Spec.Endpoint.SecretName
-			ns = clusterAgent.Spec.Endpoint.SecretNamespace
-		}
-		hostEndpoint.Spec.SecretName = &name
-		hostEndpoint.Spec.SecretNamespace = &ns
+		hostEndpoint.Spec.SecretName = &w.config.RedfishSecretName
+		hostEndpoint.Spec.SecretNamespace = &w.config.RedfishSecretNamespace
 	}
 
 	return nil
@@ -90,7 +65,7 @@ func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) e
 
 // ValidateCreate implements webhook.Validator
 func (w *HostEndpointWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hostEndpoint, ok := obj.(*bmcv1beta1.HostEndpoint)
+	hostEndpoint, ok := obj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
 		return nil, fmt.Errorf("object is not a HostEndpoint")
 	}
@@ -107,7 +82,7 @@ func (w *HostEndpointWebhook) ValidateCreate(ctx context.Context, obj runtime.Ob
 
 // ValidateUpdate implements webhook.Validator
 func (w *HostEndpointWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	hostEndpoint, ok := newObj.(*bmcv1beta1.HostEndpoint)
+	hostEndpoint, ok := newObj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
 		return nil, fmt.Errorf("object is not a HostEndpoint")
 	}
@@ -121,16 +96,7 @@ func (w *HostEndpointWebhook) ValidateDelete(ctx context.Context, obj runtime.Ob
 	return nil, nil
 }
 
-func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndpoint *bmcv1beta1.HostEndpoint) error {
-	// Validate clusterAgent exists and is not empty
-	if hostEndpoint.Spec.ClusterAgent == "" {
-		return fmt.Errorf("clusterAgent cannot be empty")
-	}
-
-	clusterAgent := &bmcv1beta1.ClusterAgent{}
-	if err := w.Client.Get(ctx, client.ObjectKey{Name: hostEndpoint.Spec.ClusterAgent}, clusterAgent); err != nil {
-		return fmt.Errorf("clusterAgent %s not found", hostEndpoint.Spec.ClusterAgent)
-	}
+func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint) error {
 
 	// Validate IP address is in subnet
 	ip := net.ParseIP(hostEndpoint.Spec.IPAddr)
@@ -138,21 +104,8 @@ func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndp
 		return fmt.Errorf("invalid IP address, it should be like 192.168.0.10 ")
 	}
 
-	// if clusterAgent.Spec.Feature == nil || clusterAgent.Spec.Feature.DhcpServerConfig == nil {
-	// 	return fmt.Errorf("spec.DhcpServerConfig not found in clusterAgent %s", clusterAgent.Name)
-	// }
-
-	// _, subnet, err := net.ParseCIDR(clusterAgent.Spec.Feature.DhcpServerConfig.Subnet)
-	// if err != nil {
-	// 	return fmt.Errorf("invalid DhcpServerConfig.Subnet %q in clusterAgent %s: %v", clusterAgent.Spec.Feature.DhcpServerConfig.Subnet, clusterAgent.Name, err)
-	// }
-
-	// if !subnet.Contains(ip) {
-	// 	return fmt.Errorf("IP address %s is not in clusterAgent DhcpServerConfig.Subnet %s", hostEndpoint.Spec.IPAddr, clusterAgent.Spec.Feature.DhcpServerConfig.Subnet)
-	// }
-
 	// Check for IP address uniqueness
-	var existingHostEndpoints bmcv1beta1.HostEndpointList
+	var existingHostEndpoints topohubv1beta1.HostEndpointList
 	if err := w.Client.List(ctx, &existingHostEndpoints); err != nil {
 		return fmt.Errorf("failed to list hostEndpoints: %v", err)
 	}
@@ -164,7 +117,7 @@ func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndp
 	}
 
 	// Check IP address conflict with existing HostStatus
-	hostStatusList := &bmcv1beta1.HostStatusList{}
+	hostStatusList := &topohubv1beta1.HostStatusList{}
 	if err := w.Client.List(ctx, hostStatusList); err != nil {
 		return fmt.Errorf("failed to list HostStatus: %v", err)
 	}

@@ -21,12 +21,15 @@ const (
 
 // Resource Kinds
 const (
+	// KindDhcpSubnet is the kind name for Subnet resource
+	KindSubnet = "Subnet"
+
 	// KindHostEndpoint is the kind name for HostEndpoint resource
 	KindHostEndpoint = "HostEndpoint"
+
 	// KindHostStatus is the kind name for HostStatus resource
 	KindHostStatus = "HostStatus"
-	// KindClusterAgent is the kind name for ClusterAgent resource
-	KindClusterAgent = "ClusterAgent"
+
 	// KindHostOperation is the kind name for HostOperation resource
 	KindHostOperation = "HostOperation"
 )
@@ -54,7 +57,7 @@ var (
 )
 
 func init() {
-	SchemeBuilder.Register(&ClusterAgent{}, &ClusterAgentList{})
+	SchemeBuilder.Register(&Subnet{}, &SubnetList{})
 	SchemeBuilder.Register(&HostEndpoint{}, &HostEndpointList{})
 	SchemeBuilder.Register(&HostStatus{}, &HostStatusList{})
 	SchemeBuilder.Register(&HostOperation{}, &HostOperationList{})

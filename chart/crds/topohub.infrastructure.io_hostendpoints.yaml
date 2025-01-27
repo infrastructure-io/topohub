@@ -15,8 +15,8 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.clusterAgent
-      name: CLUSTERAGENT
+    - jsonPath: .spec.clusterName
+      name: CLUSTERNAME
       type: string
     - jsonPath: .spec.ipAddr
       name: HOSTIP
@@ -46,8 +46,8 @@ spec:
           spec:
             description: HostEndpointSpec defines the desired state of HostEndpoint
             properties:
-              clusterAgent:
-                description: ClusterAgent specifies which clusterAgent this hostEndpoint
+              clusterName:
+                description: ClusterName specifies which clusterName this hostEndpoint
                   belongs to
                 type: string
               https:

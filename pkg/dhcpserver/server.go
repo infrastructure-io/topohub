@@ -11,17 +11,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/infrastructure-io/topohub/pkg/dhcpserver/types"
-	bmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 )
 
 // DhcpServer defines the interface for DHCP server operations
 type DhcpServer interface {
 	Start() error
 	Stop() error
-	GetClientInfo() ([]types.ClientInfo, error)
+	GetClientInfo() ([]dhcpserver.ClientInfo, error)
 }
 
 // dhcpServer implements the DhcpServer interface.
@@ -29,27 +29,27 @@ type DhcpServer interface {
 // methods to monitor its operation and retrieve statistics.
 type dhcpServer struct {
 	// config holds the DHCP server configuration
-	config *bmcv1beta1.DhcpServerConfig
+	config *topohubv1beta1.DhcpServerConfig
 	// cmd represents the running DHCP server process
 	cmd *exec.Cmd
 	// mutex protects access to shared resources
 	mutex lock.Mutex
 
 	// stats holds current IP usage statistics
-	stats types.IPUsageStats
+	stats dhcpserver.IPUsageStats
 	// totalIPs is the total number of IP addresses available for allocation
 	totalIPs int
 	// dhcpConfigPath is the path to the DHCP server configuration file
 	dhcpConfigPath string
 	// previousClients stores the last known state of DHCP clients
-	previousClients []types.ClientInfo
+	previousClients []dhcpserver.ClientInfo
 	// clusterAgentName is used to generate unique lease file path
 	clusterAgentName string
 	// leaseFilePath is the rendered lease file path
 	leaseFilePath string
 	// Event channels for hoststatus
-	addChan    chan<- types.ClientInfo
-	deleteChan chan<- types.ClientInfo
+	addChan    chan<- dhcpserver.ClientInfo
+	deleteChan chan<- dhcpserver.ClientInfo
 
 	// record the last time of the bound ip in the dhcp server
 	lastBoundIPList map[string]string
@@ -71,7 +71,7 @@ var _ DhcpServer = (*dhcpServer)(nil)
 //
 // Returns:
 //   - DhcpServer interface implementation
-func NewDhcpServer(config *bmcv1beta1.DhcpServerConfig, clusterAgentName string, addChan chan<- types.ClientInfo, deleteChan chan<- types.ClientInfo) (*dhcpServer, error) {
+func NewDhcpServer(config *topohubv1beta1.DhcpServerConfig, clusterAgentName string, addChan chan<- dhcpserver.ClientInfo, deleteChan chan<- dhcpserver.ClientInfo) (*dhcpServer, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
@@ -346,7 +346,7 @@ func (s *dhcpServer) Stop() error {
 }
 
 // GetClientInfo returns information about DHCP clients
-func (s *dhcpServer) GetClientInfo() ([]types.ClientInfo, error) {
+func (s *dhcpServer) GetClientInfo() ([]dhcpserver.ClientInfo, error) {
 	log.Logger.Debugf("Retrieving DHCP client information from lease file: %s", s.leaseFilePath)
 	clients, err := GetDhcpClients(s.leaseFilePath)
 	if err != nil {

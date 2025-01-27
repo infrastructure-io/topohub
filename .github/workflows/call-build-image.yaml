@@ -38,10 +38,7 @@ jobs:
         # ====modify====
         include:
           - name: agent
-            dockerfile: ./image/agent/Dockerfile
-            context: ./
-          - name: controller
-            dockerfile: ./image/controller/Dockerfile
+            dockerfile: ./image/topohub/Dockerfile
             context: ./
 
     steps:

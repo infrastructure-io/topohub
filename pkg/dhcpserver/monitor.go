@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	hoststatusdata "github.com/infrastructure-io/topohub/pkg/agent/hoststatus/data"
+	hoststatusdata "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 
-	"github.com/infrastructure-io/topohub/pkg/dhcpserver/types"
+	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 )
 
 // monitor periodically checks server health and updates statistics.
@@ -80,8 +80,8 @@ func (s *dhcpServer) updateStats() error {
 	}
 
 	// Compare with previous clients to detect changes
-	newClients := make(map[string]types.ClientInfo)
-	oldClients := make(map[string]types.ClientInfo)
+	newClients := make(map[string]dhcpserver.ClientInfo)
+	oldClients := make(map[string]dhcpserver.ClientInfo)
 
 	for _, client := range clients {
 		newClients[client.IP] = client

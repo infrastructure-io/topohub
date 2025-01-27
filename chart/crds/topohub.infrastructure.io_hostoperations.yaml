@@ -21,8 +21,8 @@ spec:
     - jsonPath: .status.status
       name: STATUS
       type: string
-    - jsonPath: .status.clusterAgent
-      name: CLUSTERAGENT
+    - jsonPath: .status.clusterName
+      name: CLUSTERNAME
       type: string
     - jsonPath: .status.ipAddr
       name: HOSTIP
@@ -68,7 +68,7 @@ spec:
             type: object
           status:
             properties:
-              clusterAgent:
+              clusterName:
                 type: string
               ipAddr:
                 type: string

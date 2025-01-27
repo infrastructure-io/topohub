@@ -8,7 +8,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:printcolumn:name="CLUSTERAGENT",type="string",JSONPath=".spec.clusterAgent"
+// +kubebuilder:printcolumn:name="CLUSTERNAME",type="string",JSONPath=".spec.clusterName"
 // +kubebuilder:printcolumn:name="HOSTIP",type="string",JSONPath=".spec.ipAddr"
 
 // HostEndpoint is the Schema for the hostendpoints API
@@ -21,9 +21,9 @@ type HostEndpoint struct {
 
 // HostEndpointSpec defines the desired state of HostEndpoint
 type HostEndpointSpec struct {
-	// ClusterAgent specifies which clusterAgent this hostEndpoint belongs to
+	// ClusterName specifies which clusterName this hostEndpoint belongs to
 	// +optional
-	ClusterAgent string `json:"clusterAgent,omitempty"`
+	ClusterName *string `json:"clusterName,omitempty"`
 
 	// IPAddr is the IP address of the host endpoint
 	// +kubebuilder:validation:Required

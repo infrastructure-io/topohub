@@ -3,7 +3,7 @@ package redfish
 import (
 	"fmt"
 
-	bmcv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/stmcginnis/gofish/redfish"
 )
 
@@ -36,21 +36,21 @@ func (c *redfishClient) Power(bootCmd string) error {
 		c.logger.Debugf("system %s, supported reset types: %+v", system.Name, system.SupportedResetTypes)
 
 		switch bootCmd {
-		case bmcv1beta1.BootCmdOn:
+		case topohubv1beta1.BootCmdOn:
 			fallthrough
-		case bmcv1beta1.BootCmdForceOn:
+		case topohubv1beta1.BootCmdForceOn:
 			fallthrough
-		case bmcv1beta1.BootCmdForceOff:
+		case topohubv1beta1.BootCmdForceOff:
 			fallthrough
-		case bmcv1beta1.BootCmdGracefulShutdown:
+		case topohubv1beta1.BootCmdGracefulShutdown:
 			fallthrough
-		case bmcv1beta1.BootCmdForceRestart:
+		case topohubv1beta1.BootCmdForceRestart:
 			fallthrough
-		case bmcv1beta1.BootCmdGracefulRestart:
+		case topohubv1beta1.BootCmdGracefulRestart:
 			c.logger.Infof("operation %s on %s for System: %+v \n", bootCmd, c.config.Endpoint, system.Name)
 			err = system.Reset(redfish.ResetType(bootCmd))
 
-		case bmcv1beta1.BootCmdResetPxeOnce:
+		case topohubv1beta1.BootCmdResetPxeOnce:
 			// https://github.com/stmcginnis/gofish/blob/main/examples/reboot.md
 			// Creates a boot override to pxe once
 			bootOverride := redfish.Boot{

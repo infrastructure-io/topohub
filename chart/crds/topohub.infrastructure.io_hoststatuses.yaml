@@ -82,7 +82,7 @@ spec:
                 - secretNamespace
                 - type
                 type: object
-              clusterAgent:
+              clusterName:
                 type: string
               healthy:
                 type: boolean
@@ -126,7 +126,7 @@ spec:
                 type: object
             required:
             - basic
-            - clusterAgent
+            - clusterName
             - healthy
             - info
             - lastUpdateTime

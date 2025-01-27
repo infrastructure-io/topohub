@@ -5,7 +5,7 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 	"reflect"
 
-	"github.com/infrastructure-io/topohub/pkg/agent/hoststatus/data"
+	hoststatusData "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 	"github.com/stmcginnis/gofish"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ var _ RefishClient = (*redfishClient)(nil)
 var CacheClient = make(map[string]*redfishClient)
 
 // NewClient 创建一个新的 Redfish 客户端
-func NewClient(hostCon data.HostConnectCon, log *zap.SugaredLogger) (RefishClient, error) {
+func NewClient(hostCon hoststatusData.HostConnectCon, log *zap.SugaredLogger) (RefishClient, error) {
 
 	url := buildEndpoint(hostCon)
 	config := gofish.ClientConfig{
@@ -71,7 +71,7 @@ func NewClient(hostCon data.HostConnectCon, log *zap.SugaredLogger) (RefishClien
 }
 
 // buildEndpoint 根据 HostConnectCon 构建 Redfish 服务的端点 URL
-func buildEndpoint(hostCon data.HostConnectCon) string {
+func buildEndpoint(hostCon hoststatusData.HostConnectCon) string {
 	protocol := "http"
 	if hostCon.Info.Https {
 		protocol = "https"

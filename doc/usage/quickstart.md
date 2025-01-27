@@ -52,7 +52,7 @@ clusterAgent:
 EOF
 
 # 安装 BMC 组件
-helm install bmc bmc/bmc-operator \
+helm install bmc bmc/topohub \
     --namespace bmc  --create-namespace  --wait \
     -f my-values.yaml
 
@@ -60,7 +60,7 @@ helm install bmc bmc/bmc-operator \
 kubectl get pod -n bmc
 NAME                                      READY   STATUS    RESTARTS   AGE
 agent-bmc-clusteragent-6b9695698b-hphkj   1/1     Running   0          39m
-bmc-bmc-operator-7b4986f89c-bd9j9         1/1     Running   0          40m
+bmc-topohub-7b4986f89c-bd9j9         1/1     Running   0          40m
 ```
 
 ### 多集群纳管，以 macvlan 模式部署
@@ -113,7 +113,7 @@ clusterAgent:
 EOF
 
 # 安装 BMC 组件
-helm install bmc bmc/bmc-operator \
+helm install bmc bmc/topohub \
     --namespace bmc  --create-namespace  --wait \
     -f my-values.yaml
 
@@ -121,7 +121,7 @@ helm install bmc bmc/bmc-operator \
 kubectl get pod -n bmc
 NAME                                      READY   STATUS    RESTARTS   AGE
 agent-bmc-clusteragent-6b9695698b-hphkj   1/1     Running   0          39m
-bmc-bmc-operator-7b4986f89c-bd9j9         1/1     Running   0          40m
+bmc-topohub-7b4986f89c-bd9j9         1/1     Running   0          40m
 ```
 
 ## 接入主机
@@ -140,7 +140,7 @@ bmc-clusteragent   true
 ~# kubectl get pod -n bmc
 NAME                                      READY   STATUS    RESTARTS   AGE
 agent-bmc-clusteragent-6b9695698b-hphkj   1/1     Running   0          39m
-bmc-bmc-operator-7b4986f89c-bd9j9         1/1     Running   0          40m
+bmc-topohub-7b4986f89c-bd9j9         1/1     Running   0          40m
 
 # 查看 agent 实例的详细配置
 ~# kubectl get clusteragent bmc-clusteragent -o yaml
