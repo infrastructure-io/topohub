@@ -156,7 +156,7 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 	// Now update the status using the latest version
 	hostStatus.Status = topohubv1beta1.HostStatusStatus{
 		Healthy:        false,
-		ClusterAgent:   hostEndpoint.Spec.ClusterAgent,
+		ClusterName:    *hostEndpoint.Spec.ClusterName,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
 		Basic: topohubv1beta1.BasicInfo{
 			Type:            topohubv1beta1.HostTypeEndpoint,

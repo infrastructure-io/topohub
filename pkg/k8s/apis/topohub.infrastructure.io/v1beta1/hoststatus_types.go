@@ -10,6 +10,9 @@ const (
 	LabelClientActive = GroupName + "/dhcp-ip-active"
 	LabelClusterName  = GroupName + "/cluster-name"
 	LabelSubnet       = GroupName + "/subnet"
+
+	HostTypeDHCP     = "dhcp"
+	HostTypeEndpoint = "hostendpoint"
 )
 
 // +genclient
@@ -55,6 +58,7 @@ type LogEntry struct {
 }
 
 type BasicInfo struct {
+	// +kubebuilder:validation:Enum=dhcp;hostendpoint
 	Type            string `json:"type"`
 	IpAddr          string `json:"ipAddr"`
 	SecretName      string `json:"secretName"`
