@@ -89,8 +89,8 @@ func main() {
 		},
 		HealthProbeBindAddress: ":" + *probePort,
 		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    webhookPortInt,
-			CertDir: agentConfig.WebhookCertDir,
+			Port: webhookPortInt,
+			//CertDir: agentConfig.WebhookCertDir,
 		}),
 		LeaderElection:          true,
 		LeaderElectionID:        "topohub-lock",
@@ -180,9 +180,22 @@ func main() {
 	// Start manager
 	go func() {
 		log.Logger.Info("Starting manager")
+		// If LeaderElection is used, the binary must be exited immediately after this returns,
+		// otherwise components that need leader election might continue to run after the leader
+		// lock was lost.
 		if err := mgr.Start(ctx); err != nil {
 			log.Logger.Errorf("Problem running manager: %v", err)
+
+			// Stop DHCP server to remove ip if it was started
+
 			os.Exit(1)
+		}
+	}()
+
+	go func() {
+		select {
+		case <-mgr.Elected():
+			log.Logger.Infof("Leader elected")
 		}
 	}()
 
@@ -198,10 +211,11 @@ func main() {
 		select {
 		case <-ticker.C:
 			log.Logger.Debug("Agent still running...")
+
 		case sig := <-sigChan:
 			log.Logger.Infof("Received signal %v, shutting down...", sig)
 
-			// Stop DHCP server if it was started
+			// Stop DHCP server to remove ip if it was started
 
 			// Stop hoststatus controller
 			hostStatusCtrl.Stop()

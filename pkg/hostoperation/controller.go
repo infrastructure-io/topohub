@@ -33,6 +33,7 @@ func NewHostOperationController(mgr ctrl.Manager, agentConfig *config.AgentConfi
 	}, nil
 }
 
+// 只有 leader 才会执行 Reconcile
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.Logger.Named("HostOperationController").With(

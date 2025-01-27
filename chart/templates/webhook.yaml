@@ -10,7 +10,7 @@ metadata:
   name: {{ include "topohub.fullname" . }}-webhook-server-cert
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-webhook
+    app: {{ include "topohub.fullname" . }}-webhook
 type: kubernetes.io/tls
 data:
   tls.crt: {{ $cert.Cert | b64enc }}
@@ -48,7 +48,7 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      name: {{ .Release.Name }}-webhook-service
+      name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /mutate-topohub-infrastructure-io-v1beta1-hostendpoint
       port: {{ .Values.webhook.webhookPort }}
@@ -66,7 +66,7 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      name: {{ .Release.Name }}-webhook-service
+      name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /mutate-topohub-infrastructure-io-v1beta1-hostoperation
       port: {{ .Values.webhook.webhookPort }}
@@ -81,9 +81,9 @@ webhooks:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ .Release.Name }}-mutating-webhook-configuration
+  name: {{ include "topohub.fullname" . }}-mutating-webhook-configuration
   labels:
-    app: {{ .Release.Name }}-webhook
+    app: {{ include "topohub.fullname" . }}-webhook
 webhooks:
 - name: subnets.topohub.infrastructure.io
   admissionReviewVersions: ["v1"]
@@ -92,7 +92,7 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      name: {{ .Release.Name }}-webhook-service
+      name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /mutate-topohub-infrastructure-io-v1beta1-subnet
       port: {{ .Values.webhook.webhookPort }}
@@ -110,7 +110,7 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      name: {{ .Release.Name }}-webhook-service
+      name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /mutate-topohub-infrastructure-io-v1beta1-hostendpoint
       port: {{ .Values.webhook.webhookPort }}
@@ -128,7 +128,7 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      name: {{ .Release.Name }}-webhook-service
+      name: {{ include "topohub.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /mutate-topohub-infrastructure-io-v1beta1-hostoperation
       port: {{ .Values.webhook.webhookPort }}

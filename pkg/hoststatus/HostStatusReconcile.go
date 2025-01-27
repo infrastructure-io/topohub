@@ -287,6 +287,7 @@ func (c *hostStatusController) processHostStatus(hostStatus *topohubv1beta1.Host
 	return nil
 }
 
+// 只有 leader 才会执行 Reconcile
 // Reconcile 实现 reconcile.Reconciler 接口
 // 负责在 hoststatus 创建后 redfish 信息的第一次更新（后续的更新由 UpdateHostStatusAtInterval 完成）
 func (c *hostStatusController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

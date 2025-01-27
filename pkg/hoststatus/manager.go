@@ -21,7 +21,7 @@ type HostStatusController interface {
 	// 把 dhcp 的 client 事件 channel 返给外部，以供外部来通知自己
 	GetDHCPEventChan() (chan<- dhcpserver.DhcpClientInfo, chan<- dhcpserver.DhcpClientInfo)
 	Stop()
-	SetupWithManager(mgr ctrl.Manager) error
+	SetupWithManager(ctrl.Manager) error
 	// 更新 bmc 主机的 认证信息
 	UpdateSecret(string, string, string, string)
 }
@@ -76,11 +76,16 @@ func (c *hostStatusController) GetDHCPEventChan() (chan<- dhcpserver.DhcpClientI
 // SetupWithManager 设置 controller-runtime manager
 func (c *hostStatusController) SetupWithManager(mgr ctrl.Manager) error {
 
-	// 启动 DHCP 事件处理
-	go c.processDHCPEvents()
-
-	// 启动 hoststatus spec.info 的	周期更新
-	go c.UpdateHostStatusAtInterval()
+	go func() {
+		select {
+		case <-mgr.Elected():
+			log.Logger.Info("Elected as leader, begin to start all controllers")
+			// 启动 DHCP 事件处理
+			go c.processDHCPEvents()
+			// 启动 hoststatus spec.info 的	周期更新
+			go c.UpdateHostStatusAtInterval()
+		}
+	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&topohubv1beta1.HostStatus{}).

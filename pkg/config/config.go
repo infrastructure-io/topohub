@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
 // AgentConfig represents the agent configuration
@@ -21,6 +22,9 @@ type AgentConfig struct {
 	// storage path
 	StoragePath string
 
+	// dnsmasq config template path
+	DhcpConfigTemplatePath string
+
 	// FeatureConfigPath is the path to the feature configuration file
 	FeatureConfigPath string
 	// Redfish configuration
@@ -29,6 +33,8 @@ type AgentConfig struct {
 	RedfishSecretName               string
 	RedfishSecretNamespace          string
 	RedfishHostStatusUpdateInterval int
+	// DHCP server configuration
+	DhcpServerInterface string
 }
 
 // LoadFeatureConfig loads feature configuration from the config file
@@ -76,6 +82,17 @@ func (c *AgentConfig) loadFeatureConfig() error {
 	}
 	c.RedfishHostStatusUpdateInterval = interval
 
+	// Read dhcpServerInterface
+	interfaceBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "dhcpServerInterface"))
+	if err != nil {
+		return fmt.Errorf("failed to read dhcpServerInterface: %v", err)
+	}
+	c.DhcpServerInterface = string(interfaceBytes)
+	// Validate interface exists on the system
+	if err := tools.ValidateInterfaceExists(c.DhcpServerInterface); err != nil {
+		return fmt.Errorf("failed to find dhcpServer Interface %s: %v", c.DhcpServerInterface, err)
+	}
+
 	return nil
 }
 
@@ -121,6 +138,11 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	agentConfig.FeatureConfigPath = os.Getenv("FEATURE_CONFIG_PATH")
 	if agentConfig.FeatureConfigPath == "" {
 		return nil, fmt.Errorf("FEATURE_CONFIG_PATH environment variable not set")
+	}
+
+	agentConfig.DhcpConfigTemplatePath = os.Getenv("DHCP_CONFIG_TEMPLATE_PATH")
+	if agentConfig.DhcpConfigTemplatePath == "" {
+		return nil, fmt.Errorf("DHCP_CONFIG_TEMPLATE_PATH environment variable not set")
 	}
 
 	// Load feature configuration

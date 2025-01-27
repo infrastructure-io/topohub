@@ -12,6 +12,7 @@ import (
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
 // +kubebuilder:webhook:path=/validate-bmc-infrastructure-io-v1beta1-subnet,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=subnets,verbs=create;update,versions=v1beta1,name=vsubnet.kb.io,admissionReviewVersions=v1
@@ -90,7 +91,7 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 	}
 
 	// Validate IP ranges are within subnet
-	if err := ValidateIPRange(subnet.Spec.IPv4Subnet.IPRange, ipNet); err != nil {
+	if err := tools.ValidateIPRange(subnet.Spec.IPv4Subnet.IPRange, ipNet); err != nil {
 		return fmt.Errorf("invalid IP range: %v", err)
 	}
 
@@ -100,7 +101,7 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 		if gateway == nil {
 			return fmt.Errorf("invalid gateway IP: %s", *subnet.Spec.IPv4Subnet.Gateway)
 		}
-		if !ValidateIPInSubnet(gateway, ipNet) {
+		if !tools.ValidateIPInSubnet(gateway, ipNet) {
 			return fmt.Errorf("gateway %s is not within subnet %s", *subnet.Spec.IPv4Subnet.Gateway, subnet.Spec.IPv4Subnet.Subnet)
 		}
 	}
@@ -124,12 +125,12 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 // validateInterface validates the InterfaceSpec
 func (w *SubnetWebhook) validateInterface(iface *topohubv1beta1.InterfaceSpec, subnet *net.IPNet) error {
 	// Validate interface name format
-	if !IsValidInterfaceName(iface.Interface) {
+	if !tools.IsValidInterfaceName(iface.Interface) {
 		return fmt.Errorf("invalid interface name format: %s", iface.Interface)
 	}
 
 	// Validate interface exists on the system
-	if err := ValidateInterfaceExists(iface.Interface); err != nil {
+	if err := tools.ValidateInterfaceExists(iface.Interface); err != nil {
 		return err
 	}
 
@@ -141,7 +142,7 @@ func (w *SubnetWebhook) validateInterface(iface *topohubv1beta1.InterfaceSpec, s
 	}
 
 	// Validate interface IPv4 address is in the same subnet
-	if err := ValidateIPWithSubnetMatch(iface.IPv4, subnet); err != nil {
+	if err := tools.ValidateIPWithSubnetMatch(iface.IPv4, subnet); err != nil {
 		return fmt.Errorf("interface IPv4 validation failed: %v", err)
 	}
 

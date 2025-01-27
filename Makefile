@@ -110,8 +110,8 @@ e2e:
 	@echo "Setting up E2E test environment..."
 	$(MAKE) -C test clean
 	$(MAKE) -C test init
-	$(MAKE) -C test installDeps
-	$(MAKE) -C test deploy
+	$(MAKE) -C test deployTopohub
+	$(MAKE) -C test installSpiderpool
 	$(MAKE) -C test installDepsRedfish
 	@echo "E2E environment setup completed"
 
@@ -169,7 +169,7 @@ usage:
 	@echo "Environment variables:"
 	@echo "  VERSION        - Version tag for images (default: from git commit hash)"
 	@echo "  REGISTRY       - Container image registry (default: ghcr.io/infrastructure-io)"
-	@echo "  IMAGE_NAMESPACE - Container image namespace for tools (default: bmc)"
+	@echo "  IMAGE_NAMESPACE - Container image namespace for tools (default: topohub)"
 	@echo "  TOOLS_IMAGE_NAME - Name of the tools image (default: tools)"
 	@echo "  TOOLS_IMAGE_TAG - Tag of the tools image (default: latest)"
 	@echo "  GOOS          - Target OS for build (default: linux)"

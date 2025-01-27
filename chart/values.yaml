@@ -24,7 +24,7 @@ resources:
 securityContext: {}
 
 defaultConfig:
-  redfish:  
+  redfish:
     # Port for the endpoint (default: 443)
     port: 443
     # Enable HTTPS (default: true)
@@ -34,6 +34,10 @@ defaultConfig:
     password: "secret"
     # 状态更新间隔，它决定了多久向主机发送一次redfish请求，来更新 hostStatus 对象中的信息，默认 60 秒
     hostStatusUpdateInterval: 60
+
+  dhcpServer:
+    # 宿主机网卡名，最好是 trunck 模式接入网络，从而接入到各种子网中
+    interface: "eth0"  
 
 # Storage configuration for DHCP lease files、DHCP configuration files、sftp storage、http storage（ISO）
 storage:
@@ -98,7 +102,15 @@ nodeSelector: {}
 
 tolerations: []
 
-affinity: {}
+nodeAffinity: {}
+  # requiredDuringSchedulingIgnoredDuringExecution:
+  #   nodeSelectorTerms:
+  #   - matchExpressions:
+  #     - key: kubernetes.io/os
+  #       operator: In
+  #       values:
+  #       - linux
+
 
 ## @skip spiderpoolAgent.tolerations
 tolerations:

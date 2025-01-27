@@ -34,4 +34,5 @@ helm install dhcp-redfish ${CURRENT_DIR_PATH}/../redfishchart \
   --create-namespace \
   --set replicaCount=2  \
   --set networkInterface=net1  \
-  --set underlayMultusCNI="${UNDERLAY_CNI}"
+  --set underlayMultusCNI="${UNDERLAY_CNI}" \
+  --set nodeName="${NODE_NAME}"

@@ -37,3 +37,4 @@ helm install static-redfish ${CURRENT_DIR_PATH}/../redfishchart \
   --set underlayMultusCNI="${UNDERLAY_CNI}" \
   --set staticIp="${STATIC_IP%/*}" \
   --set staticMask="${STATIC_IP#*/}" \
+  --set nodeName="${NODE_NAME}"

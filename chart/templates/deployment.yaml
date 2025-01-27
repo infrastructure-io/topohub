@@ -56,7 +56,9 @@ spec:
         - name: WEBHOOK_CERT_DIR
           value: /tmp/k8s-webhook-server/serving-certs  
         - name: FEATURE_CONFIG_PATH
-          value: /etc/feature
+          value: /var/lib/feature
+        - name: DHCP_CONFIG_TEMPLATE_PATH
+          value: /var/lib/dhcp
         ports:
         - name: webhook
           containerPort: {{ .Values.webhook.webhookPort }}
@@ -74,7 +76,9 @@ spec:
         - name: storage-data
           mountPath: /var/lib/topohub
         - name: feature-config
-          mountPath: /etc/feature  
+          mountPath: /var/lib/feature  
+        - name: dhcp-config
+          mountPath: /var/lib/dhcp
         livenessProbe:
           httpGet:
             path: /healthz
@@ -92,10 +96,13 @@ spec:
       volumes:
       - name: webhook-certs
         secret:
-          secretName: {{ .Release.Name }}-webhook-server-cert
+          secretName: {{ include "topohub.fullname" . }}-webhook-server-cert
+      - name: dhcp-config
+        configMap:
+          name: {{ include "topohub.fullname" . }}-dhcp
       - name: feature-config
         configMap:
-          name: {{ .Release.Name }}-feature-config
+          name: {{ include "topohub.fullname" . }}-feature
       - name: storage-data
       {{- if eq .Values.storage.type "pvc" }}
         persistentVolumeClaim:

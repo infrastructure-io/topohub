@@ -7,7 +7,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: ${NAME}-secret
-  namespace: bmc
+  namespace: topohub
 type: Opaque
 data:
   username: $(echo -n "${USERNAME}" | base64)
@@ -21,10 +21,10 @@ spec:
   # The IP address of the host endpoint (required)
   ipAddr: "${IP_ADDR}"
   # The cluster agent this host endpoint belongs to (optional)
-  #clusterAgent: "bmc-clusteragent"
+  #clusterAgent: "topohub-clusteragent"
   # Credentials for accessing the host endpoint (optional)
   secretName: "${NAME}-secret"
-  secretNamespace: "bmc"
+  secretNamespace: "topohub"
   # Communication settings (optional)
   https: true  # Defaults to true if not specified
   port: 443     
@@ -41,7 +41,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: ${NAME}-secret
-  namespace: bmc
+  namespace: topohub
 type: Opaque
 data:
   username: $(echo -n "${USERNAME}" | base64)
@@ -55,10 +55,10 @@ spec:
   # The IP address of the host endpoint (required)
   ipAddr: "${IP_ADDR}"
   # The cluster agent this host endpoint belongs to (optional)
-  #clusterAgent: "bmc-clusteragent"
+  #clusterAgent: "topohub-clusteragent"
   # Credentials for accessing the host endpoint (optional)
   secretName: "${NAME}-secret"
-  secretNamespace: "bmc"
+  secretNamespace: "topohub"
   # Communication settings (optional)
   https: true  # Defaults to true if not specified
   port: 443     

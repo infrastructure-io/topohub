@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-helm repo add spiderpool https://infrastructure-io.github.io/spiderpool
+helm repo add spiderpool https://spidernet-io.github.io/spiderpool
 helm repo update spiderpool
 
 VERSION=v0.9.7

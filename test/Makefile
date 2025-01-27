@@ -1,10 +1,10 @@
 # Include common definitions
 include ../Makefile.def
 
-.PHONY: init installDeps deploy installDepsRedfish clean
+.PHONY: init installSpiderpool deployTopohub installDepsRedfish clean
 
 # Kind cluster configuration
-KIND_CLUSTER_NAME ?= bmc-e2e
+KIND_CLUSTER_NAME ?= topohub
 KIND_CONFIG = kind-config.yaml
 
 # Initialize kind cluster with 2 nodes
@@ -16,7 +16,7 @@ init:
 	kubectl taint node $(KIND_CLUSTER_NAME)-control-plane local-path=nopod:NoSchedule
 
 
-installDeps:
+installSpiderpool:
 	@echo "Installing spiderpool..."
 	chmod +x scripts/install-spiderpool.sh
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) ./scripts/install-spiderpool.sh
@@ -25,50 +25,22 @@ installDepsRedfish:
 	@echo "Installing redfish..."
 	chmod +x scripts/install-redfish-dhcp.sh
 	chmod +x scripts/install-redfish-static.sh
-	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth0-macvlan" \
+	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			./scripts/install-redfish-dhcp.sh
-	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME)  UNDERLAY_CNI="spiderpool/eth0-macvlan" \
+	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME)  UNDERLAY_CNI="spiderpool/eth0-macvlan" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			STATIC_IP="192.168.0.50/24"  \
 			./scripts/install-redfish-static.sh
 	./scripts/hostendpoint.sh
 
 # Deploy application to kind cluster
-deploy:
-	@echo "Loading images into kind cluster..."
-	docker inspect $(CONTROLLER_IMAGE_REF) &>/dev/null || \
-		docker pull $(CONTROLLER_IMAGE_REF)
-	docker inspect $(AGENT_IMAGE_REF) &>/dev/null || \
-		docker pull $(AGENT_IMAGE_REF)
-	kind load docker-image $(CONTROLLER_IMAGE_REF) --name $(KIND_CLUSTER_NAME) && \
-	kind load docker-image $(AGENT_IMAGE_REF) --name $(KIND_CLUSTER_NAME)
-	@echo "Images loaded successfully"
-	@echo "Deploying application using Helm chart..."
-	- helm uninstall bmc -n bmc --wait &>/dev/null || true
-	@echo "for macvlan deployment"
-	helm install bmc ../chart \
-		--namespace bmc \
-		--create-namespace \
-		--wait \
-		--set logLevel="debug" \
-		--set image.tag=$(VERSION) \
-		--set clusterAgent.agentYaml.image.tag=$(VERSION) \
-		--set clusterAgent.endpoint.https=false \
-		--set clusterAgent.agentYaml.hostNetwork=false \
-		--set clusterAgent.agentYaml.underlayInterface="spiderpool/eth0-macvlan" \
-		--set clusterAgent.feature.logLevel="debug" \
-		--set clusterAgent.feature.dhcpServerConfig.dhcpServerInterface="net1" \
-		--set clusterAgent.feature.dhcpServerConfig.subnet="192.168.0.0/24" \
-		--set clusterAgent.feature.dhcpServerConfig.ipRange="192.168.0.100-192.168.0.200" \
-		--set clusterAgent.feature.dhcpServerConfig.gateway="192.168.0.1" \
-		--set clusterAgent.feature.dhcpServerConfig.selfIp="192.168.0.2/24" \
-		--set clusterAgent.endpoint.username="" \
-		--set clusterAgent.endpoint.password="" \
-		--set clusterAgent.endpoint.port=8000 \
-		--set clusterAgent.storage.type="pvc"
-
+deployTopohub:
+	@echo "deploy topohub"
+	chmod +x scripts/install-topohub.sh
+	CLUSTER_NAME=$(KIND_CLUSTER_NAME) IMAGE_VERSION=$(VERSION) IMAGE_NAME=$(TOPOHUB_IMAGE_REF) ./scripts/install-topohub.sh
+	
 	# @echo "for host network deployment" 	
-	# helm install bmc ../chart \
-	# 	--namespace bmc \
+	# helm install topohub ../chart \
+	# 	--namespace topohub \
 	# 	--create-namespace \
 	# 	--wait \
 	# 	--set image.repository=$(CONTROLLER_IMAGE) \
