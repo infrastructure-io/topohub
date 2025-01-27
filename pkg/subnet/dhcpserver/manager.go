@@ -18,7 +18,7 @@ type DhcpServer interface {
 	// GetClientInfo retrieves information about all current DHCP clients.
 	// Returns a list of ClientInfo containing IP and MAC addresses for each client,
 	// or an error if the information cannot be retrieved.
-	GetClientInfo() ([]ClientInfo, error)
+	GetClientInfo() ([]DhcpClientInfo, error)
 
 	// GetIPUsageStats retrieves current IP allocation statistics.
 	// Returns IPUsageStats containing total and available IP counts,

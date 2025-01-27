@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
@@ -75,6 +77,11 @@ func main() {
 	log.Logger.Debug("configuration details: %+v", agentConfig)
 
 	// Create manager
+	webhookPortInt, err := strconv.Atoi(*webhookPort)
+	if err != nil {
+		log.Logger.Errorf("Failed to convert webhook port to int: %v", err)
+		os.Exit(1)
+	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -82,11 +89,12 @@ func main() {
 		},
 		HealthProbeBindAddress: ":" + *probePort,
 		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: ":" + *webhookPort,
+			Port:    webhookPortInt,
+			CertDir: agentConfig.WebhookCertDir,
 		}),
 		LeaderElection:          true,
 		LeaderElectionID:        "topohub-lock",
-		LeaderElectionNamespace: agentConfig.Namespace,
+		LeaderElectionNamespace: agentConfig.PodNamespace,
 	})
 	if err != nil {
 		log.Logger.Errorf("Unable to start manager: %v", err)
@@ -194,12 +202,6 @@ func main() {
 			log.Logger.Infof("Received signal %v, shutting down...", sig)
 
 			// Stop DHCP server if it was started
-			if dhcpSrv != nil {
-				log.Logger.Info("Stopping DHCP server...")
-				if err := dhcpSrv.Stop(); err != nil {
-					log.Logger.Errorf("Error stopping DHCP server: %v", err)
-				}
-			}
 
 			// Stop hoststatus controller
 			hostStatusCtrl.Stop()

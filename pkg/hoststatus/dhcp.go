@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +33,7 @@ func (c *hostStatusController) processDHCPEvents() {
 				if shouldRetry(err) {
 					log.Logger.Debugf("Retrying DHCP add event for IP %s after %v due to: %v",
 						event.IP, retryDelay, err)
-					go func(e dhcpserver.ClientInfo) {
+					go func(e dhcpserver.DhcpClientInfo) {
 						time.Sleep(retryDelay)
 						c.addChan <- e
 					}(event)
@@ -44,7 +44,7 @@ func (c *hostStatusController) processDHCPEvents() {
 				if shouldRetry(err) {
 					log.Logger.Debugf("Retrying DHCP delete event for IP %s after %v due to: %v",
 						event.IP, retryDelay, err)
-					go func(e dhcpserver.ClientInfo) {
+					go func(e dhcpserver.DhcpClientInfo) {
 						time.Sleep(retryDelay)
 						c.deleteChan <- e
 					}(event)
@@ -55,11 +55,11 @@ func (c *hostStatusController) processDHCPEvents() {
 }
 
 // create the hoststatus for the dhcp client
-func (c *hostStatusController) handleDHCPAdd(client dhcpserver.ClientInfo) error {
+func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) error {
 
 	name := formatHostStatusName(client.IP)
 	log.Logger.Debugf("Processing DHCP add event - IP: %s, MAC: %s, Active: %v, Lease: %s -> %s, ClusterName: %s, Subnet: %s",
-		client.IP, client.MAC, client.Active, client.StartTime, client.EndTime， client.ClusterName, client.Subnet )
+		client.IP, client.MAC, client.Active, client.StartTime, client.EndTime, client.ClusterName, client.Subnet)
 
 	// Try to get existing HostStatus
 	existing := &topohubv1beta1.HostStatus{}
@@ -139,8 +139,8 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.ClientInfo) error
 			Type:             topohubv1beta1.HostTypeDHCP,
 			IpAddr:           client.IP,
 			Mac:              client.MAC,
-			Port:             c.config.RedfishPort,
-			Https:            c.config.RedfishHTTPS,
+			Port:             int32(c.config.RedfishPort),
+			Https:            c.config.RedfishHttps,
 			ActiveDhcpClient: true,
 		},
 		Info: map[string]string{},
@@ -169,16 +169,9 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.ClientInfo) error
 	return nil
 }
 
-func (c *hostStatusController) handleDHCPDelete(client dhcpserver.ClientInfo) error {
+func (c *hostStatusController) handleDHCPDelete(client dhcpserver.DhcpClientInfo) error {
 	name := formatHostStatusName(client.IP)
 	log.Logger.Debugf("Processing DHCP delete event - IP: %s, MAC: %s", client.IP, client.MAC)
-
-	if c.config.RedfishSecretName != "" {
-		hostStatus.Status.Basic.SecretName = c.config.RedfishSecretName
-	}
-	if c.config.RedfishSecretNamespace != "" {
-		hostStatus.Status.Basic.SecretNamespace = c.config.RedfishSecretNamespace
-	}
 
 	// if c.config.AgentObjSpec.Feature.DhcpServerConfig.EnableBindDhcpIP {
 	// 	log.Logger.Infof("Enable Bind DhcpIP, so just label the hoststatus - IP: %s, MAC: %s", client.IP, client.MAC)

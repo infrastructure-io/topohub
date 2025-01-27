@@ -41,7 +41,7 @@ type hostStatusController struct {
 }
 
 func NewHostStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager) HostStatusController {
-	log.Logger.Debugf("Creating new HostStatus controller for cluster agent: %s", config.ClusterAgentName)
+	log.Logger.Debugf("Creating new HostStatus controller")
 
 	// Create event recorder
 	eventBroadcaster := record.NewBroadcaster()
