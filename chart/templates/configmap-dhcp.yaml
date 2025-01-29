@@ -1,9 +1,70 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "topohub.fullname" . }}-dhcp
+  name: {{ include "topohub.fullname" . }}-dhcp-config
   labels:
     {{- include "topohub.labels" . | nindent 4 }}
 data:
-  dhcp-config.tmpl: |
-    # this is for dnsmasq configuration
+  dnsmasq.conf.tmpl: |
+    # Basic DHCP configuration
+    dhcp-authoritative
+    dhcp-leasefile={{ "{{ .LeaseFile }}" }}
+    log-facility={{ "{{ .LogFile }}" }}
+    log-dhcp
+    interface={{ "{{ .Interface }}" }}
+
+    # DHCP range configuration
+    {{- "{{ range .IPRanges }}" }}
+    dhcp-range={{ "{{ . }}" }}
+    {{- "{{ end }}" }}
+
+    # Gateway configuration
+    {{- "{{ if .Gateway }}" }}
+    dhcp-option=3,{{ "{{ .Gateway }}" }}  # Default gateway
+    {{- "{{ end }}" }}
+
+    # DNS configuration
+    {{- "{{ if .DNS }}" }}
+    dhcp-option=6,{{ "{{ .DNS }}" }}  # DNS server
+    {{- "{{ end }}" }}
+
+    # PXE boot configuration
+    {{- "{{ if .EnablePxe }}" }}
+    # Enable TFTP server
+    enable-tftp
+    tftp-root=/var/lib/tftp
+    
+    # PXE boot menu
+    dhcp-boot=pxelinux.0
+    dhcp-match=set:ipxe,175  # iPXE sends a 175 option
+    dhcp-boot=tag:!ipxe,undionly.kpxe
+    dhcp-boot=tag:ipxe,http://{{ "{{ .Gateway }}" }}/boot.ipxe
+    {{- "{{ end }}" }}
+
+    # ZTP configuration
+    {{- "{{ if .EnableZtp }}" }}
+    # DHCP options for ZTP
+    dhcp-option=vendor:Cisco,9,http://{{ "{{ .Gateway }}" }}/ztp.py
+    dhcp-option=vendor:Arista,114,http://{{ "{{ .Gateway }}" }}/ztp.py
+    dhcp-option=vendor:Juniper,0,http://{{ "{{ .Gateway }}" }}/ztp.conf
+    {{- "{{ end }}" }}
+
+    # Additional options
+    # Disable DNS server functionality
+    port=0
+    # Disable re-use of the DHCP servername and filename fields as extra option space
+    dhcp-no-override
+    # Don't read /etc/hosts
+    no-hosts
+    # Read additional hosts file for IP-MAC bindings
+    addn-hosts={{ "{{ .StoragePathDhcpConfig }}" }}/dnsmasq-{{ "{{ .Name }}" }}.hosts
+
+    # Logging configuration
+    log-queries
+    log-dhcp
+    quiet-dhcp6
+
+    # Performance tuning
+    cache-size=0
+    no-resolv
+    no-poll

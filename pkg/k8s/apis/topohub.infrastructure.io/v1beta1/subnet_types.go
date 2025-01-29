@@ -134,6 +134,23 @@ type SubnetSpec struct {
 
 // SubnetStatus defines the observed state of Subnet
 type SubnetStatus struct {
+	// Dhcp ip status
+	// +optional
+	DhcpStatus *DhcpStatusSpec `json:"dhcpStatus,omitempty"`
+
+	// the name of the node who hosts the subnet
+	HostNode *string `json:"hostNode,omitempty"`
+
+	// Conditions represent the latest available observations of an object's state
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+}
+
+type DhcpStatusSpec struct {
 	// Total number of IP addresses in the subnet
 	DhcpIpTotalAmount int32 `json:"dhcpIpTotalAmount"`
 

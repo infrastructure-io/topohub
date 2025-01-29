@@ -16,11 +16,15 @@ type AgentConfig struct {
 	// pod namespace
 	PodNamespace string
 
+	// node name
+	NodeName string
+
 	// webhook cert dir
 	WebhookCertDir string
 
 	// storage path
 	StoragePath           string
+	StoragePathDhcpLog    string
 	StoragePathDhcpLease  string
 	StoragePathDhcpConfig string
 	StoragePathZtp        string
@@ -127,14 +131,15 @@ func (c *AgentConfig) initStorageDirectory() error {
 		return fmt.Errorf("did not exist storage path %s: %v", c.StoragePath, err)
 	}
 
-	c.StoragePathDhcpLease = filepath.Join(c.StoragePath, "dhcpLease")
-	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcpConfig")
+	c.StoragePathDhcpLease = filepath.Join(c.StoragePath, "dhcp/lease")
+	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcp/config")
+	c.StoragePathDhcpLog = filepath.Join(c.StoragePath, "dhcp/log")
 	c.StoragePathZtp = filepath.Join(c.StoragePath, "ztp")
 	c.StoragePathSftp = filepath.Join(c.StoragePath, "sftp")
 	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
 
 	// List of required subdirectories
-	subdirs := []string{c.StoragePathDhcpLease, c.StoragePathDhcpConfig, c.StoragePathZtp, c.StoragePathSftp, c.StoragePathHttp}
+	subdirs := []string{c.StoragePathDhcpLease, c.StoragePathDhcpConfig, c.StoragePathDhcpLog, c.StoragePathZtp, c.StoragePathSftp, c.StoragePathHttp}
 
 	// Check and create each subdirectory if it doesn't exist
 	for _, dir := range subdirs {
@@ -156,6 +161,11 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	agentConfig.PodNamespace = os.Getenv("POD_NAMESPACE")
 	if agentConfig.PodNamespace == "" {
 		return nil, fmt.Errorf("POD_NAMESPACE environment variable not set")
+	}
+
+	agentConfig.NodeName = os.Getenv("NODE_NAME")
+	if agentConfig.NodeName == "" {
+		return nil, fmt.Errorf("NODE_NAME environment variable not set")
 	}
 
 	agentConfig.WebhookCertDir = os.Getenv("WEBHOOK_CERT_DIR")
