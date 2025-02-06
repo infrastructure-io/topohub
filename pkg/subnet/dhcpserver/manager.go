@@ -86,6 +86,8 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 
 // Run starts the DHCP server and all associated services
 func (s *dhcpServer) Run() error {
+	s.log.Infof("run whole dhcp server service")
+
 	// 清理可能存在的旧接口
 	if err := s.cleanupAllInterface(); err != nil {
 		s.log.Warnf("Failed to cleanup old interface: %v", err)
@@ -101,6 +103,8 @@ func (s *dhcpServer) Run() error {
 
 	// 启动状态监控
 	go s.monitor()
+
+	s.log.Infof("finished setting up dhcp server")
 
 	return nil
 }

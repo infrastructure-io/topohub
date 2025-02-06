@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -24,11 +25,9 @@ func (s *dhcpServer) statusUpdateWorker() {
 
 		case <-s.statusUpdateCh:
 			s.log.Debugf("it is about to update the status of subnet %+v", s.subnet)
-			s.mu.Lock()
 			if err := s.updateSubnetWithRetry(); err != nil {
 				log.Logger.Errorf("Failed to update subnet status: %v", err)
 			}
-			s.mu.Unlock()
 		}
 	}
 }
@@ -44,9 +43,14 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 	return retry.OnError(backoff,
 		func(err error) bool {
 			// Retry on any error
-			return true
+			//return true
+			// 这里我们只在遇到冲突错误时重试
+			return errors.IsConflict(err)
 		},
 		func() error {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			
 			// 获取最新的 subnet
 			current := &topohubv1beta1.Subnet{}
 			if err := s.client.Get(context.Background(), types.NamespacedName{
@@ -74,8 +78,9 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				}
 				updated.Status.Conditions = append(updated.Status.Conditions, metav1.Condition{
 					Type:               "DhcpServer",
-					Status:             "True",
+					Reason:             "hostChange",
 					Message:            "dhcp server is hosted by node " + s.config.NodeName,
+					Status:             "True",
 					LastTransitionTime: metav1.Now(),
 				})
 			}
@@ -83,15 +88,13 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			if reflect.DeepEqual(current.Status.DhcpStatus, updated.Status.DhcpStatus) {
 				return nil
 			}
-			// 更新 crd 实例
-			s.log.Infof("updated subnet status: %v", updated.Status.DhcpStatus)
 
+			// 更新 crd 实例
 			if err := s.client.Status().Update(context.Background(), updated); err != nil {
+				s.log.Errorf("Failed to update subnet %s status: %v", s.subnet.Name, err)
 				return err
 			}
-
-			// 更新本地 subnet
-			s.subnet = updated
+			s.log.Infof("updated subnet status: %v", updated.Status.DhcpStatus)
 
 			return nil
 		})

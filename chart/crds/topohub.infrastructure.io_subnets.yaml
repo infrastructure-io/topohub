@@ -18,16 +18,16 @@ spec:
     - jsonPath: .spec.ipv4Subnet.subnet
       name: SUBNET
       type: string
-    - jsonPath: .status.dhcpStatus.ipTotalAmount
+    - jsonPath: .spec.feature.enableSyncEndpoint.defaultClusterName
+      name: CLUSTER
+      type: string
+    - jsonPath: .status.dhcpStatus.dhcpIpTotalAmount
       name: IP_TOTAL
       type: integer
-    - jsonPath: .status.dhcpStatus.ipAvailableAmount
+    - jsonPath: .status.dhcpStatus.dhcpIpAvailableAmount
       name: IP_AVAILABLE
       type: integer
-    - jsonPath: .status.dhcpStatus.ipAssignedAmount
-      name: IP_ASSIGNED
-      type: integer
-    - jsonPath: .status.dhcpStatus.ipReservedAmount
+    - jsonPath: .status.dhcpStatus.dhcpIpReservedAmount
       name: IP_RESERVED
       type: integer
     - jsonPath: .spec.feature.enablePxe

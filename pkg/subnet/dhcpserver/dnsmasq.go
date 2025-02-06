@@ -25,14 +25,14 @@ func (s *dhcpServer) startDnsmasq() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate dnsmasq config: %v", err)
 	}
-	s.log.Infof("dns config file %s", configFilePath)
+	s.log.Infof("dnsmasq config file %s", configFilePath)
 
 	// 创建 context 用于进程管理
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cmdCancel = cancel
 
 	// 启动 dnsmasq
-	cmd := exec.Command("dnsmasq", "-C", configFilePath)
+	cmd := exec.Command("dnsmasq", "-C", configFilePath, "-d")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
