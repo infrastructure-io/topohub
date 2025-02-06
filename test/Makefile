@@ -32,7 +32,7 @@ installDepsRedfish:
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME)  UNDERLAY_CNI="spiderpool/eth1-macvlan" \
 			NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			./scripts/install-redfish-static.sh  ; ./scripts/hostendpoint.sh
-	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth1-macvlan" \
+	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth1-vlan10-macvlan" \
 			NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			./scripts/install-redfish-dhcp.sh
 
@@ -42,6 +42,7 @@ deployTopohub:
 	chmod +x scripts/install-topohub.sh
 	CLUSTER_NAME=$(KIND_CLUSTER_NAME) IMAGE_VERSION=$(VERSION) \
 		IMAGE_NAME=$(TOPOHUB_IMAGE_REF) ./scripts/install-topohub.sh
+	chmod +x scripts/subnet.sh && ./scripts/subnet.sh
 
 
 show:

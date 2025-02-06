@@ -32,7 +32,7 @@ cat <<EOF >/tmp/topo.yaml
 replicaCount: 1
 logLevel: "debug"
 image:
-  tag: ${IMAGE_VERSION}
+  tag: "${IMAGE_VERSION}"
 
 defaultConfig:
   redfish:

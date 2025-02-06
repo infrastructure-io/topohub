@@ -26,11 +26,11 @@ for IMAGE in $IMAGES; do
 done
 
 
-echo "get the eth0 subnet of node"
+echo "get the eth1 subnet of node"
 NODE_ID=`docker ps | grep ${E2E_CLUSTER_NAME}-control-plane  | awk '{print $1}' `
-INTERFACE_MASK=` docker exec ${NODE_ID} ip a s eth0  | grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}/[0-9]+' | awk -F'/' '{print $2}' `
+INTERFACE_MASK=` docker exec ${NODE_ID} ip a s eth1  | grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}/[0-9]+' | awk -F'/' '{print $2}' `
 # INTERFACE_IP="172.18.0.3"
-NODE_INTERFACE_IP=` docker exec ${NODE_ID} ip a s eth0  |  grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}' `
+NODE_INTERFACE_IP=` docker exec ${NODE_ID} ip a s eth1  |  grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}' `
 # INTERFACE_IP="172.18.0.13"
 NEW_INTERFACE_IP=$(echo ${NODE_INTERFACE_IP} | awk -F. '{print $1"."$2"."$3"."$4+10}')
 
