@@ -45,17 +45,17 @@ helm install spiderpool spiderpool/spiderpool \
 #     master: ["${INTERFACE}"]
 # EOF
 
-INTERFACE=eth0
+INTERFACE=eth1
 cat <<EOF | kubectl apply -f -
 apiVersion: spiderpool.spidernet.io/v2beta1
 kind: SpiderIPPool
 metadata:
   name: ${INTERFACE}-pool
 spec:
-  #gateway: 172.17.9.1
-  subnet: 172.17.9.0/24
+  #gateway: 192.168.1.1
+  subnet: 192.168.1.0/24
   ips:
-    - 172.17.9.100-172.17.9.200
+    - 192.168.1.200-192.168.1.250
 ---
 apiVersion: spiderpool.spidernet.io/v2beta1
 kind: SpiderMultusConfig
@@ -68,6 +68,33 @@ spec:
     master: ["${INTERFACE}"]
     ippools:
       ipv4: ["${INTERFACE}-pool"]
+EOF
+
+INTERFACE=eth1
+VLAN_ID=10
+cat <<EOF | kubectl apply -f -
+apiVersion: spiderpool.spidernet.io/v2beta1
+kind: SpiderIPPool
+metadata:
+  name: ${INTERFACE}-vlan${VLAN_ID}-pool
+spec:
+  #gateway: 192.168.10.1
+  subnet: 192.168.10.0/24
+  ips:
+    - 192.168.10.200-192.168.10.250
+---
+apiVersion: spiderpool.spidernet.io/v2beta1
+kind: SpiderMultusConfig
+metadata:
+  name: ${INTERFACE}-vlan${VLAN_ID}-macvlan
+  namespace: spiderpool
+spec:
+  cniType: macvlan
+  macvlan:
+    master: ["${INTERFACE}"]
+    vlanID: ${VLAN_ID}
+    ippools:
+      ipv4: ["${INTERFACE}-vlan${VLAN_ID}-pool"]
 EOF
 
 echo "finish installing spiderpool"

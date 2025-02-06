@@ -18,17 +18,17 @@ spec:
     - jsonPath: .spec.ipv4Subnet.subnet
       name: SUBNET
       type: string
-    - jsonPath: .status.IpTotalAmount
-      name: TOTAL
+    - jsonPath: .status.dhcpStatus.ipTotalAmount
+      name: IP_TOTAL
       type: integer
-    - jsonPath: .status.IpAvailableAmount
-      name: AVAILABLE
+    - jsonPath: .status.dhcpStatus.ipAvailableAmount
+      name: IP_AVAILABLE
       type: integer
-    - jsonPath: .status.IpAssignAmount
-      name: ASSIGNED
+    - jsonPath: .status.dhcpStatus.ipAssignedAmount
+      name: IP_ASSIGNED
       type: integer
-    - jsonPath: .status.IpReservedAmount
-      name: RESERVED
+    - jsonPath: .status.dhcpStatus.ipReservedAmount
+      name: IP_RESERVED
       type: integer
     - jsonPath: .spec.feature.enablePxe
       name: PXE
@@ -227,19 +227,19 @@ spec:
                 properties:
                   dhcpIpAssignAmount:
                     description: Number of assigned IP addresses
-                    format: int32
+                    format: int64
                     type: integer
                   dhcpIpAvailableAmount:
                     description: Number of available IP addresses
-                    format: int32
+                    format: int64
                     type: integer
                   dhcpIpReservedAmount:
                     description: Number of reserved IP addresses
-                    format: int32
+                    format: int64
                     type: integer
                   dhcpIpTotalAmount:
                     description: Total number of IP addresses in the subnet
-                    format: int32
+                    format: int64
                     type: integer
                 required:
                 - dhcpIpAssignAmount

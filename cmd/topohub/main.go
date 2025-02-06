@@ -128,7 +128,7 @@ func main() {
 	}
 
 	// todo: subnet manager
-	subnetMgr := subnet.NewSubnetReconciler(agentConfig, k8sClient)
+	subnetMgr := subnet.NewSubnetReconciler(*agentConfig, k8sClient)
 	if err = subnetMgr.SetupWithManager(mgr); err != nil {
 		log.Logger.Errorf("Failed to setup subnet manager: %v", err)
 		os.Exit(1)

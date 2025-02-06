@@ -2,7 +2,6 @@ package dhcpserver
 
 import (
 	"fmt"
-	"net"
 	"strings"
 
 	"github.com/vishvananda/netlink"

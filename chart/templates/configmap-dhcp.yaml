@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "topohub.fullname" . }}-dhcp-config
+  name: {{ include "topohub.fullname" . }}-dhcp
   labels:
     {{- include "topohub.labels" . | nindent 4 }}
 data:
@@ -32,21 +32,21 @@ data:
     {{- "{{ if .EnablePxe }}" }}
     # Enable TFTP server
     enable-tftp
-    tftp-root=/var/lib/tftp
+    tftp-root={{ "{{ .TftpServerDir }}" }}
     
     # PXE boot menu
     dhcp-boot=pxelinux.0
     dhcp-match=set:ipxe,175  # iPXE sends a 175 option
     dhcp-boot=tag:!ipxe,undionly.kpxe
-    dhcp-boot=tag:ipxe,http://{{ "{{ .Gateway }}" }}/boot.ipxe
+    dhcp-boot=tag:ipxe,http://{{ "{{ .SelfIP }}" }}/boot.ipxe
     {{- "{{ end }}" }}
 
     # ZTP configuration
     {{- "{{ if .EnableZtp }}" }}
     # DHCP options for ZTP
-    dhcp-option=vendor:Cisco,9,http://{{ "{{ .Gateway }}" }}/ztp.py
-    dhcp-option=vendor:Arista,114,http://{{ "{{ .Gateway }}" }}/ztp.py
-    dhcp-option=vendor:Juniper,0,http://{{ "{{ .Gateway }}" }}/ztp.conf
+    dhcp-option=vendor:Cisco,9,http://{{ "{{ .SelfIP }}" }}/ztp.py
+    dhcp-option=vendor:Arista,114,http://{{ "{{ .SelfIP }}" }}/ztp.py
+    dhcp-option=vendor:Juniper,0,http://{{ "{{ .SelfIP }}" }}/ztp.conf
     {{- "{{ end }}" }}
 
     # Additional options
@@ -56,8 +56,6 @@ data:
     dhcp-no-override
     # Don't read /etc/hosts
     no-hosts
-    # Read additional hosts file for IP-MAC bindings
-    addn-hosts={{ "{{ .StoragePathDhcpConfig }}" }}/dnsmasq-{{ "{{ .Name }}" }}.hosts
 
     # Logging configuration
     log-queries
@@ -65,6 +63,6 @@ data:
     quiet-dhcp6
 
     # Performance tuning
-    cache-size=0
+    # cache-size=150
     no-resolv
     no-poll

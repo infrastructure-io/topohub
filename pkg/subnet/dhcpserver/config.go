@@ -1,13 +1,13 @@
 package dhcpserver
 
 import (
-	"encoding/binary"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
 // generateDnsmasqConfig generates the dnsmasq configuration file
@@ -20,6 +20,13 @@ func (s *dhcpServer) generateDnsmasqConfig(clients map[string]*DhcpClientInfo) (
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %v", err)
 	}
+
+	templateContent, err := os.ReadFile(s.configTemplatePath)
+	if err != nil {
+		s.log.Errorf("failed to read template file: %+v", err)
+		return "", err
+	}
+	s.log.Debugf("read template file content: \n%s", string(templateContent))
 
 	// 准备目录
 	configFile := s.configPath
@@ -53,6 +60,9 @@ func (s *dhcpServer) generateDnsmasqConfig(clients map[string]*DhcpClientInfo) (
 		EnablePxe        bool
 		EnableZtp        bool
 		DhcpHostBindings []string
+		Name             string
+		SelfIP           string
+		TftpServerDir    string
 	}{
 		Interface:        interfaceName,
 		IPRanges:         strings.Split(s.subnet.Spec.IPv4Subnet.IPRange, ","),
@@ -63,6 +73,9 @@ func (s *dhcpServer) generateDnsmasqConfig(clients map[string]*DhcpClientInfo) (
 		EnablePxe:        s.subnet.Spec.Feature.EnablePxe,
 		EnableZtp:        s.subnet.Spec.Feature.EnableZtp,
 		DhcpHostBindings: dhcpHosts,
+		Name:             s.subnet.Name,
+		SelfIP:           strings.Split(s.subnet.Spec.Interface.IPv4, "/")[0],
+		TftpServerDir:    s.config.StoragePathSftp,
 	}
 
 	// 创建配置文件
@@ -81,21 +94,20 @@ func (s *dhcpServer) generateDnsmasqConfig(clients map[string]*DhcpClientInfo) (
 	}
 
 	// 统计 IP 使用情况
-	totalIPs := 0
-	for _, ipRange := range strings.Split(s.subnet.Spec.IPv4Subnet.IPRange, ",") {
-		parts := strings.Split(ipRange, "-")
-		if len(parts) != 2 {
-			continue
-		}
-		start := net.ParseIP(parts[0])
-		end := net.ParseIP(parts[1])
-		if start == nil || end == nil {
-			continue
-		}
-		totalIPs += int(binary.BigEndian.Uint32(end.To4())) - int(binary.BigEndian.Uint32(start.To4())) + 1
+	total, err := tools.CountIPsInRange(s.subnet.Spec.IPv4Subnet.IPRange)
+	if err != nil {
+		s.log.Errorf("failed to count ips in range: %+v", err)
+		total = 0
 	}
-	s.totalIPs = totalIPs
-	s.log.Infof("total ip of dhcp server: %s", totalIPs)
+	s.totalIPs = total
+	s.log.Infof("total ip of dhcp server: %s", total)
+
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		s.log.Errorf("failed to read content file: %+v", err)
+		return "", err
+	}
+	s.log.Debugf("read config file: \n%s", string(content))
 
 	return configFile, nil
 }

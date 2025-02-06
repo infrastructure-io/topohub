@@ -24,7 +24,6 @@ func shouldRetry(err error) bool {
 // DHCP manager 把 dhcp client 事件告知后，进行 hoststatus 更新
 func (c *hostStatusController) processDHCPEvents() {
 
-	subnet.
 	for {
 		select {
 		case <-c.stopCh:
@@ -61,7 +60,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 
 	name := formatHostStatusName(client.IP)
 	log.Logger.Debugf("Processing DHCP add event - IP: %s, MAC: %s, Active: %v, Lease: %s -> %s, ClusterName: %s, Subnet: %s",
-		client.IP, client.MAC, client.Active, client.StartTime, client.EndTime, client.ClusterName, client.Subnet)
+		client.IP, client.MAC, client.Active, client.StartTime, client.ClusterName, client.Subnet)
 
 	// Try to get existing HostStatus
 	existing := &topohubv1beta1.HostStatus{}
@@ -90,8 +89,8 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 			return err
 		}
 		log.Logger.Infof("Successfully updated HostStatus %s", name)
-		log.Logger.Debugf("Updated DHCP client details - IP: %s, MAC: %s, Lease: %s -> %s",
-			client.IP, client.MAC, client.StartTime, client.EndTime)
+		log.Logger.Debugf("Updated DHCP client details - IP: %s, MAC: %s, Lease: %s ",
+			client.IP, client.MAC, client.StartTime)
 		return nil
 	}
 
@@ -166,8 +165,8 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	}
 
 	log.Logger.Infof("Successfully created HostStatus %s", name)
-	log.Logger.Debugf("DHCP client details - IP: %s, MAC: %s, Lease: %s -> %s",
-		client.IP, client.MAC, client.StartTime, client.EndTime)
+	log.Logger.Debugf("DHCP client details - IP: %s, MAC: %s, Lease: %s",
+		client.IP, client.MAC, client.StartTime)
 	return nil
 }
 

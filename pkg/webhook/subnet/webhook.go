@@ -52,6 +52,8 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 		subnet.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = ""
 	}
 
+
+
 	return nil
 }
 
@@ -76,17 +78,55 @@ func (w *SubnetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) 
 
 // ValidateUpdate implements webhook.Validator
 func (w *SubnetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	subnet, ok := newObj.(*topohubv1beta1.Subnet)
+	oldSubnet, ok := oldObj.(*topohubv1beta1.Subnet)
 	if !ok {
-		err := fmt.Errorf("object is not a Subnet")
+		err := fmt.Errorf("old object is not a Subnet")
 		log.Logger.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Infof("Validating update of Subnet %s", subnet.Name)
+	newSubnet, ok := newObj.(*topohubv1beta1.Subnet)
+	if !ok {
+		err := fmt.Errorf("new object is not a Subnet")
+		log.Logger.Error(err.Error())
+		return nil, err
+	}
 
-	if err := w.validateSubnet(ctx, subnet); err != nil {
-		log.Logger.Errorf("Failed to validate Subnet %s: %v", subnet.Name, err)
+	log.Logger.Infof("Validating update of Subnet %s", newSubnet.Name)
+
+	// 1. 验证 subnet 不允许修改
+	if oldSubnet.Spec.IPv4Subnet.Subnet != newSubnet.Spec.IPv4Subnet.Subnet {
+		return nil, fmt.Errorf("subnet %s cannot be modified", oldSubnet.Spec.IPv4Subnet.Subnet)
+	}
+
+	// 2. 验证 IP 范围只允许扩大，不允许缩小
+	_, ipNet, err := net.ParseCIDR(newSubnet.Spec.IPv4Subnet.Subnet)
+	if err != nil {
+		return nil, fmt.Errorf("invalid subnet format: %v", err)
+	}
+
+	if err := tools.ValidateIPRangeExpansion(oldSubnet.Spec.IPv4Subnet.IPRange, newSubnet.Spec.IPv4Subnet.IPRange, ipNet); err != nil {
+		return nil, err
+	}
+
+	// 3. 验证 interface name 不允许修改
+	if oldSubnet.Spec.Interface.Interface != newSubnet.Spec.Interface.Interface {
+		return nil, fmt.Errorf("interface name cannot be modified")
+	}
+
+	// 4. 验证 vlanId 不允许修改
+	if !tools.Int32PtrEqual(oldSubnet.Spec.Interface.VlanID, newSubnet.Spec.Interface.VlanID) {
+		return nil, fmt.Errorf("interface VLAN ID cannot be modified")
+	}
+
+	// 5. 验证 interface ipv4 不允许修改
+	if oldSubnet.Spec.Interface.IPv4 != newSubnet.Spec.Interface.IPv4 {
+		return nil, fmt.Errorf("interface IPv4 address cannot be modified")
+	}
+
+	// 执行其他常规验证
+	if err := w.validateSubnet(ctx, newSubnet); err != nil {
+		log.Logger.Errorf("Failed to validate Subnet %s: %v", newSubnet.Name, err)
 		return nil, err
 	}
 

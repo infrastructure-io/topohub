@@ -5,23 +5,27 @@ import (
 	"time"
 
 	"github.com/infrastructure-io/topohub/pkg/lock"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"reflect"
+
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type SubnetManager interface {
 	SetupWithManager(mgr ctrl.Manager) error
 	Stop()
-	GetDhcpClientEvents() (chan<- dhcpserver.DhcpClientInfo, chan<- dhcpserver.DhcpClientInfo)
+	GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
 }
 
 type subnetManager struct {
@@ -61,7 +65,7 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 	// Get the Subnet instance
 	subnet := &topohubv1beta1.Subnet{}
 	if err := s.client.Get(ctx, req.NamespacedName, subnet); err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			// Subnet was deleted
 			logger.Infof("Subnet %s was deleted, removing from cache", req.Name)
 			s.cache.Delete(req.Name)
@@ -81,6 +85,38 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 	defer s.lockLeader.Unlock()
 	// if we are the leader, we should handle the subnet
 	if s.leader {
+		// try to update status
+		updatedSubnet := subnet.DeepCopy()
+		if updatedSubnet.Status.HostNode == nil || *updatedSubnet.Status.HostNode != s.config.NodeName {
+			logger.Infof("update host node to %s", subnet.Name)
+			updatedSubnet.Status.HostNode = &s.config.NodeName
+			// update Conditions
+			if updatedSubnet.Status.Conditions == nil {
+				updatedSubnet.Status.Conditions = []metav1.Condition{}
+			}
+			updatedSubnet.Status.Conditions = append(updatedSubnet.Status.Conditions, metav1.Condition{
+				Type:               "DhcpServer",
+				Status:             "True",
+				Message:            "dhcp server is hosted by node " + s.config.NodeName,
+				LastTransitionTime: metav1.Now(),
+			})
+		}
+
+		if updatedSubnet.Status.DhcpStatus == nil {
+			log.Logger.Debugf("initializing DhcpStatus in Subnet %s", updatedSubnet.Name)
+			total, err := tools.CountIPsInRange(updatedSubnet.Spec.IPv4Subnet.IPRange)
+			if err != nil {
+				log.Logger.Errorf("Failed to count IPs in range %s: %v", updatedSubnet.Spec.IPv4Subnet.IPRange, err)
+				total = 0
+			}
+			updatedSubnet.Status.DhcpStatus = &topohubv1beta1.DhcpStatusSpec{
+				DhcpIpTotalAmount:     total,
+				DhcpIpAvailableAmount: total,
+				DhcpIpAssignAmount:    0,
+				DhcpIpReservedAmount:  0,
+			}
+		}
+
 		if s.cache.HasSpecChanged(subnet) {
 			logger.Infof("Subnet %s spec changed or new subnet detected (subnet: %s, ipRange: %s)",
 				subnet.Name,
@@ -103,12 +139,25 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 					s.cache.Set(subnet)
 				}
 			} else {
-				logger.Infof("updated DHCP server for subnet %s", subnet.Name)
+				logger.Infof("updated DHCP server for subnet %s", updatedSubnet.Name)
 				s.dhcpServerList[subnet.Name].UpdateService(*subnet)
 				s.cache.Set(subnet)
 			}
 		} else {
 			logger.Debugf("Subnet %s spec has no change", subnet.Name)
+		}
+
+		if !reflect.DeepEqual(updatedSubnet, subnet) {
+			logger.Infof("update subnet for %s", subnet.Name)
+			err := s.client.Status().Update(ctx, updatedSubnet)
+			if err != nil {
+				if k8serrors.IsConflict(err) {
+					logger.Infof("Resource version conflict when updating subnet status, will retry")
+					return reconcile.Result{Requeue: true}, nil
+				}
+				logger.Errorf("Failed to update subnet status: %v", err)
+				return reconcile.Result{RequeueAfter: time.Second * 5}, err
+			}
 		}
 	}
 
@@ -145,11 +194,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 				// 检查是否已经存在对应的 DHCP 服务器
 				if _, exists := s.dhcpServerList[subnet.Name]; !exists {
 					// 创建新的 DHCP 服务器实例
-					dhcpServer, err := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
-					if err != nil {
-						log.Logger.Errorf("Failed to create DHCP server for subnet %s: %v", subnet.Name, err)
-						continue
-					}
+					dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
 
 					// 启动 DHCP 服务器
 					if err := dhcpServer.Run(); err != nil {
@@ -170,12 +215,12 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 
 func (s *subnetManager) Stop() {
 	// Clean up any resources if needed
-	for _, server := range s.dhcpServerList {
-		log.Logger.Infof("Stopping DHCP server for subnet %s", server.subnet.Name)
+	for name, server := range s.dhcpServerList {
+		log.Logger.Infof("Stopping DHCP server for subnet %s", name)
 		server.Stop()
 	}
 }
 
-func (s *subnetManager) GetDhcpClientEvents() (chan<- dhcpserver.DhcpClientInfo, chan<- dhcpserver.DhcpClientInfo) {
+func (s *subnetManager) GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
 	return s.addedDhcpClient, s.deletedDhcpClient
 }

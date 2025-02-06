@@ -2,8 +2,6 @@ package dhcpserver
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -13,7 +11,6 @@ import (
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 )
-
 
 // statusUpdateWorker handles subnet status updates with retries
 func (s *dhcpServer) statusUpdateWorker() {
@@ -40,27 +37,32 @@ func (s *dhcpServer) updateSubnetWithRetry(subnet *topohubv1beta1.Subnet) error 
 		Steps:    5,
 	}
 
-	return retry.OnError(backoff, func() error {
-		// 获取最新的 subnet
-		current := &topohubv1beta1.Subnet{}
-		if err := s.client.Get(context.Background(), types.NamespacedName{
-			Name:      subnet.Name,
-			Namespace: subnet.Namespace,
-		}, current); err != nil {
-			return err
-		}
+	return retry.OnError(backoff, 
+		func(err error) bool {
+			// Retry on any error
+			return true
+		},
+		func() error {
+			// 获取最新的 subnet
+			current := &topohubv1beta1.Subnet{}
+			if err := s.client.Get(context.Background(), types.NamespacedName{
+				Name:      subnet.Name,
+				Namespace: subnet.Namespace,
+			}, current); err != nil {
+				return err
+			}
 
-		// 更新状态
-		current.Status = subnet.Status
-		if err := s.client.Status().Update(context.Background(), current); err != nil {
-			return err
-		}
+			// 更新状态
+			current.Status = subnet.Status
+			if err := s.client.Status().Update(context.Background(), current); err != nil {
+				return err
+			}
 
-		// 更新本地 subnet
-		s.mu.Lock()
-		s.subnet = current
-		s.mu.Unlock()
+			// 更新本地 subnet
+			s.mu.Lock()
+			s.subnet = current
+			s.mu.Unlock()
 
-		return nil
-	})
+			return nil
+		})
 }

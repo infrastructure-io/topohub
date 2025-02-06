@@ -12,6 +12,7 @@ import (
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -41,7 +42,7 @@ type dhcpServer struct {
 	statusUpdateCh chan *topohubv1beta1.Subnet
 	log            *zap.SugaredLogger
 	currentClients map[string]*DhcpClientInfo
-	totalIPs       int
+	totalIPs       uint64
 
 	// restart the dhcp server
 	restartCh chan struct{}
@@ -55,6 +56,12 @@ type dhcpServer struct {
 
 // NewDhcpServer creates a new DHCP server instance
 func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClient chan DhcpClientInfo, deletedDhcpClient chan DhcpClientInfo) *dhcpServer {
+	total, err := tools.CountIPsInRange(subnet.Spec.IPv4Subnet.IPRange)
+	if err != nil {
+		log.Logger.Error("failed to count ips in range", zap.Error(err))
+		total = 0
+	}
+
 	return &dhcpServer{
 		config:             config,
 		subnet:             subnet,
@@ -67,11 +74,11 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 		restartCh:          make(chan struct{}),
 		log:                log.Logger.With(zap.String("subnet", subnet.Name)),
 		currentClients:     make(map[string]*DhcpClientInfo),
-		totalIPs:           0,
+		totalIPs:           total,
 		configTemplatePath: filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
 		configPath:         filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
 		leasePath:          filepath.Join(config.StoragePathDhcpLease, fmt.Sprintf("dnsmasq-%s.leases", subnet.Name)),
-		logPath:            filepath.Join(s.config.StoragePathDhcpLog, fmt.Sprintf("dnsmasq-%s.log", s.subnet.Name)),
+		logPath:            filepath.Join(config.StoragePathDhcpLog, fmt.Sprintf("dnsmasq-%s.log", subnet.Name)),
 	}
 }
 

@@ -9,10 +9,10 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="SUBNET",type="string",JSONPath=".spec.ipv4Subnet.subnet"
-// +kubebuilder:printcolumn:name="TOTAL",type="integer",JSONPath=".status.IpTotalAmount"
-// +kubebuilder:printcolumn:name="AVAILABLE",type="integer",JSONPath=".status.IpAvailableAmount"
-// +kubebuilder:printcolumn:name="ASSIGNED",type="integer",JSONPath=".status.IpAssignAmount"
-// +kubebuilder:printcolumn:name="RESERVED",type="integer",JSONPath=".status.IpReservedAmount"
+// +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.ipTotalAmount"
+// +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.ipAvailableAmount"
+// +kubebuilder:printcolumn:name="IP_ASSIGNED",type="integer",JSONPath=".status.dhcpStatus.ipAssignedAmount"
+// +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.ipReservedAmount"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
 // +kubebuilder:printcolumn:name="ZTP",type="boolean",JSONPath=".spec.feature.enableZtp"
 // +kubebuilder:subresource:status
@@ -152,16 +152,16 @@ type SubnetStatus struct {
 
 type DhcpStatusSpec struct {
 	// Total number of IP addresses in the subnet
-	DhcpIpTotalAmount int32 `json:"dhcpIpTotalAmount"`
+	DhcpIpTotalAmount uint64 `json:"dhcpIpTotalAmount"`
 
 	// Number of available IP addresses
-	DhcpIpAvailableAmount int32 `json:"dhcpIpAvailableAmount"`
+	DhcpIpAvailableAmount uint64 `json:"dhcpIpAvailableAmount"`
 
 	// Number of assigned IP addresses
-	DhcpIpAssignAmount int32 `json:"dhcpIpAssignAmount"`
+	DhcpIpAssignAmount uint64 `json:"dhcpIpAssignAmount"`
 
 	// Number of reserved IP addresses
-	DhcpIpReservedAmount int32 `json:"dhcpIpReservedAmount"`
+	DhcpIpReservedAmount uint64 `json:"dhcpIpReservedAmount"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

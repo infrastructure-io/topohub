@@ -117,14 +117,6 @@ func (c *AgentConfig) verifyWebhookCertDir() error {
 	return nil
 }
 
-// ensureStoragePath ensures that the storage path exists
-func (c *AgentConfig) ensureStoragePath() error {
-	if err := os.MkdirAll(c.StoragePath, 0755); err != nil {
-		return fmt.Errorf("failed to create storage path %s: %v", c.StoragePath, err)
-	}
-	return nil
-}
-
 func (c *AgentConfig) initStorageDirectory() error {
 	// Check if main storage directory exists
 	if _, err := os.Stat(c.StoragePath); err != nil {
@@ -139,14 +131,20 @@ func (c *AgentConfig) initStorageDirectory() error {
 	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
 
 	// List of required subdirectories
-	subdirs := []string{c.StoragePathDhcpLease, c.StoragePathDhcpConfig, c.StoragePathDhcpLog, c.StoragePathZtp, c.StoragePathSftp, c.StoragePathHttp}
+	subdirs := []string{
+		c.StoragePathDhcpLease,
+		c.StoragePathDhcpConfig,
+		c.StoragePathDhcpLog,
+		c.StoragePathZtp,
+		c.StoragePathSftp,
+		c.StoragePathHttp,
+	}
 
 	// Check and create each subdirectory if it doesn't exist
 	for _, dir := range subdirs {
-		subPath := filepath.Join(c.StoragePath, dir)
-		if _, err := os.Stat(subPath); os.IsNotExist(err) {
-			if err := os.MkdirAll(subPath, 0755); err != nil {
-				return fmt.Errorf("failed to create subdirectory %s: %v", subPath, err)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("failed to create subdirectory %s: %v", dir, err)
 			}
 		}
 	}
@@ -199,7 +197,7 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	}
 
 	// Ensure storage path exists
-	if err := agentConfig.ensureStoragePath(); err != nil {
+	if err := agentConfig.initStorageDirectory(); err != nil {
 		return nil, fmt.Errorf("failed to ensure storage path: %v", err)
 	}
 

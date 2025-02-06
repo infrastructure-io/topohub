@@ -72,7 +72,7 @@ func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 	// 更新 subnet
 	s.subnet = &subnet
 	// 重启 DHCP 服务
-	s.restartCh <- struct{}
+	s.restartCh <- struct{}{}
 
 	return nil
 }
@@ -138,9 +138,9 @@ func (s *dhcpServer) processLeaseFile(leaseFile string) error {
 	if updated.Status.DhcpStatus == nil {
 		updated.Status.DhcpStatus = &topohubv1beta1.DhcpStatusSpec{}
 	}
-	updated.Status.DhcpStatus.IpTotalAmount = int32(s.totalIPs)
-	updated.Status.DhcpStatus.IpAssignAmount = int32(len(currentClients))
-	updated.Status.DhcpStatus.IpAvailableAmount = int32(s.totalIPs - len(currentClients))
+	updated.Status.DhcpStatus.DhcpIpTotalAmount = s.totalIPs
+	updated.Status.DhcpStatus.DhcpIpAssignAmount = uint64(len(currentClients))
+	updated.Status.DhcpStatus.DhcpIpAvailableAmount = s.totalIPs - uint64(len(currentClients))
 
 	// 发送状态更新
 	s.statusUpdateCh <- updated
@@ -178,8 +178,8 @@ func (s *dhcpServer) monitor() {
 
 		// lease file event
 		case event := <-watcher.Events:
-			if event.Name == leaseFile && (event.Op&fsnotify.Write == fsnotify.Write) {
-				if err := s.processLeaseFile(leaseFile); err != nil {
+			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
+				if err := s.processLeaseFile(s.leasePath); err != nil {
 					s.log.Errorf("Failed to process lease file: %v", err)
 				}
 			}
@@ -212,17 +212,18 @@ func (s *dhcpServer) monitor() {
 
 		if needRestart || needReload {
 
-			configFilePath, err := s.generateDnsmasqConfig(currentClients)
+			configFilePath, err := s.generateDnsmasqConfig(s.currentClients)
 			if err != nil {
 				s.log.Errorf("Failed to update dnsmasq config: %v", err)
-				return err
+				continue
 			}
 
 			if needReload {
 				s.log.Infof("reload dhcp server")
 				// 重新加载 dnsmasq 配置
 				if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
-					return fmt.Errorf("failed to reload dnsmasq: %v", err)
+					s.log.Errorf("failed to reload dnsmasq: %v", err)
+					continue
 				}
 				s.log.Infof("Reloaded dnsmasq config: %s", configFilePath)
 			} else {
