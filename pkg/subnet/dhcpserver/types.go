@@ -11,13 +11,6 @@ type DhcpClientInfo struct {
 	ClusterName string `json:"clusterName,omitempty"`
 }
 
-// IPUsageStats represents IP usage statistics for a subnet
-type IPUsageStats struct {
-	TotalIPs     int `json:"totalIPs"`
-	UsedIPs      int `json:"usedIPs"`
-	AvailableIPs int `json:"availableIPs"`
-}
-
 // DhcpServerConfig represents the configuration for the DHCP server
 type DhcpServerConfig struct {
 	Interface string

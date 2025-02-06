@@ -39,7 +39,7 @@ type subnetManager struct {
 	dhcpServerList map[string]dhcpserver.DhcpServer
 }
 
-func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interface) (SubnetManager, error) {
+func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interface) SubnetManager {
 	return &subnetManager{
 		config:            &config,
 		kubeClient:        kubeClient,
@@ -49,7 +49,7 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 		deletedDhcpClient: make(chan dhcpserver.DhcpClientInfo, 100),
 		leader:            false,
 		dhcpServerList:    make(map[string]dhcpserver.DhcpServer),
-	}, nil
+	}
 }
 
 // Reconcile handles the reconciliation of Subnet objects
@@ -86,8 +86,6 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 				subnet.Name,
 				subnet.Spec.IPv4Subnet.Subnet,
 				subnet.Spec.IPv4Subnet.IPRange)
-			// Update the cache with the latest version
-			s.cache.Set(subnet)
 
 			// todo: start the dhcp server on the subnet
 			if _, ok := s.dhcpServerList[subnet.Name]; !ok {
@@ -100,13 +98,15 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 					}, err
 				} else {
 					logger.Infof("Started DHCP server for subnet %s", subnet.Name)
+					// Update the cache with the latest version
 					s.dhcpServerList[subnet.Name] = t
+					s.cache.Set(subnet)
 				}
 			} else {
 				logger.Infof("updated DHCP server for subnet %s", subnet.Name)
 				s.dhcpServerList[subnet.Name].UpdateService(*subnet)
+				s.cache.Set(subnet)
 			}
-
 		} else {
 			logger.Debugf("Subnet %s spec has no change", subnet.Name)
 		}
@@ -118,6 +118,7 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 	s.client = mgr.GetClient()
 
+	// start all dhcp server when we are the leader
 	go func() {
 		log.Logger.Info("waiting for the election of leader")
 		select {
@@ -127,7 +128,6 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 			s.lockLeader.Lock()
 			defer s.lockLeader.Unlock()
 			s.leader = true
-			s.lockLeader.Unlock()
 
 			// 获取所有的 Subnet 实例并启动 DHCP 服务器
 			var subnetList topohubv1beta1.SubnetList

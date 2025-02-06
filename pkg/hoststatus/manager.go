@@ -18,8 +18,6 @@ import (
 )
 
 type HostStatusController interface {
-	// 把 dhcp 的 client 事件 channel 返给外部，以供外部来通知自己
-	GetDHCPEventChan() (chan<- dhcpserver.DhcpClientInfo, chan<- dhcpserver.DhcpClientInfo)
 	Stop()
 	SetupWithManager(ctrl.Manager) error
 	// 更新 bmc 主机的 认证信息
@@ -33,14 +31,14 @@ type hostStatusController struct {
 	// determine the cluster agent name and the path to the feature
 	// configuration directory.
 	config     *config.AgentConfig
-	addChan    chan dhcpserver.DhcpClientInfo
-	deleteChan chan dhcpserver.DhcpClientInfo
 	stopCh     chan struct{}
 	wg         sync.WaitGroup
 	recorder   record.EventRecorder
+	addChan    chan dhcpserver.DhcpClientInfo
+	deleteChan chan dhcpserver.DhcpClientInfo
 }
 
-func NewHostStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager) HostStatusController {
+func NewHostStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager, addChan, deleteChan chan dhcpserver.DhcpClientInfo) HostStatusController {
 	log.Logger.Debugf("Creating new HostStatus controller")
 
 	// Create event recorder
@@ -52,8 +50,8 @@ func NewHostStatusController(kubeClient kubernetes.Interface, config *config.Age
 		client:     mgr.GetClient(),
 		kubeClient: kubeClient,
 		config:     config,
-		addChan:    make(chan dhcpserver.DhcpClientInfo),
-		deleteChan: make(chan dhcpserver.DhcpClientInfo),
+		addChan:    addChan,
+		deleteChan: deleteChan,
 		stopCh:     make(chan struct{}),
 		recorder:   recorder,
 	}
@@ -67,10 +65,6 @@ func (c *hostStatusController) Stop() {
 	close(c.stopCh)
 	c.wg.Wait()
 	log.Logger.Info("HostStatus controller stopped successfully")
-}
-
-func (c *hostStatusController) GetDHCPEventChan() (chan<- dhcpserver.DhcpClientInfo, chan<- dhcpserver.DhcpClientInfo) {
-	return c.addChan, c.deleteChan
 }
 
 // SetupWithManager 设置 controller-runtime manager

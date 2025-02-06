@@ -4,42 +4,33 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 	"syscall"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
 // startDnsmasq starts the dnsmasq process
 func (s *dhcpServer) startDnsmasq() error {
+
+	if err := s.setupInterface(); err != nil {
+		return fmt.Errorf("failed to setup interface: %v", err)
+	}
+
 	configFilePath, err := s.generateDnsmasqConfig(s.currentClients)
 	if err != nil {
 		return fmt.Errorf("failed to generate dnsmasq config: %v", err)
 	}
+	s.log.Infof("dns config file %s", configFilePath)
 
 	// 创建 context 用于进程管理
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cmdCancel = cancel
-
-	// 统计 IP 使用情况
-	totalIPs := 0
-	for _, ipRange := range strings.Split(s.subnet.Spec.IPv4Subnet.IPRange, ",") {
-		parts := strings.Split(ipRange, "-")
-		if len(parts) != 2 {
-			continue
-		}
-		start := net.ParseIP(parts[0])
-		end := net.ParseIP(parts[1])
-		if start == nil || end == nil {
-			continue
-		}
-		totalIPs += int(binary.BigEndian.Uint32(end.To4())) - int(binary.BigEndian.Uint32(start.To4())) + 1
-	}
-	s.totalIPs = totalIPs
 
 	// 启动 dnsmasq
 	cmd := exec.Command("dnsmasq", "-C", configFilePath)
@@ -52,8 +43,8 @@ func (s *dhcpServer) startDnsmasq() error {
 
 	s.cmd = cmd
 
-	// 启动进程监控
 	go func() {
+		// cancel the ctx
 		defer cancel()
 		if err := cmd.Wait(); err != nil {
 			if ctx.Err() == nil {
@@ -69,6 +60,19 @@ func (s *dhcpServer) startDnsmasq() error {
 	if cmd.Process == nil {
 		return fmt.Errorf("dnsmasq process failed to start")
 	}
+
+	return nil
+}
+
+// UpdateService updates the subnet configuration and restarts the DHCP server
+func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 更新 subnet
+	s.subnet = &subnet
+	// 重启 DHCP 服务
+	s.restartCh <- struct{}
 
 	return nil
 }
@@ -127,9 +131,6 @@ func (s *dhcpServer) processLeaseFile(leaseFile string) error {
 	// 更新客户端缓存和统计信息
 	s.mu.Lock()
 	s.currentClients = currentClients
-	s.stats.TotalIPs = s.totalIPs
-	s.stats.UsedIPs = len(currentClients)
-	s.stats.AvailableIPs = s.totalIPs - len(currentClients)
 	s.mu.Unlock()
 
 	// 更新 Subnet 状态
@@ -144,55 +145,90 @@ func (s *dhcpServer) processLeaseFile(leaseFile string) error {
 	// 发送状态更新
 	s.statusUpdateCh <- updated
 
-	// 更新 dnsmasq 配置
-	if s.subnet.Spec.Feature.EnableBindDhcpIP {
-		configFilePath, err := s.generateDnsmasqConfig(currentClients)
-		if err != nil {
-			s.log.Errorf("Failed to update dnsmasq config: %v", err)
-			return err
-		}
-
-		// 重新加载 dnsmasq 配置
-		if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
-			return fmt.Errorf("failed to reload dnsmasq: %v", err)
-		}
-		s.log.Infof("Reloaded dnsmasq config: %s", configFilePath)
-	}
-
 	return nil
 }
 
-// watchLeaseStatus monitors the lease file and updates status
-func (s *dhcpServer) watchLeaseStatus() {
-	leaseFile := filepath.Join(s.config.StoragePathDhcpLease, fmt.Sprintf("dnsmasq-%s.leases", s.subnet.Name))
+// monitor monitors the lease file and updates status
+func (s *dhcpServer) monitor() {
 
-	// 创建文件监控器
+	// 添加 lease 文件监控
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		s.log.Errorf("Failed to create lease file watcher: %v", err)
 		return
 	}
 	defer watcher.Close()
-
-	// 添加监控文件
-	if err := watcher.Add(filepath.Dir(leaseFile)); err != nil {
+	if err := watcher.Add(filepath.Dir(s.leasePath)); err != nil {
 		s.log.Errorf("Failed to watch lease file: %v", err)
 		return
 	}
 
+	// watch the process at an interval
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
 	// 开始监控
 	for {
+		needRestart := false
+		needReload := false
 		select {
 		case <-s.stopCh:
+			s.log.Errorf("subnet monitor is exiting")
 			return
+
+		// lease file event
 		case event := <-watcher.Events:
 			if event.Name == leaseFile && (event.Op&fsnotify.Write == fsnotify.Write) {
 				if err := s.processLeaseFile(leaseFile); err != nil {
 					s.log.Errorf("Failed to process lease file: %v", err)
 				}
 			}
+			if s.subnet.Spec.Feature.EnableBindDhcpIP {
+				needReload = true
+			}
+
+		// watch error of lease file
 		case err := <-watcher.Errors:
 			s.log.Errorf("Lease file watcher error: %v", err)
+
+		// subnet changes
+		case <-s.restartCh:
+			s.log.Infof("dhcp server reload after receiving a subnet updating event")
+			needReload = true
+
+		// check the process
+		case <-ticker.C:
+			isDead := s.cmd == nil || s.cmd.Process == nil
+			if !isDead {
+				if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
+					log.Logger.Errorf("DHCP server process check failed: %v", err)
+					needRestart = true
+				}
+			} else {
+				needRestart = true
+				s.log.Infof("dhcp server is dead, restart it")
+			}
+		}
+
+		if needRestart || needReload {
+
+			configFilePath, err := s.generateDnsmasqConfig(currentClients)
+			if err != nil {
+				s.log.Errorf("Failed to update dnsmasq config: %v", err)
+				return err
+			}
+
+			if needReload {
+				s.log.Infof("reload dhcp server")
+				// 重新加载 dnsmasq 配置
+				if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
+					return fmt.Errorf("failed to reload dnsmasq: %v", err)
+				}
+				s.log.Infof("Reloaded dnsmasq config: %s", configFilePath)
+			} else {
+				s.log.Infof("restarting dhcp server")
+				s.startDnsmasq()
+			}
 		}
 	}
 }

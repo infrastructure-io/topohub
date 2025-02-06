@@ -14,32 +14,17 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
-// UpdateService updates the subnet configuration and restarts the DHCP server
-func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// 更新 subnet
-	s.subnet = &subnet
-
-	// 重启 DHCP 服务
-	if err := s.restartDhcpServer(); err != nil {
-		return fmt.Errorf("failed to restart DHCP server: %v", err)
-	}
-
-	// 更新状态
-	s.statusUpdateCh <- &subnet
-
-	return nil
-}
 
 // statusUpdateWorker handles subnet status updates with retries
 func (s *dhcpServer) statusUpdateWorker() {
 	for {
 		select {
 		case <-s.stopCh:
+			s.log.Errorf("the status updater of subnet is exiting")
 			return
+
 		case subnet := <-s.statusUpdateCh:
+			s.log.Errorf("it is about to update the subnet status: %+v", subnet.Status)
 			if err := s.updateSubnetWithRetry(subnet); err != nil {
 				log.Logger.Errorf("Failed to update subnet status: %v", err)
 			}

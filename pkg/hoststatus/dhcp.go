@@ -23,6 +23,8 @@ func shouldRetry(err error) bool {
 
 // DHCP manager 把 dhcp client 事件告知后，进行 hoststatus 更新
 func (c *hostStatusController) processDHCPEvents() {
+
+	subnet.
 	for {
 		select {
 		case <-c.stopCh:

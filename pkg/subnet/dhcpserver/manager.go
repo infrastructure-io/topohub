@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 
 	"go.uber.org/zap"
 
@@ -25,40 +26,53 @@ type DhcpServer interface {
 }
 
 type dhcpServer struct {
-	config            *config.AgentConfig
-	subnet            *topohubv1beta1.Subnet
-	client            client.Client
+	config *config.AgentConfig
+	subnet *topohubv1beta1.Subnet
+	client client.Client
+
 	cmd               *exec.Cmd
 	cmdCancel         context.CancelFunc
 	stopCh            chan struct{}
 	addedDhcpClient   chan DhcpClientInfo
 	deletedDhcpClient chan DhcpClientInfo
-	stats             *IPUsageStats
-	mu                *lock.RWMutex
-	statusUpdateCh    chan *topohubv1beta1.Subnet
-	log               *zap.SugaredLogger
-	currentClients    map[string]*DhcpClientInfo
-	totalIPs          int
+
+	mu *lock.RWMutex
+	// update the status of crd
+	statusUpdateCh chan *topohubv1beta1.Subnet
+	log            *zap.SugaredLogger
+	currentClients map[string]*DhcpClientInfo
+	totalIPs       int
+
+	// restart the dhcp server
+	restartCh chan struct{}
+
+	// file path
+	configTemplatePath string
+	configPath         string
+	leasePath          string
+	logPath            string
 }
 
 // NewDhcpServer creates a new DHCP server instance
-func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClient chan DhcpClientInfo, deletedDhcpClient chan DhcpClientInfo) (*dhcpServer, error) {
-	server := &dhcpServer{
-		config:            config,
-		subnet:            subnet,
-		client:            client,
-		addedDhcpClient:   addedDhcpClient,
-		deletedDhcpClient: deletedDhcpClient,
-		stopCh:            make(chan struct{}),
-		stats:             &IPUsageStats{},
-		mu:                &lock.RWMutex{},
-		statusUpdateCh:    make(chan *topohubv1beta1.Subnet, 100),
-		log:               log.Logger.With(zap.String("subnet", subnet.Name)),
-		currentClients:    make(map[string]*DhcpClientInfo),
-		totalIPs:          0,
+func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClient chan DhcpClientInfo, deletedDhcpClient chan DhcpClientInfo) *dhcpServer {
+	return &dhcpServer{
+		config:             config,
+		subnet:             subnet,
+		client:             client,
+		addedDhcpClient:    addedDhcpClient,
+		deletedDhcpClient:  deletedDhcpClient,
+		stopCh:             make(chan struct{}),
+		mu:                 &lock.RWMutex{},
+		statusUpdateCh:     make(chan *topohubv1beta1.Subnet, 100),
+		restartCh:          make(chan struct{}),
+		log:                log.Logger.With(zap.String("subnet", subnet.Name)),
+		currentClients:     make(map[string]*DhcpClientInfo),
+		totalIPs:           0,
+		configTemplatePath: filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
+		configPath:         filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
+		leasePath:          filepath.Join(config.StoragePathDhcpLease, fmt.Sprintf("dnsmasq-%s.leases", subnet.Name)),
+		logPath:            filepath.Join(s.config.StoragePathDhcpLog, fmt.Sprintf("dnsmasq-%s.log", s.subnet.Name)),
 	}
-
-	return server, nil
 }
 
 // Run starts the DHCP server and all associated services
@@ -68,35 +82,26 @@ func (s *dhcpServer) Run() error {
 		s.log.Warnf("Failed to cleanup old interface: %v", err)
 	}
 
-	// 启动状态更新协程
+	// 启动 CRD 更新协程
 	go s.statusUpdateWorker()
 
 	// 启动 DHCP 服务
-	if err := s.restartDhcpServer(); err != nil {
+	if err := s.startDnsmasq(); err != nil {
 		return fmt.Errorf("failed to start DHCP server: %v", err)
 	}
 
 	// 启动状态监控
-	go s.watchLeaseStatus()
+	go s.monitor()
 
 	return nil
 }
 
-// restartDhcpServer configures and starts the dnsmasq service
-func (s *dhcpServer) restartDhcpServer() error {
-	// 1. 配置网络接口
-	if err := s.setupInterface(); err != nil {
-		return fmt.Errorf("failed to setup interface: %v", err)
-	}
-	//  启动 dnsmasq
-	return s.startDnsmasq()
-}
-
 // Stop stops all services and cleans up resources
 func (s *dhcpServer) Stop() error {
-	close(s.stopCh)
+	s.log.Infof("stop whole dhcp server service")
 
 	// 停止 dnsmasq 进程
+	close(s.stopCh)
 	if s.cmd != nil && s.cmd.Process != nil {
 		if err := s.cmd.Process.Kill(); err != nil {
 			s.log.Errorf("Failed to kill dnsmasq process: %v", err)
@@ -104,6 +109,7 @@ func (s *dhcpServer) Stop() error {
 	}
 
 	// 清理网络接口
+	s.log.Infof("clean all interfaces")
 	if err := s.cleanupAllInterface(); err != nil {
 		s.log.Errorf("Failed to cleanup network interface: %v", err)
 	}
