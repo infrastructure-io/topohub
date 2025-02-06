@@ -25,11 +25,15 @@ func (s *dhcpServer) setupInterface() error {
 
 	// 根据配置创建接口
 	if s.subnet.Spec.Interface.VlanID != nil && *s.subnet.Spec.Interface.VlanID > 0 {
+		s.log.Infof("Creating VLAN interface: %s.topohub.%d on vlan %d", baseInterface, *s.subnet.Spec.Interface.VlanID, *s.subnet.Spec.Interface.VlanID)
+
 		interfaceName = fmt.Sprintf(vlanInterfaceFormat, baseInterface, *s.subnet.Spec.Interface.VlanID)
 		if err := s.createVlanInterface(parent, interfaceName, *s.subnet.Spec.Interface.VlanID); err != nil {
 			return err
 		}
 	} else {
+		s.log.Infof("Creating MACVLAN interface: %s.topohub", baseInterface)
+
 		interfaceName = fmt.Sprintf(macvlanInterfaceFormat, baseInterface)
 		if err := s.createMacvlanInterface(parent, interfaceName); err != nil {
 			return err
@@ -96,6 +100,8 @@ func (s *dhcpServer) createMacvlanInterface(parent netlink.Link, name string) er
 
 // configureIP configures IP address on the interface
 func (s *dhcpServer) configureIP(name, ipStr string) error {
+	s.log.Infof("Configuring IP address: %s on interface %s", ipStr, name)
+
 	// 获取接口
 	link, err := netlink.LinkByName(name)
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -22,7 +21,7 @@ func (s *dhcpServer) startDnsmasq() error {
 		return fmt.Errorf("failed to setup interface: %v", err)
 	}
 
-	configFilePath, err := s.generateDnsmasqConfig(s.currentClients)
+	configFilePath, err := s.generateDnsmasqConfig()
 	if err != nil {
 		return fmt.Errorf("failed to generate dnsmasq config: %v", err)
 	}
@@ -61,6 +60,9 @@ func (s *dhcpServer) startDnsmasq() error {
 		return fmt.Errorf("dnsmasq process failed to start")
 	}
 
+	// update the status of subnet
+	s.statusUpdateCh <- struct{}{}
+
 	return nil
 }
 
@@ -73,77 +75,6 @@ func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 	s.subnet = &subnet
 	// 重启 DHCP 服务
 	s.restartCh <- struct{}{}
-
-	return nil
-}
-
-// processLeaseFile reads and processes the lease file
-func (s *dhcpServer) processLeaseFile(leaseFile string) error {
-	// 读取租约文件
-	content, err := os.ReadFile(leaseFile)
-	if err != nil {
-		return fmt.Errorf("failed to read lease file: %v", err)
-	}
-
-	lines := strings.Split(string(content), "\n")
-	currentClients := make(map[string]*DhcpClientInfo)
-
-	s.mu.Lock()
-	previousClients := s.currentClients
-	s.mu.Unlock()
-
-	// 处理每一行租约记录
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) < 5 {
-			continue
-		}
-
-		// 解析租约信息
-		clientInfo := &DhcpClientInfo{
-			MAC:       fields[1],
-			IP:        fields[2],
-			Active:    true,
-			StartTime: fields[0],
-			Subnet:    s.subnet.Spec.IPv4Subnet.Subnet,
-		}
-
-		currentClients[clientInfo.MAC] = clientInfo
-
-		// 检查是否为新增客户端
-		if _, exists := previousClients[clientInfo.MAC]; !exists {
-			s.addedDhcpClient <- *clientInfo
-		}
-	}
-
-	// 检查删除的客户端
-	for mac, client := range previousClients {
-		if _, exists := currentClients[mac]; !exists {
-			client.Active = false
-			s.deletedDhcpClient <- *client
-		}
-	}
-
-	// 更新客户端缓存和统计信息
-	s.mu.Lock()
-	s.currentClients = currentClients
-	s.mu.Unlock()
-
-	// 更新 Subnet 状态
-	updated := s.subnet.DeepCopy()
-	if updated.Status.DhcpStatus == nil {
-		updated.Status.DhcpStatus = &topohubv1beta1.DhcpStatusSpec{}
-	}
-	updated.Status.DhcpStatus.DhcpIpTotalAmount = s.totalIPs
-	updated.Status.DhcpStatus.DhcpIpAssignAmount = uint64(len(currentClients))
-	updated.Status.DhcpStatus.DhcpIpAvailableAmount = s.totalIPs - uint64(len(currentClients))
-
-	// 发送状态更新
-	s.statusUpdateCh <- updated
 
 	return nil
 }
@@ -178,13 +109,9 @@ func (s *dhcpServer) monitor() {
 
 		// lease file event
 		case event := <-watcher.Events:
-			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
-				if err := s.processLeaseFile(s.leasePath); err != nil {
-					s.log.Errorf("Failed to process lease file: %v", err)
-				}
-			}
-			if s.subnet.Spec.Feature.EnableBindDhcpIP {
+			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) && s.subnet.Spec.Feature.EnableBindDhcpIP {
 				needReload = true
+				s.log.Infof("dhcp server reload after binding new ip")
 			}
 
 		// watch error of lease file
@@ -193,8 +120,8 @@ func (s *dhcpServer) monitor() {
 
 		// subnet changes
 		case <-s.restartCh:
-			s.log.Infof("dhcp server reload after receiving a subnet updating event")
 			needReload = true
+			s.log.Infof("dhcp server reload after the spec of subnet is updated")
 
 		// check the process
 		case <-ticker.C:
@@ -211,8 +138,7 @@ func (s *dhcpServer) monitor() {
 		}
 
 		if needRestart || needReload {
-
-			configFilePath, err := s.generateDnsmasqConfig(s.currentClients)
+			configFilePath, err := s.generateDnsmasqConfig()
 			if err != nil {
 				s.log.Errorf("Failed to update dnsmasq config: %v", err)
 				continue
@@ -230,6 +156,9 @@ func (s *dhcpServer) monitor() {
 				s.log.Infof("restarting dhcp server")
 				s.startDnsmasq()
 			}
+
+			// update the status of subnet
+			s.statusUpdateCh <- struct{}{}
 		}
 	}
 }

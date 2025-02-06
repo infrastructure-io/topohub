@@ -3,6 +3,7 @@ package subnet
 import (
 	"context"
 	"fmt"
+	"github.com/infrastructure-io/topohub/pkg/config"
 	"net"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,10 +21,12 @@ import (
 // SubnetWebhook validates Subnet resources
 type SubnetWebhook struct {
 	Client client.Client
+	config *config.AgentConfig
 }
 
-func (w *SubnetWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (w *SubnetWebhook) SetupWebhookWithManager(mgr ctrl.Manager, config config.AgentConfig) error {
 	w.Client = mgr.GetClient()
+	w.config = &config
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&topohubv1beta1.Subnet{}).
 		WithValidator(w).
@@ -52,7 +55,9 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 		subnet.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = ""
 	}
 
-
+	if subnet.Spec.Interface.Interface == "" {
+		subnet.Spec.Interface.Interface = w.config.DhcpServerInterface
+	}
 
 	return nil
 }

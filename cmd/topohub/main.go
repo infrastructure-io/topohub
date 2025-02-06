@@ -116,7 +116,7 @@ func main() {
 	}
 
 	// Setup Subnet webhook
-	if err = (&subnetwebhook.SubnetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&subnetwebhook.SubnetWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
 		log.Logger.Errorf("unable to create webhook %s: %v", "DhcpSubnet", err)
 		os.Exit(1)
 	}

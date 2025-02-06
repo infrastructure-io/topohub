@@ -11,11 +11,14 @@ data:
     dhcp-leasefile={{ "{{ .LeaseFile }}" }}
     log-facility={{ "{{ .LogFile }}" }}
     log-dhcp
+    bind-interfaces
     interface={{ "{{ .Interface }}" }}
+    listen-address={{ "{{ .SelfIP }}" }}
 
     # DHCP range configuration
+    # format: <start_ip>,<end_ip>,<lease_time>  or <start_ip>,<end_ip>
     {{- "{{ range .IPRanges }}" }}
-    dhcp-range={{ "{{ . }}" }}
+    dhcp-range={{ "{{ . }}" }},30d
     {{- "{{ end }}" }}
 
     # Gateway configuration
@@ -47,6 +50,10 @@ data:
     dhcp-option=vendor:Cisco,9,http://{{ "{{ .SelfIP }}" }}/ztp.py
     dhcp-option=vendor:Arista,114,http://{{ "{{ .SelfIP }}" }}/ztp.py
     dhcp-option=vendor:Juniper,0,http://{{ "{{ .SelfIP }}" }}/ztp.conf
+    {{- "{{ end }}" }}
+
+    {{- "{{ if .EnableBindDhcpIP }}" }}
+    conf-dir={{ "{{ .HostIpBindingsConfigPath }}" }}
     {{- "{{ end }}" }}
 
     # Additional options

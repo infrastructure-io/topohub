@@ -29,7 +29,7 @@ spec:
       endpointType: hoststatus
     enableBindDhcpIP: true
     enableReserveNoneDhcpIP: true
-    enablePxe: false
+    enablePxe: true
     enableZtp: false
 EOF
 
