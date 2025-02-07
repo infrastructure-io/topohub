@@ -1,6 +1,6 @@
 module github.com/infrastructure-io/topohub
 
-go 1.23.5
+go 1.23.6
 
 require (
 	github.com/onsi/ginkgo/v2 v2.21.0
