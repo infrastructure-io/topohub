@@ -33,6 +33,7 @@ RUN apt-get update && \
 WORKDIR /
 # Copy the binary from builder stage
 COPY --from=builder /workspace/bin/topohub /usr/local/bin/
+COPY ./image/topohub/files /files
 
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/topohub"]

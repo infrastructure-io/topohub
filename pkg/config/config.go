@@ -23,13 +23,15 @@ type AgentConfig struct {
 	WebhookCertDir string
 
 	// storage path
-	StoragePath           string
-	StoragePathDhcpLog    string
-	StoragePathDhcpLease  string
-	StoragePathDhcpConfig string
-	StoragePathZtp        string
-	StoragePathSftp       string
-	StoragePathHttp       string
+	StoragePath                         string
+	StoragePathDhcpLog                  string
+	StoragePathDhcpLease                string
+	StoragePathDhcpConfig               string
+	StoragePathZtp                      string
+	StoragePathSftp                     string
+	StoragePathSftpRelativeDirForPxeEfi string
+	StoragePathSftpAbsoluteDirForPxeEfi string
+	StoragePathHttp                     string
 
 	// dnsmasq config template path
 	DhcpConfigTemplatePath string
@@ -128,6 +130,8 @@ func (c *AgentConfig) initStorageDirectory() error {
 	c.StoragePathDhcpLog = filepath.Join(c.StoragePath, "dhcp/log")
 	c.StoragePathZtp = filepath.Join(c.StoragePath, "ztp")
 	c.StoragePathSftp = filepath.Join(c.StoragePath, "sftp")
+	c.StoragePathSftpRelativeDirForPxeEfi = "boot/grub/x86_64-efi"
+	c.StoragePathSftpAbsoluteDirForPxeEfi = filepath.Join(c.StoragePathSftp, c.StoragePathSftpRelativeDirForPxeEfi)
 	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
 
 	// List of required subdirectories
@@ -137,6 +141,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 		c.StoragePathDhcpLog,
 		c.StoragePathZtp,
 		c.StoragePathSftp,
+		c.StoragePathSftpAbsoluteDirForPxeEfi,
 		c.StoragePathHttp,
 	}
 
@@ -147,6 +152,30 @@ func (c *AgentConfig) initStorageDirectory() error {
 				return fmt.Errorf("failed to create subdirectory %s: %v", dir, err)
 			}
 		}
+	}
+
+	// Set ownership and permissions for SFTP directory
+	if err := os.Chown(c.StoragePathSftp, 65534, 65534); err != nil { // 65534 is nobody:nogroup
+		return fmt.Errorf("failed to change ownership of SFTP directory: %v", err)
+	}
+	if err := os.Chmod(c.StoragePathSftp, 0777); err != nil {
+		return fmt.Errorf("failed to change permissions of SFTP directory: %v", err)
+	}
+
+	// Copy core.efi file if it exists
+	sourceFile := "/files/core.efi"
+	if _, err := os.Stat(sourceFile); err == nil {
+		targetFile := filepath.Join(c.StoragePathSftpAbsoluteDirForPxeEfi, "core.efi")
+		log.Logger.Infof("%s exists, copying to %s", sourceFile, targetFile)
+
+		input, err := os.ReadFile(sourceFile)
+		if err != nil {
+			return fmt.Errorf("failed to read core.efi: %v", err)
+		}
+		if err := os.WriteFile(targetFile, input, 0644); err != nil {
+			return fmt.Errorf("failed to copy core.efi to %s: %v", targetFile, err)
+		}
+		log.Logger.Infof("Successfully copied core.efi to %s", targetFile)
 	}
 
 	return nil

@@ -24,11 +24,9 @@ spec:
   feature:
     enableSyncEndpoint:
       dhcpClient: true
-      scanEndpoint: false
       defaultClusterName: cluster1
       endpointType: hoststatus
     enableBindDhcpIP: true
-    enableReserveNoneDhcpIP: true
     enablePxe: true
     enableZtp: false
 EOF
@@ -60,11 +58,9 @@ spec:
   feature:
     enableSyncEndpoint:
       dhcpClient: true
-      scanEndpoint: false
       defaultClusterName: cluster2
       endpointType: hoststatus
     enableBindDhcpIP: true
-    enableReserveNoneDhcpIP: true
     enablePxe: true
     enableZtp: true
 EOF

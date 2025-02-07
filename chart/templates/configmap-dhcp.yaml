@@ -38,10 +38,8 @@ data:
     tftp-root={{ "{{ .TftpServerDir }}" }}
     
     # PXE boot menu
-    dhcp-boot=pxelinux.0
-    dhcp-match=set:ipxe,175  # iPXE sends a 175 option
-    dhcp-boot=tag:!ipxe,undionly.kpxe
-    dhcp-boot=tag:ipxe,http://{{ "{{ .SelfIP }}" }}/boot.ipxe
+    dhcp-match=set:efi-x86_64,option:client-arch,7
+    dhcp-boot=tag:efi-x86_64,{{ "{{ .PxeEfiInTftpServerDir }}" }}/core.efi
     {{- "{{ end }}" }}
 
     

@@ -3,6 +3,7 @@ package hoststatus
 import (
 	"context"
 	"reflect"
+	"strings"
 	"time"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -166,6 +167,28 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	}
 	if c.config.RedfishSecretNamespace != "" {
 		hostStatus.Status.Basic.SecretNamespace = c.config.RedfishSecretNamespace
+	}
+
+	// update the labels
+	if hostStatus.ObjectMeta.Labels == nil {
+		hostStatus.ObjectMeta.Labels = make(map[string]string)
+	}
+	// cluster name
+	hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = hostStatus.Status.Basic.ClusterName
+	// ip
+	IpAddr := strings.Split(hostStatus.Status.Basic.IpAddr, "/")[0]
+	hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
+	// mode
+	if hostStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP {
+		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
+	} else {
+		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeEndpoint
+	}
+	// dhcp
+	if hostStatus.Status.Basic.ActiveDhcpClient {
+		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
+	} else {
+		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "false"
 	}
 
 	if err := c.client.Status().Update(context.Background(), hostStatus); err != nil {

@@ -31,6 +31,8 @@ func (s *dhcpServer) setupInterface() error {
 		if err := s.createVlanInterface(parent, interfaceName, *s.subnet.Spec.Interface.VlanID); err != nil {
 			return err
 		}
+	} else {
+		interfaceName = baseInterface
 	}
 	// } else {
 	// 	s.log.Infof("Creating MACVLAN interface: %s.topohub", baseInterface)

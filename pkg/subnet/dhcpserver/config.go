@@ -63,6 +63,7 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 		Name                     string
 		SelfIP                   string
 		TftpServerDir            string
+		PxeEfiInTftpServerDir    string
 		HostIpBindingsConfigPath string
 	}{
 		Interface:                interfaceName,
@@ -77,6 +78,7 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 		Name:                     s.subnet.Name,
 		SelfIP:                   strings.Split(s.subnet.Spec.Interface.IPv4, "/")[0],
 		TftpServerDir:            s.config.StoragePathSftp,
+		PxeEfiInTftpServerDir:    s.config.StoragePathSftpRelativeDirForPxeEfi,
 		HostIpBindingsConfigPath: s.HostIpBindingsConfigPath,
 	}
 
