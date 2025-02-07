@@ -111,7 +111,6 @@ func specEqual(a, b topohubv1beta1.SubnetSpec) bool {
 	}
 	if a.Feature != nil && b.Feature != nil {
 		if a.Feature.EnableBindDhcpIP != b.Feature.EnableBindDhcpIP ||
-			a.Feature.EnableReserveNoneDhcpIP != b.Feature.EnableReserveNoneDhcpIP ||
 			a.Feature.EnablePxe != b.Feature.EnablePxe ||
 			a.Feature.EnableZtp != b.Feature.EnableZtp {
 			return false

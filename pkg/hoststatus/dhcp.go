@@ -2,6 +2,7 @@ package hoststatus
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -59,38 +60,42 @@ func (c *hostStatusController) processDHCPEvents() {
 func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) error {
 
 	name := formatHostStatusName(client.IP)
-	log.Logger.Debugf("Processing DHCP add event - IP: %s, MAC: %s, Active: %v, Lease: %s -> %s, ClusterName: %s, Subnet: %s",
-		client.IP, client.MAC, client.Active, client.StartTime, client.ClusterName, client.Subnet)
+	log.Logger.Debugf("Processing DHCP add event: %+v ", client)
 
 	// Try to get existing HostStatus
 	existing := &topohubv1beta1.HostStatus{}
 	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
 	if err == nil {
-		// HostStatus exists, check if MAC changed,  or if failed to update status after creating
-		if existing.Status.Basic.Mac == client.MAC {
-			log.Logger.Debugf("HostStatus %s exists with same MAC %s, no update needed", name, client.MAC)
-			return nil
-		}
-		// MAC changed, update the object
-		log.Logger.Infof("Updating HostStatus %s: MAC changed from %s to %s",
-			name, existing.Status.Basic.Mac, client.MAC)
-
 		// Create a copy of the existing object to avoid modifying the cache
 		updated := existing.DeepCopy()
-		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		updated.Status.Basic.Mac = client.MAC
 
-		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			if errors.IsConflict(err) {
-				log.Logger.Debugf("Conflict updating HostStatus %s, will retry", name)
+		// HostStatus exists, check if MAC changed,  or if failed to update status after creating
+		if updated.Status.Basic.Mac != client.MAC {
+			// MAC changed, update the object
+			log.Logger.Infof("Updating HostStatus %s: MAC changed from %s to %s",
+				name, updated.Status.Basic.Mac, client.MAC)
+			updated.Status.Basic.Mac = client.MAC
+		}
+		if updated.Status.Basic.DhcpExpireTime == nil || *updated.Status.Basic.DhcpExpireTime != client.DhcpExpireTime.Format(time.RFC3339) {
+			// DHCP expire time changed, update the object
+			log.Logger.Infof("Updating HostStatus %s: DHCP expire time changed from %s to %s",
+				name, updated.Status.Basic.DhcpExpireTime, client.DhcpExpireTime.Format(time.RFC3339))
+			expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
+			updated.Status.Basic.DhcpExpireTime = &expireTimeStr
+		}
+
+		if !reflect.DeepEqual(existing.Status, updated.Status) {
+			updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
+			if err := c.client.Status().Update(context.Background(), updated); err != nil {
+				if errors.IsConflict(err) {
+					log.Logger.Debugf("Conflict updating HostStatus %s, will retry", name)
+					return err
+				}
+				log.Logger.Errorf("Failed to update HostStatus %s: %v", name, err)
 				return err
 			}
-			log.Logger.Errorf("Failed to update HostStatus %s: %v", name, err)
-			return err
+			log.Logger.Infof("Successfully updated HostStatus %s", name)
 		}
-		log.Logger.Infof("Successfully updated HostStatus %s", name)
-		log.Logger.Debugf("Updated DHCP client details - IP: %s, MAC: %s, Lease: %s ",
-			client.IP, client.MAC, client.StartTime)
 		return nil
 	}
 
@@ -103,11 +108,11 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				topohubv1beta1.LabelIPAddr:       client.IP,
-				topohubv1beta1.LabelClientMode:   topohubv1beta1.HostTypeDHCP,
-				topohubv1beta1.LabelClientActive: "true",
-				topohubv1beta1.LabelClusterName:  client.ClusterName,
-				topohubv1beta1.LabelSubnet:       client.Subnet,
+				// topohubv1beta1.LabelIPAddr:       strings.Split(client.IP, "/")[0],
+				// topohubv1beta1.LabelClientMode:   topohubv1beta1.HostTypeDHCP,
+				// topohubv1beta1.LabelClientActive: "true",
+				// topohubv1beta1.LabelClusterName:  client.ClusterName,
+				topohubv1beta1.LabelSubnetName: client.SubnetName,
 			},
 		},
 	}
@@ -143,6 +148,10 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 			Https:            c.config.RedfishHttps,
 			ActiveDhcpClient: true,
 			ClusterName:      client.ClusterName,
+			DhcpExpireTime: func() *string {
+				expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
+				return &expireTimeStr
+			}(),
 		},
 		Info: map[string]string{},
 		Log: topohubv1beta1.LogStruct{
@@ -165,64 +174,57 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	}
 
 	log.Logger.Infof("Successfully created HostStatus %s", name)
-	log.Logger.Debugf("DHCP client details - IP: %s, MAC: %s, Lease: %s",
-		client.IP, client.MAC, client.StartTime)
+	log.Logger.Debugf("DHCP client details - %+v", client)
 	return nil
 }
 
 func (c *hostStatusController) handleDHCPDelete(client dhcpserver.DhcpClientInfo) error {
 	name := formatHostStatusName(client.IP)
-	log.Logger.Debugf("Processing DHCP delete event - IP: %s, MAC: %s", client.IP, client.MAC)
+	log.Logger.Debugf("Processing DHCP delete event - %+v", client)
 
-	// if c.config.AgentObjSpec.Feature.DhcpServerConfig.EnableBindDhcpIP {
-	// 	log.Logger.Infof("Enable Bind DhcpIP, so just label the hoststatus - IP: %s, MAC: %s", client.IP, client.MAC)
-
-	// 	// 获取现有的 HostStatus
-	// 	existing := &topohubv1beta1.HostStatus{}
-	// 	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
-	// 	if err != nil {
-	// 		if errors.IsNotFound(err) {
-	// 			log.Logger.Debugf("HostStatus %s not found, skip labeling", name)
-	// 			return nil
-	// 		}
-	// 		log.Logger.Errorf("Failed to get HostStatus %s: %v", name, err)
-	// 		return err
-	// 	}
-
-	// 	// 创建更新对象的副本
-	// 	updated := existing.DeepCopy()
-	// 	// 如果没有 labels map，则创建
-	// 	if updated.Labels == nil {
-	// 		updated.Labels = make(map[string]string)
-	// 	}
-	// 	// 添加或更新标签
-	// 	updated.Labels[topohubv1beta1.LabelClientActive] = "false"
-	// 	updated.Status.Basic.ActiveDhcpClient = false
-	// 	// 更新对象
-	// 	if err := c.client.Update(context.Background(), updated); err != nil {
-	// 		log.Logger.Errorf("Failed to update labels of HostStatus %s: %v", name, err)
-	// 		return err
-	// 	}
-	// 	log.Logger.Infof("Successfully labeled HostStatus %s with dhcp-bound=false", name)
-
-	// } else {
-	log.Logger.Infof("Disable Bind DhcpIP, so delete the hoststatus - IP: %s, MAC: %s", client.IP, client.MAC)
-
-	existing := &topohubv1beta1.HostStatus{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-	if err := c.client.Delete(context.Background(), existing); err != nil {
+	// 获取现有的 HostStatus
+	existing := &topohubv1beta1.HostStatus{}
+	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
+	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Logger.Debugf("HostStatus %s not found, already deleted", name)
+			log.Logger.Debugf("HostStatus %s not found, skip labeling", name)
 			return nil
 		}
-		log.Logger.Errorf("Failed to delete HostStatus %s: %v", name, err)
+		log.Logger.Errorf("Failed to get HostStatus %s: %v", name, err)
 		return err
 	}
-	log.Logger.Infof("Successfully deleted HostStatus %s", name)
-	//}
+
+	// 创建更新对象的副本
+	updated := existing.DeepCopy()
+	// 如果没有 labels map，则创建
+	if updated.Labels == nil {
+		updated.Labels = make(map[string]string)
+	}
+	// 添加或更新标签
+	updated.Labels[topohubv1beta1.LabelClientActive] = "false"
+	updated.Status.Basic.ActiveDhcpClient = false
+	// 更新对象
+	if err := c.client.Update(context.Background(), updated); err != nil {
+		log.Logger.Errorf("Failed to update labels of HostStatus %s: %v", name, err)
+		return err
+	}
+	log.Logger.Infof("Successfully disactivate the dhcp client of HostStatus %s", name)
+
+	// log.Logger.Infof("Disable Bind DhcpIP, so delete the hoststatus - IP: %s, MAC: %s", client.IP, client.MAC)
+	// existing := &topohubv1beta1.HostStatus{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name: name,
+	// 	},
+	// }
+	// if err := c.client.Delete(context.Background(), existing); err != nil {
+	// 	if errors.IsNotFound(err) {
+	// 		log.Logger.Debugf("HostStatus %s not found, already deleted", name)
+	// 		return nil
+	// 	}
+	// 	log.Logger.Errorf("Failed to delete HostStatus %s: %v", name, err)
+	// 	return err
+	// }
+	// log.Logger.Infof("Successfully deleted HostStatus %s", name)
 
 	return nil
 }

@@ -73,7 +73,7 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 		mu:                       &lock.RWMutex{},
 		statusUpdateCh:           make(chan struct{}),
 		restartCh:                make(chan struct{}),
-		log:                      log.Logger.With(zap.String("subnet", subnet.Name)),
+		log:                      log.Logger.With(zap.String("subnetManager", subnet.Name)),
 		currentClients:           make(map[string]*DhcpClientInfo),
 		totalIPs:                 total,
 		configTemplatePath:       filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),

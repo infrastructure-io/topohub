@@ -3,8 +3,9 @@ package subnet
 import (
 	"context"
 	"fmt"
-	"github.com/infrastructure-io/topohub/pkg/config"
 	"net"
+
+	"github.com/infrastructure-io/topohub/pkg/config"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -57,6 +58,10 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 
 	if subnet.Spec.Interface.Interface == "" {
 		subnet.Spec.Interface.Interface = w.config.DhcpServerInterface
+	}
+	if subnet.Spec.Interface.VlanID == nil {
+		a:=int32(0)
+		subnet.Spec.Interface.VlanID = &a
 	}
 
 	return nil
@@ -176,7 +181,7 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 	}
 
 	// Validate interface configuration
-	if err := w.validateInterface(&subnet.Spec.Interface, ipNet); err != nil {
+	if err := w.validateInterface(&subnet.Spec.Interface, ipNet, subnet); err != nil {
 		return fmt.Errorf("invalid interface configuration: %v", err)
 	}
 
@@ -184,10 +189,9 @@ func (w *SubnetWebhook) validateSubnet(ctx context.Context, subnet *topohubv1bet
 }
 
 // validateInterface validates the InterfaceSpec
-func (w *SubnetWebhook) validateInterface(iface *topohubv1beta1.InterfaceSpec, subnet *net.IPNet) error {
-	// Validate interface name format
-	if !tools.IsValidInterfaceName(iface.Interface) {
-		return fmt.Errorf("invalid interface name format: %s", iface.Interface)
+func (w *SubnetWebhook) validateInterface(iface *topohubv1beta1.InterfaceSpec, cidr *net.IPNet, subnet *topohubv1beta1.Subnet) error {
+	if iface == nil {
+		return fmt.Errorf("interface spec is required")
 	}
 
 	// Validate interface exists on the system
@@ -203,8 +207,41 @@ func (w *SubnetWebhook) validateInterface(iface *topohubv1beta1.InterfaceSpec, s
 	}
 
 	// Validate interface IPv4 address is in the same subnet
-	if err := tools.ValidateIPWithSubnetMatch(iface.IPv4, subnet); err != nil {
+	if err := tools.ValidateIPWithSubnetMatch(iface.IPv4, cidr); err != nil {
 		return fmt.Errorf("interface IPv4 validation failed: %v", err)
+	}
+
+	// List all existing subnets to check for interface conflicts
+	existingSubnets := &topohubv1beta1.SubnetList{}
+	if err := w.Client.List(context.Background(), existingSubnets); err != nil {
+		return fmt.Errorf("failed to list existing subnets: %v", err)
+	}
+
+	// Check for interface and VLAN ID conflicts
+	for _, existingSubnet := range existingSubnets.Items {
+		if existingSubnet.ObjectMeta.Name == subnet.ObjectMeta.Name {
+			continue
+		}
+
+		// Check if using the same interface
+		if existingSubnet.Spec.Interface.Interface == iface.Interface {
+			// If both have VLAN IDs, check if they're the same
+			if existingSubnet.Spec.Interface.VlanID != nil && iface.VlanID != nil {
+				if *existingSubnet.Spec.Interface.VlanID == *iface.VlanID {
+					return fmt.Errorf("interface %s with VLAN ID %d is already used by subnet %s",
+						iface.Interface, *iface.VlanID, existingSubnet.Name)
+				}
+			} else if existingSubnet.Spec.Interface.VlanID == nil && iface.VlanID == nil {
+				// If neither has VLAN ID, it's a conflict
+				return fmt.Errorf("interface %s is already used by subnet %s",
+					iface.Interface, existingSubnet.Name)
+			} else if existingSubnet.Spec.Interface.VlanID == nil && iface.VlanID == nil && existingSubnet.Spec.Interface.Interface == iface.Interface {
+				// If both have no VLAN ID, it's a conflict
+				return fmt.Errorf("interface %s is already used by subnet %s",
+					iface.Interface, existingSubnet.Name)
+			}
+			// If one has VLAN ID and the other doesn't, they can coexist
+		}
 	}
 
 	return nil

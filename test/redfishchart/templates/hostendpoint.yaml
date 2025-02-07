@@ -2,7 +2,7 @@
 apiVersion: topohub.infrastructure.io/v1beta1
 kind: HostEndpoint
 metadata:
-  name: test-hostendpoint
+  name: {{ .Release.Name }}-mockup
 spec:
   # 指定 clusterAgent，如果集群中只有一个 clusterAgent 实例，这个字段可以留空
   clusterName: "cluster-mock"

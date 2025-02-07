@@ -73,15 +73,15 @@ type FeatureSpec struct {
 	// +optional
 	EnableSyncEndpoint *EnableSyncEndpointSpec `json:"enableSyncEndpoint,omitempty"`
 
-	// Enable DHCP IP binding
+	// Enable Automatically bind DHCP Client IP in the dhcp server config
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
 	EnableBindDhcpIP bool `json:"enableBindDhcpIP"`
 
-	// Enable reservation for non-DHCP IPs
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	EnableReserveNoneDhcpIP bool `json:"enableReserveNoneDhcpIP"`
+	// // Enable reservation for non-DHCP IPs
+	// // +kubebuilder:validation:Required
+	// // +kubebuilder:default=false
+	// EnableReserveNoneDhcpIP bool `json:"enableReserveNoneDhcpIP"`
 
 	// Enable PXE boot support
 	// +kubebuilder:validation:Required
@@ -96,15 +96,15 @@ type FeatureSpec struct {
 
 // EnableSyncEndpointSpec defines the sync endpoint configuration
 type EnableSyncEndpointSpec struct {
-	// Enable DHCP client-based endpoint sync
+	// Enable automatically create the hoststatus object for the dhcp client. Notice, it will not be deleted automatically
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=true
 	DhcpClient bool `json:"dhcpClient"`
 
-	// Enable subnet scan-based endpoint sync
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	ScanEndpoint bool `json:"scanEndpoint"`
+	// // Enable subnet scan-based endpoint sync
+	// // +kubebuilder:validation:Required
+	// // +kubebuilder:default=false
+	// ScanEndpoint bool `json:"scanEndpoint"`
 
 	// Default cluster name
 	// +optional

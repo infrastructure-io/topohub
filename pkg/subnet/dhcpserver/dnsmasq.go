@@ -11,7 +11,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
 // startDnsmasq starts the dnsmasq process
@@ -82,58 +81,83 @@ func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 // monitor monitors the lease file and updates status
 func (s *dhcpServer) monitor() {
 
-	// 添加 lease 文件监控
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		s.log.Errorf("Failed to create lease file watcher: %v", err)
-		return
-	}
-	defer watcher.Close()
-	if err := watcher.Add(filepath.Dir(s.leasePath)); err != nil {
-		s.log.Errorf("Failed to watch lease file: %v", err)
-		return
+	watcher := &fsnotify.Watcher{Events: make(chan fsnotify.Event, 0)}
+	var err error
+	if s.subnet.Spec.Feature.EnableBindDhcpIP {
+		s.log.Infof(" bind dhcp ip is enabled, and watch lease file")
+		// 添加 lease 文件监控
+		watcher, err = fsnotify.NewWatcher()
+		if err != nil {
+			s.log.Errorf("Failed to create lease file watcher: %v", err)
+			return
+		}
+		defer watcher.Close()
+		if err := watcher.Add(filepath.Dir(s.leasePath)); err != nil {
+			s.log.Errorf("Failed to watch lease file: %v", err)
+			return
+		}
+	} else {
+		s.log.Infof("bind dhcp ip is disabled, and do not watch lease file")
 	}
 
 	// watch the process at an interval
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
+	tickerProcess := time.NewTicker(3 * time.Second)
+	defer tickerProcess.Stop()
+
+	// watch the lease file at an interval for dhcp expiration
+	tickerLease := time.NewTicker(10 * time.Minute)
+	defer tickerLease.Stop()
 
 	// 开始监控
 	for {
 		needRestart := false
 		needReload := false
+
 		select {
 		case <-s.stopCh:
 			s.log.Errorf("subnet monitor is exiting")
 			return
 
-		// lease file event
-		case event := <-watcher.Events:
-			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) && s.subnet.Spec.Feature.EnableBindDhcpIP {
-				needReload = true
-				s.log.Infof("dhcp server reload after binding new ip")
-			}
-
 		// watch error of lease file
 		case err := <-watcher.Errors:
 			s.log.Errorf("Lease file watcher error: %v", err)
 
-		// subnet changes
+		// lease file event
+		case event, ok := <-watcher.Events:
+			if !ok {
+				s.log.Panicf("Lease file watcher channel closed")
+			}
+			s.log.Debugf("watcher event: %+v", event)
+			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
+				needReload = true
+				s.log.Infof("dhcp server reload after binding new ip")
+			}
+
+		// reconcile notify subnet changes
 		case <-s.restartCh:
 			needReload = true
 			s.log.Infof("dhcp server reload after the spec of subnet is updated")
 
+		// check the dhcp expiration in the lease file
+		case <-tickerLease.C:
+			// try to update the dhcp expiration time from the lease file to hoststatus
+			if err := s.processLeaseAndUpdateBindings(true, true); err != nil {
+				s.log.Errorf("failed to update dhcp expiration time: %v", err)
+			}
+
 		// check the process
-		case <-ticker.C:
+		case <-tickerProcess.C:
 			isDead := s.cmd == nil || s.cmd.Process == nil
 			if !isDead {
 				if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
-					log.Logger.Errorf("DHCP server process check failed: %v", err)
+					s.log.Errorf("DHCP server process check failed: %v", err)
 					needRestart = true
+				} else {
+					s.log.Debugf("dhcp server for %s is running", s.subnet.Name)
 				}
 			} else {
 				needRestart = true
-				s.log.Infof("dhcp server is dead, restart it")
+				s.log.Infof("dhcp server for %s is dead, restart it", s.subnet.Name)
 			}
 		}
 

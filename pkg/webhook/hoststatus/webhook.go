@@ -3,6 +3,7 @@ package hoststatus
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,18 +40,27 @@ func (w *HostStatusWebhook) Default(ctx context.Context, obj runtime.Object) err
 		return err
 	}
 
-	log.Logger.Debugf("Setting initial values for nil fields in HostStatus %s", hoststatus.Name)
+	log.Logger.Debugf("Processing Default webhook for HostStatus %s", hoststatus.Name)
 
-	if hoststatus.Status.Basic.ClusterName != "" {
-		if hoststatus.ObjectMeta.Labels == nil {
-			hoststatus.ObjectMeta.Labels = make(map[string]string)
-		}
-		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = hoststatus.Status.Basic.ClusterName
+	if hoststatus.ObjectMeta.Labels == nil {
+		hoststatus.ObjectMeta.Labels = make(map[string]string)
+	}
+	// cluster name
+	hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = hoststatus.Status.Basic.ClusterName
+	// ip
+	IpAddr := strings.Split(hoststatus.Status.Basic.IpAddr, "/")[0]
+	hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
+	// mode
+	if hoststatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP {
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
 	} else {
-		if hoststatus.ObjectMeta.Labels == nil {
-			hoststatus.ObjectMeta.Labels = make(map[string]string)
-		}
-		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = ""
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeEndpoint
+	}
+	// dhcp
+	if hoststatus.Status.Basic.ActiveDhcpClient {
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
+	} else {
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "false"
 	}
 
 	return nil

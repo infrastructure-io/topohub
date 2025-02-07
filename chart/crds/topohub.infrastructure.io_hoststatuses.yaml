@@ -61,6 +61,8 @@ spec:
                     type: boolean
                   clusterName:
                     type: string
+                  dhcpExpireTime:
+                    type: string
                   https:
                     type: boolean
                   ipAddr:

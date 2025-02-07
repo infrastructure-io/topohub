@@ -26,8 +26,8 @@ for IMAGE in $IMAGES; do
 done
 
 echo "install redfish"
-helm uninstall dhcp-redfish -n  redfish || true 
-helm install dhcp-redfish ${CURRENT_DIR_PATH}/../redfishchart \
+helm uninstall ${HELM_NAME} -n  redfish || true 
+helm install ${HELM_NAME} ${CURRENT_DIR_PATH}/../redfishchart \
   --wait \
   --debug \
   --namespace redfish \

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	vlanInterfaceFormat    = "%s.topohub.%d"
-	macvlanInterfaceFormat = "%s.topohub"
+	vlanInterfaceFormat = "%s.topohub.%d"
+	//macvlanInterfaceFormat = "%s.topohub"
 )
 
 // setupInterface configures the network interface for DHCP server
@@ -31,14 +31,15 @@ func (s *dhcpServer) setupInterface() error {
 		if err := s.createVlanInterface(parent, interfaceName, *s.subnet.Spec.Interface.VlanID); err != nil {
 			return err
 		}
-	} else {
-		s.log.Infof("Creating MACVLAN interface: %s.topohub", baseInterface)
-
-		interfaceName = fmt.Sprintf(macvlanInterfaceFormat, baseInterface)
-		if err := s.createMacvlanInterface(parent, interfaceName); err != nil {
-			return err
-		}
 	}
+	// } else {
+	// 	s.log.Infof("Creating MACVLAN interface: %s.topohub", baseInterface)
+
+	// 	interfaceName = fmt.Sprintf(macvlanInterfaceFormat, baseInterface)
+	// 	if err := s.createMacvlanInterface(parent, interfaceName); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// 配置 IP 地址
 	return s.configureIP(interfaceName, s.subnet.Spec.Interface.IPv4)
@@ -71,32 +72,32 @@ func (s *dhcpServer) createVlanInterface(parent netlink.Link, name string, vlanI
 	return nil
 }
 
-// createMacvlanInterface creates a macvlan interface
-func (s *dhcpServer) createMacvlanInterface(parent netlink.Link, name string) error {
-	// 检查接口是否已存在
-	if link, err := netlink.LinkByName(name); err == nil {
-		s.log.Debugf("Interface %s already exists", name)
-		return netlink.LinkSetUp(link)
-	}
+// // createMacvlanInterface creates a macvlan interface
+// func (s *dhcpServer) createMacvlanInterface(parent netlink.Link, name string) error {
+// 	// 检查接口是否已存在
+// 	if link, err := netlink.LinkByName(name); err == nil {
+// 		s.log.Debugf("Interface %s already exists", name)
+// 		return netlink.LinkSetUp(link)
+// 	}
 
-	macvlan := &netlink.Macvlan{
-		LinkAttrs: netlink.LinkAttrs{
-			Name:        name,
-			ParentIndex: parent.Attrs().Index,
-		},
-		Mode: netlink.MACVLAN_MODE_BRIDGE,
-	}
+// 	macvlan := &netlink.Macvlan{
+// 		LinkAttrs: netlink.LinkAttrs{
+// 			Name:        name,
+// 			ParentIndex: parent.Attrs().Index,
+// 		},
+// 		Mode: netlink.MACVLAN_MODE_BRIDGE,
+// 	}
 
-	if err := netlink.LinkAdd(macvlan); err != nil {
-		return fmt.Errorf("failed to create macvlan interface: %v", err)
-	}
+// 	if err := netlink.LinkAdd(macvlan); err != nil {
+// 		return fmt.Errorf("failed to create macvlan interface: %v", err)
+// 	}
 
-	if err := netlink.LinkSetUp(macvlan); err != nil {
-		return fmt.Errorf("failed to set macvlan interface up: %v", err)
-	}
+// 	if err := netlink.LinkSetUp(macvlan); err != nil {
+// 		return fmt.Errorf("failed to set macvlan interface up: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // configureIP configures IP address on the interface
 func (s *dhcpServer) configureIP(name, ipStr string) error {

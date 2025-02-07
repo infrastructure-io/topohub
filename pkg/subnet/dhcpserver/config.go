@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/infrastructure-io/topohub/pkg/tools"
 )
@@ -40,7 +42,7 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 	if s.subnet.Spec.Interface.VlanID != nil && *s.subnet.Spec.Interface.VlanID > 0 {
 		interfaceName = fmt.Sprintf(vlanInterfaceFormat, s.subnet.Spec.Interface.Interface, *s.subnet.Spec.Interface.VlanID)
 	} else {
-		interfaceName = fmt.Sprintf(macvlanInterfaceFormat, s.subnet.Spec.Interface.Interface)
+		interfaceName = s.subnet.Spec.Interface.Interface
 	}
 
 	ipRange := strings.Split(s.subnet.Spec.IPv4Subnet.IPRange, ",")
@@ -101,7 +103,7 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 	}
 
 	// update the binding config
-	err = s.processLeaseAndUpdateBindings(true)
+	err = s.processLeaseAndUpdateBindings(true, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to write binding config: %v", err)
 	}
@@ -126,11 +128,13 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 }
 
 // processLeaseFile reads and processes the lease file
-func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease bool) error {
+func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bool) error {
 	leaseFile := s.leasePath
 
 	existingContent := []byte("")
 	var err error
+
+	// make sure the bindings file exists
 	if s.subnet.Spec.Feature.EnableBindDhcpIP {
 		// 读取现有的绑定配置
 		existingContent, err = os.ReadFile(s.HostIpBindingsConfigPath)
@@ -171,23 +175,45 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease bool) error {
 
 		fields := strings.Fields(line)
 		if len(fields) < 5 {
+			s.log.Warnf("invalid lease line: %s", line)
 			continue
 		}
 
 		// 解析租约信息
-		clientInfo := &DhcpClientInfo{
-			MAC:       fields[1],
-			IP:        fields[2],
-			Active:    true,
-			StartTime: fields[0],
-			Subnet:    s.subnet.Spec.IPv4Subnet.Subnet,
+		expireTimestamp, err := strconv.ParseInt(fields[0], 10, 64)
+		if err != nil {
+			s.log.Warnf("failed to parse lease expiration time: %v", err)
+			continue
+		}
+		expireTime := time.Unix(expireTimestamp, 0)
+
+		clusterName := ""
+		if s.subnet.Spec.Feature.EnableSyncEndpoint != nil && s.subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName != nil {
+			clusterName = *s.subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName
 		}
 
+		clientInfo := &DhcpClientInfo{
+			MAC:            fields[1],
+			IP:             fields[2],
+			Active:         true,
+			DhcpExpireTime: expireTime,
+			Subnet:         s.subnet.Spec.IPv4Subnet.Subnet,
+			SubnetName:     s.subnet.Name,
+			ClusterName:    clusterName,
+		}
 		currentClients[clientInfo.MAC] = clientInfo
 
 		// 检查是否为新增客户端
-		if _, exists := previousClients[clientInfo.MAC]; !exists {
-			s.addedDhcpClient <- *clientInfo
+		if s.subnet.Spec.Feature.EnableBindDhcpIP {
+			if _, exists := previousClients[clientInfo.MAC]; !exists {
+				s.addedDhcpClient <- *clientInfo
+				s.log.Infof("send event to add dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+			} else {
+				if clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.MAC].DhcpExpireTime) {
+					s.addedDhcpClient <- *clientInfo
+					s.log.Infof("send event to update the ExpireTime for dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+				}
+			}
 		}
 	}
 
@@ -195,14 +221,17 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease bool) error {
 	for mac, client := range previousClients {
 		if _, exists := currentClients[mac]; !exists {
 			client.Active = false
-			s.deletedDhcpClient <- *client
+			if s.subnet.Spec.Feature.EnableBindDhcpIP {
+				s.deletedDhcpClient <- *client
+				s.log.Infof("send event to delete dhcp client: %s, %s", client.MAC, client.IP)
+			}
 		}
 	}
 
 	// 更新客户端缓存和统计信息
 	s.currentClients = currentClients
 
-	if s.subnet.Spec.Feature.EnableBindDhcpIP {
+	if !ignoreBinding && s.subnet.Spec.Feature.EnableBindDhcpIP {
 		s.log.Infof("EnableBindDhcpIP is true, generate bindings file: %s", s.HostIpBindingsConfigPath)
 		var existingLines []string
 

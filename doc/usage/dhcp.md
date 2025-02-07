@@ -32,5 +32,9 @@ DHCP server 的配置文件，位于 confimap bmc-dhcp-config 中，若有修改
 
 ## 故障排查
 
-agent 的 DHCP 服务器的配置，存储在 Agent 的 /etc/dhcp/dhcpd.conf 文件中
+如果 POD 使用 hostpath 存储，则 DHCP server 的目录默认位于 /var/lib/topohub/， 否则位于 PVC 中
+存储目录的 dhcp 目录下，有如下子目录
+1. config目录：目录中存储了以 subnet 名字命名的 DHCP server 的配置文件
+2. leases目录：目录中存储了以 subnet 名字命名的 lease 文件，存储了 DHCP client 的 IP 分配记录
+3. log 目录：目录中存储了以 subnet 名字命名的日志文件
 

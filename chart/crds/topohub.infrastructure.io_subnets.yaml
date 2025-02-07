@@ -66,15 +66,12 @@ spec:
                 properties:
                   enableBindDhcpIP:
                     default: false
-                    description: Enable DHCP IP binding
+                    description: Enable Automatically bind DHCP Client IP in the dhcp
+                      server config
                     type: boolean
                   enablePxe:
                     default: false
                     description: Enable PXE boot support
-                    type: boolean
-                  enableReserveNoneDhcpIP:
-                    default: false
-                    description: Enable reservation for non-DHCP IPs
                     type: boolean
                   enableSyncEndpoint:
                     description: EnableSyncEndpoint configuration
@@ -84,7 +81,8 @@ spec:
                         type: string
                       dhcpClient:
                         default: true
-                        description: Enable DHCP client-based endpoint sync
+                        description: Enable automatically create the hoststatus object
+                          for the dhcp client. Notice, it will not be deleted automatically
                         type: boolean
                       endpointType:
                         default: hoststatus
@@ -92,14 +90,9 @@ spec:
                         enum:
                         - hoststatus
                         type: string
-                      scanEndpoint:
-                        default: false
-                        description: Enable subnet scan-based endpoint sync
-                        type: boolean
                     required:
                     - dhcpClient
                     - endpointType
-                    - scanEndpoint
                     type: object
                   enableZtp:
                     default: false
@@ -108,7 +101,6 @@ spec:
                 required:
                 - enableBindDhcpIP
                 - enablePxe
-                - enableReserveNoneDhcpIP
                 - enableZtp
                 type: object
               interface:
