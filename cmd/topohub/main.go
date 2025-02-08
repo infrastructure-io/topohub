@@ -22,6 +22,7 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
 	"github.com/infrastructure-io/topohub/pkg/hostoperation"
 	"github.com/infrastructure-io/topohub/pkg/hoststatus"
+	"github.com/infrastructure-io/topohub/pkg/httpserver"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
@@ -174,6 +175,15 @@ func main() {
 	if err = hostOperationCtrl.SetupWithManager(mgr); err != nil {
 		log.Logger.Errorf("Unable to create hostoperation controller: %v", err)
 		os.Exit(1)
+	}
+
+	// start http server for pxe and ztp
+	if agentConfig.HttpEnabled {
+		log.Logger.Info("Http server is enabled for pxe and ztp")
+		httpServer := httpserver.NewHttpServer(*agentConfig)
+		httpServer.Run()
+	} else {
+		log.Logger.Info("Http server is disabled for pxe and ztp")
 	}
 
 	// Add health check

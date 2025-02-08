@@ -3,6 +3,7 @@ package hoststatus
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,10 +21,12 @@ import (
 // HostStatusWebhook validates HostStatus resources
 type HostStatusWebhook struct {
 	Client client.Client
+	log    *zap.SugaredLogger
 }
 
 func (w *HostStatusWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	w.Client = mgr.GetClient()
+	w.log = log.Logger.Named("hoststatusWebhook")
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&topohubv1beta1.HostStatus{}).
 		WithValidator(w).
@@ -36,11 +39,11 @@ func (w *HostStatusWebhook) Default(ctx context.Context, obj runtime.Object) err
 	hoststatus, ok := obj.(*topohubv1beta1.HostStatus)
 	if !ok {
 		err := fmt.Errorf("object is not a HostStatus")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return err
 	}
 
-	log.Logger.Debugf("Processing Default webhook for HostStatus %s", hoststatus.Name)
+	w.log.Debugf("Processing Default webhook for HostStatus %s", hoststatus.Name)
 
 	if hoststatus.ObjectMeta.Labels == nil {
 		hoststatus.ObjectMeta.Labels = make(map[string]string)
@@ -71,11 +74,11 @@ func (w *HostStatusWebhook) ValidateCreate(ctx context.Context, obj runtime.Obje
 	hoststatus, ok := obj.(*topohubv1beta1.HostStatus)
 	if !ok {
 		err := fmt.Errorf("object is not a HostStatus")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Validating creation of HostStatus %s", hoststatus.Name)
+	w.log.Debugf("Validating creation of HostStatus %s", hoststatus.Name)
 
 	return nil, nil
 }
@@ -85,11 +88,11 @@ func (w *HostStatusWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj r
 	hoststatus, ok := newObj.(*topohubv1beta1.HostStatus)
 	if !ok {
 		err := fmt.Errorf("object is not a HostStatus")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Validating update of HostStatus %s", hoststatus.Name)
+	w.log.Debugf("Validating update of HostStatus %s", hoststatus.Name)
 
 	return nil, nil
 }

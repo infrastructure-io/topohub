@@ -22,6 +22,7 @@ type HostEndpointReconciler struct {
 	client     client.Client
 	kubeClient kubernetes.Interface
 	config     *config.AgentConfig
+	log        *zap.SugaredLogger
 }
 
 // NewHostEndpointReconciler creates a new HostEndpoint reconciler
@@ -30,13 +31,14 @@ func NewHostEndpointReconciler(mgr ctrl.Manager, kubeClient kubernetes.Interface
 		client:     mgr.GetClient(),
 		kubeClient: kubeClient,
 		config:     config,
+		log:        log.Logger.Named("hostendpointReconcile"),
 	}, nil
 }
 
 // 只有 leader 才会执行 Reconcile
 // Reconcile handles the reconciliation of HostEndpoint objects
 func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.Logger.Named("hostendpointReconcile/" + req.Name)
+	logger := r.log.With("hostendpoint", req.Name)
 
 	// 获取 HostEndpoint
 	hostEndpoint := &topohubv1beta1.HostEndpoint{}

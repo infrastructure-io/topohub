@@ -41,7 +41,8 @@ defaultConfig:
     # 宿主机网卡名，最好是 trunck 模式接入网络，从而接入到各种子网中
     interface: "eth0"  
 
-  iosHttpServer:
+  # for iso and ztp in dchp subnet
+  httpServer:
     enabled: true
     # Port for the endpoint (default: 10080)
     port: 80

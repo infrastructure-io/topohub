@@ -23,6 +23,7 @@ type HostOperationController struct {
 	client.Client
 	Scheme      *runtime.Scheme
 	agentConfig *config.AgentConfig
+	log         *zap.SugaredLogger
 }
 
 func NewHostOperationController(mgr ctrl.Manager, agentConfig *config.AgentConfig) (*HostOperationController, error) {
@@ -30,15 +31,14 @@ func NewHostOperationController(mgr ctrl.Manager, agentConfig *config.AgentConfi
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		agentConfig: agentConfig,
+		log:         log.Logger.Named("HostOperationController"),
 	}, nil
 }
 
 // 只有 leader 才会执行 Reconcile
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.Logger.Named("HostOperationController").With(
-		zap.String("HostOperation", req.Name),
-	)
+	logger := r.log.With("hostoperation", req.Name)
 
 	logger.Debugf("Starting reconcile for HostOperation %s", req.Name)
 

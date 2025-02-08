@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
@@ -47,6 +48,9 @@ type AgentConfig struct {
 	RedfishHostStatusUpdateInterval int
 	// DHCP server configuration
 	DhcpServerInterface string
+
+	HttpEnabled bool
+	HttpPort    string
 }
 
 // LoadFeatureConfig loads feature configuration from the config file
@@ -104,6 +108,19 @@ func (c *AgentConfig) loadFeatureConfig() error {
 	if err := tools.ValidateInterfaceExists(c.DhcpServerInterface); err != nil {
 		return fmt.Errorf("failed to find dhcpServer Interface %s: %v", c.DhcpServerInterface, err)
 	}
+
+	// http
+	httpPortBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "httpServerPort"))
+	if err != nil {
+		return fmt.Errorf("failed to read httpServerPort: %v", err)
+	}
+	c.HttpPort = string(httpPortBytes)
+
+	httpEnabledBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "httpServerEnabled"))
+	if err != nil {
+		return fmt.Errorf("failed to read httpServerEnabled: %v", err)
+	}
+	c.HttpEnabled = strings.ToLower(string(httpEnabledBytes)) == "true"
 
 	return nil
 }

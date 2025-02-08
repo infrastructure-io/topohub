@@ -3,6 +3,7 @@ package hostendpoint
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 	"net"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,11 +23,13 @@ import (
 type HostEndpointWebhook struct {
 	Client client.Client
 	config *config.AgentConfig
+	log    *zap.SugaredLogger
 }
 
 func (w *HostEndpointWebhook) SetupWebhookWithManager(mgr ctrl.Manager, config config.AgentConfig) error {
 	w.Client = mgr.GetClient()
 	w.config = &config
+	w.log = log.Logger.Named("hostendpointWebhook")
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&topohubv1beta1.HostEndpoint{}).
 		WithValidator(w).
@@ -41,18 +44,18 @@ func (w *HostEndpointWebhook) Default(ctx context.Context, obj runtime.Object) e
 		return fmt.Errorf("object is not a HostEndpoint")
 	}
 
-	log.Logger.Infof("Setting initial values for nil fields in HostEndpoint %s", hostEndpoint.Name)
+	w.log.Infof("Setting initial values for nil fields in HostEndpoint %s", hostEndpoint.Name)
 
 	if hostEndpoint.Spec.HTTPS == nil {
 		defaultHTTPS := true
 		hostEndpoint.Spec.HTTPS = &defaultHTTPS
-		log.Logger.Infof("Setting default HTTPS to true for HostEndpoint %s", hostEndpoint.Name)
+		w.log.Infof("Setting default HTTPS to true for HostEndpoint %s", hostEndpoint.Name)
 	}
 
 	if hostEndpoint.Spec.Port == nil {
 		defaultPort := int32(443)
 		hostEndpoint.Spec.Port = &defaultPort
-		log.Logger.Infof("Setting default Port to 443 for HostEndpoint %s", hostEndpoint.Name)
+		w.log.Infof("Setting default Port to 443 for HostEndpoint %s", hostEndpoint.Name)
 	}
 
 	if (hostEndpoint.Spec.SecretName == nil || *hostEndpoint.Spec.SecretName == "") && (hostEndpoint.Spec.SecretNamespace == nil || *hostEndpoint.Spec.SecretNamespace == "") {
@@ -82,14 +85,14 @@ func (w *HostEndpointWebhook) ValidateCreate(ctx context.Context, obj runtime.Ob
 	hostEndpoint, ok := obj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
 		err := fmt.Errorf("object is not a HostEndpoint")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Infof("Validating creation of HostEndpoint %s", hostEndpoint.Name)
+	w.log.Infof("Validating creation of HostEndpoint %s", hostEndpoint.Name)
 
 	if err := w.validateHostEndpoint(ctx, hostEndpoint); err != nil {
-		log.Logger.Errorf("Failed to validate HostEndpoint %s: %v", hostEndpoint.Name, err)
+		w.log.Errorf("Failed to validate HostEndpoint %s: %v", hostEndpoint.Name, err)
 		return nil, err
 	}
 
@@ -101,11 +104,11 @@ func (w *HostEndpointWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj
 	hostEndpoint, ok := newObj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
 		err := fmt.Errorf("object is not a HostEndpoint")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Infof("Rejecting update of HostEndpoint %s: updates are not allowed", hostEndpoint.Name)
+	w.log.Infof("Rejecting update of HostEndpoint %s: updates are not allowed", hostEndpoint.Name)
 	return nil, fmt.Errorf("updates to HostEndpoint resources are not allowed")
 }
 

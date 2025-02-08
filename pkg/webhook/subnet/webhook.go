@@ -3,6 +3,7 @@ package subnet
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 	"net"
 
 	"github.com/infrastructure-io/topohub/pkg/config"
@@ -23,11 +24,13 @@ import (
 type SubnetWebhook struct {
 	Client client.Client
 	config *config.AgentConfig
+	log    *zap.SugaredLogger
 }
 
 func (w *SubnetWebhook) SetupWebhookWithManager(mgr ctrl.Manager, config config.AgentConfig) error {
 	w.Client = mgr.GetClient()
 	w.config = &config
+	w.log = log.Logger.Named("subnetWebhook")
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&topohubv1beta1.Subnet{}).
 		WithValidator(w).
@@ -42,7 +45,7 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 		return fmt.Errorf("object is not a Subnet")
 	}
 
-	log.Logger.Debugf("Setting initial values for nil fields in Subnet %s", subnet.Name)
+	w.log.Debugf("Setting initial values for nil fields in Subnet %s", subnet.Name)
 
 	if subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName != nil && *subnet.Spec.Feature.EnableSyncEndpoint.DefaultClusterName != "" {
 		if subnet.ObjectMeta.Labels == nil {
@@ -60,7 +63,7 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 		subnet.Spec.Interface.Interface = w.config.DhcpServerInterface
 	}
 	if subnet.Spec.Interface.VlanID == nil {
-		a:=int32(0)
+		a := int32(0)
 		subnet.Spec.Interface.VlanID = &a
 	}
 
@@ -72,14 +75,14 @@ func (w *SubnetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) 
 	subnet, ok := obj.(*topohubv1beta1.Subnet)
 	if !ok {
 		err := fmt.Errorf("object is not a Subnet")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Infof("Validating creation of Subnet %s", subnet.Name)
+	w.log.Infof("Validating creation of Subnet %s", subnet.Name)
 
 	if err := w.validateSubnet(ctx, subnet); err != nil {
-		log.Logger.Errorf("Failed to validate Subnet %s: %v", subnet.Name, err)
+		w.log.Errorf("Failed to validate Subnet %s: %v", subnet.Name, err)
 		return nil, err
 	}
 
@@ -91,18 +94,18 @@ func (w *SubnetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runti
 	oldSubnet, ok := oldObj.(*topohubv1beta1.Subnet)
 	if !ok {
 		err := fmt.Errorf("old object is not a Subnet")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
 	newSubnet, ok := newObj.(*topohubv1beta1.Subnet)
 	if !ok {
 		err := fmt.Errorf("new object is not a Subnet")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Infof("Validating update of Subnet %s", newSubnet.Name)
+	w.log.Infof("Validating update of Subnet %s", newSubnet.Name)
 
 	// 1. 验证 subnet 不允许修改
 	if oldSubnet.Spec.IPv4Subnet.Subnet != newSubnet.Spec.IPv4Subnet.Subnet {
@@ -136,7 +139,7 @@ func (w *SubnetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runti
 
 	// 执行其他常规验证
 	if err := w.validateSubnet(ctx, newSubnet); err != nil {
-		log.Logger.Errorf("Failed to validate Subnet %s: %v", newSubnet.Name, err)
+		w.log.Errorf("Failed to validate Subnet %s: %v", newSubnet.Name, err)
 		return nil, err
 	}
 
