@@ -44,7 +44,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 	}
 
 	ipRange := strings.Split(s.subnet.Spec.IPv4Subnet.IPRange, ",")
-	for k, _ := range ipRange {
+	for k := range ipRange {
 		ipRange[k] = strings.ReplaceAll(ipRange[k], "-", ",")
 	}
 
