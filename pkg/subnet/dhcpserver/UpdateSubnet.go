@@ -12,6 +12,7 @@ import (
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,9 +49,9 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			return errors.IsConflict(err)
 		},
 		func() error {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			
+			s.lockData.RLock()
+			defer s.lockData.RUnlock()
+
 			// 获取最新的 subnet
 			current := &topohubv1beta1.Subnet{}
 			if err := s.client.Get(context.Background(), types.NamespacedName{
@@ -60,14 +61,22 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				return err
 			}
 
+			// 统计 IP 使用情况
+			totalIPs, err := tools.CountIPsInRange(s.subnet.Spec.IPv4Subnet.IPRange)
+			if err != nil {
+				s.log.Errorf("failed to count ips in range: %+v", err)
+				totalIPs = 0
+			}
+			s.log.Debugf("total ip of dhcp server: %v", totalIPs)
+
 			// 更新状态
 			updated := current.DeepCopy()
 			if updated.Status.DhcpStatus == nil {
 				updated.Status.DhcpStatus = &topohubv1beta1.DhcpStatusSpec{}
 			}
-			updated.Status.DhcpStatus.DhcpIpTotalAmount = s.totalIPs
+			updated.Status.DhcpStatus.DhcpIpTotalAmount = totalIPs
 			updated.Status.DhcpStatus.DhcpIpAssignAmount = uint64(len(s.currentClients))
-			updated.Status.DhcpStatus.DhcpIpAvailableAmount = s.totalIPs - uint64(len(s.currentClients))
+			updated.Status.DhcpStatus.DhcpIpAvailableAmount = totalIPs - uint64(len(s.currentClients))
 
 			if updated.Status.HostNode == nil || *updated.Status.HostNode != s.config.NodeName {
 				s.log.Infof("update host node %s to subnet %s", s.config.NodeName, s.subnet.Name)

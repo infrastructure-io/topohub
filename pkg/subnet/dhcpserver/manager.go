@@ -12,7 +12,6 @@ import (
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/log"
-	"github.com/infrastructure-io/topohub/pkg/tools"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -24,25 +23,31 @@ type DhcpServer interface {
 	Stop() error
 	// UpdateService updates the subnet configuration
 	UpdateService(subnet topohubv1beta1.Subnet) error
+	// DeleteDhcpBinding deletes the DHCP binding for the specified IP and MAC
+	DeleteDhcpBinding(ip, mac string) error
 }
 
 type dhcpServer struct {
 	config *config.AgentConfig
-	subnet *topohubv1beta1.Subnet
 	client client.Client
 
+	lockData       *lock.RWMutex
+	subnet         *topohubv1beta1.Subnet
+	currentClients map[string]*DhcpClientInfo
+
+	lockConfigUpdate *lock.RWMutex
+
+	//
 	cmd               *exec.Cmd
 	cmdCancel         context.CancelFunc
 	stopCh            chan struct{}
 	addedDhcpClient   chan DhcpClientInfo
 	deletedDhcpClient chan DhcpClientInfo
+	deletedHostStatus chan DhcpClientInfo
 
-	mu *lock.RWMutex
 	// update the status of crd
 	statusUpdateCh chan struct{}
 	log            *zap.SugaredLogger
-	currentClients map[string]*DhcpClientInfo
-	totalIPs       uint64
 
 	// restart the dhcp server
 	restartCh chan struct{}
@@ -57,25 +62,21 @@ type dhcpServer struct {
 
 // NewDhcpServer creates a new DHCP server instance
 func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClient chan DhcpClientInfo, deletedDhcpClient chan DhcpClientInfo) *dhcpServer {
-	total, err := tools.CountIPsInRange(subnet.Spec.IPv4Subnet.IPRange)
-	if err != nil {
-		log.Logger.Error("failed to count ips in range", zap.Error(err))
-		total = 0
-	}
 
 	return &dhcpServer{
 		config:                   config,
+		lockData:                 &lock.RWMutex{},
+		lockConfigUpdate:         &lock.RWMutex{},
 		subnet:                   subnet,
 		client:                   client,
 		addedDhcpClient:          addedDhcpClient,
 		deletedDhcpClient:        deletedDhcpClient,
+		deletedHostStatus:        make(chan DhcpClientInfo, 100),
 		stopCh:                   make(chan struct{}),
-		mu:                       &lock.RWMutex{},
 		statusUpdateCh:           make(chan struct{}),
 		restartCh:                make(chan struct{}),
-		log:                      log.Logger.Named("subnetManager/" + subnet.Name),
+		log:                      log.Logger.Named("dhcpServer/" + subnet.Name),
 		currentClients:           make(map[string]*DhcpClientInfo),
-		totalIPs:                 total,
 		configTemplatePath:       filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
 		configPath:               filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
 		HostIpBindingsConfigPath: filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s-bindIp.conf", subnet.Name)),
@@ -127,5 +128,10 @@ func (s *dhcpServer) Stop() error {
 		s.log.Errorf("Failed to cleanup network interface: %v", err)
 	}
 
+	return nil
+}
+
+func (s *dhcpServer) DeleteDhcpBinding(ip, mac string) error {
+	s.deletedHostStatus <- DhcpClientInfo{IP: ip, MAC: mac}
 	return nil
 }

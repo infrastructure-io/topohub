@@ -9,32 +9,30 @@ import (
 	"strings"
 	"text/template"
 	"time"
-
-	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
 // generateDnsmasqConfig generates the dnsmasq configuration file
-func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
+func (s *dhcpServer) generateDnsmasqConfig() error {
 
 	s.log.Infof("generating config")
 
 	// 读取模板文件
 	tmpl, err := template.ParseFiles(s.configTemplatePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %v", err)
+		return fmt.Errorf("failed to parse template: %v", err)
 	}
 
 	templateContent, err := os.ReadFile(s.configTemplatePath)
 	if err != nil {
 		s.log.Errorf("failed to read template file: %+v", err)
-		return "", err
+		return err
 	}
 	s.log.Debugf("read template file content: \n%s", string(templateContent))
 
 	// 准备目录
 	configFile := s.configPath
 	if err := os.MkdirAll(filepath.Dir(configFile), 0755); err != nil {
-		return "", fmt.Errorf("failed to create config directory: %v", err)
+		return fmt.Errorf("failed to create config directory: %v", err)
 	}
 
 	// 准备接口名称
@@ -84,14 +82,14 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 
 	// 删除已存在的配置文件
 	if err := os.Remove(configFile); err != nil && !os.IsNotExist(err) {
-		return "", fmt.Errorf("failed to remove existing config file: %v", err)
+		return fmt.Errorf("failed to remove existing config file: %v", err)
 	}
 	f, err := os.Create(configFile)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			s.log.Infof("config file already exists: %s", configFile)
 		} else {
-			return "", fmt.Errorf("failed to create config file: %v", err)
+			return fmt.Errorf("failed to create config file: %v", err)
 		}
 	}
 	s.log.Infof("Generated dnsmasq config file: %s", configFile)
@@ -101,57 +99,40 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 
 	// 写入配置
 	if err := tmpl.Execute(f, data); err != nil {
-		return "", fmt.Errorf("failed to write config: %v", err)
+		return fmt.Errorf("failed to write config: %v", err)
 	}
 
+	// make sure the binding config file exists
+	if _, err := os.ReadFile(s.HostIpBindingsConfigPath); err != nil && os.IsNotExist(err) && s.subnet.Spec.Feature.EnableBindDhcpIP {
+		// 如果文件不存在，创建文件
+		if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
+			s.log.Panicf("failed to create directory for bindings file: %v", err)
+		}
+		if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
+			s.log.Panicf("failed to create bindings file: %v", err)
+		}
+		s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
+	}
 	// update the binding config
 	_, err = s.processLeaseAndUpdateBindings(true)
 	if err != nil {
-		return "", fmt.Errorf("failed to write binding config: %v", err)
+		return fmt.Errorf("failed to write binding config: %v", err)
 	}
-
-	// 统计 IP 使用情况
-	total, err := tools.CountIPsInRange(s.subnet.Spec.IPv4Subnet.IPRange)
-	if err != nil {
-		s.log.Errorf("failed to count ips in range: %+v", err)
-		total = 0
-	}
-	s.totalIPs = total
-	s.log.Infof("total ip of dhcp server: %v", total)
 
 	content, err := os.ReadFile(configFile)
 	if err != nil {
 		s.log.Errorf("failed to read content file: %+v", err)
-		return "", err
+		return err
 	}
 	s.log.Debugf("read config file: \n%s", string(content))
 
-	return configFile, nil
+	return nil
 }
 
 // processLeaseFile reads and processes the lease file
 func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError bool) (needReload bool, finalErr error) {
 	leaseFile := s.leasePath
 	needReload = false
-
-	existingContent := []byte("")
-	var err error
-
-	// make sure the bindings file exists
-	if s.subnet.Spec.Feature.EnableBindDhcpIP {
-		// 读取现有的绑定配置
-		existingContent, err = os.ReadFile(s.HostIpBindingsConfigPath)
-		if err != nil && os.IsNotExist(err) {
-			// 如果文件不存在，创建文件
-			if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
-				return needReload, fmt.Errorf("failed to create directory for bindings file: %v", err)
-			}
-			if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
-				return needReload, fmt.Errorf("failed to create bindings file: %v", err)
-			}
-			s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
-		}
-	}
 
 	// 读取租约文件
 	content, err := os.ReadFile(leaseFile)
@@ -166,8 +147,8 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 	lines := strings.Split(string(content), "\n")
 	currentClients := make(map[string]*DhcpClientInfo)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.lockData.Lock()
+	defer s.lockData.Unlock()
 	previousClients := s.currentClients
 
 	// 处理每一行租约记录
@@ -244,71 +225,113 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 	s.currentClients = currentClients
 
 	if s.subnet.Spec.Feature.EnableBindDhcpIP && needReload {
+		// make sure new binding config exists in the config file
 		s.log.Infof("EnableBindDhcpIP is true, generate bindings file: %s", s.HostIpBindingsConfigPath)
-		var existingLines []string
-
-		// 解析现有的绑定记录，使用 IP 作为键
-		existingBindings := make(map[string]string) // IP -> 完整绑定记录
-		if len(existingContent) > 0 {
-			lines := strings.Split(string(existingContent), "\n")
-			for _, line := range lines {
-				if line == "" {
-					continue
-				}
-				if strings.HasPrefix(line, "dhcp-host=") {
-					parts := strings.Split(strings.TrimPrefix(line, "dhcp-host="), ",")
-					if len(parts) == 2 {
-						ip := parts[1]
-						existingBindings[ip] = line
-					}
-				}
-				existingLines = append(existingLines, line)
-				s.log.Debugf("existing binding: %s", line)
-			}
+		newbindings := make(map[string]string)
+		for _, client := range s.currentClients {
+			newbindings[client.IP] = client.MAC
 		}
-
-		// 准备新的绑定记录
-		newBindings := make(map[string]string) // IP -> 新的绑定记录
-		for _, client := range currentClients {
-			newBindings[client.IP] = fmt.Sprintf("dhcp-host=%s,%s", client.MAC, client.IP)
+		if err := s.UpdateDhcpBindings(newbindings, nil); err != nil {
+			s.log.Errorf("failed to add dhcp bindings: %v", err)
+			return false, err
 		}
-
-		// 创建新的配置文件内容
-		var finalLines []string
-		for _, line := range existingLines {
-			if strings.HasPrefix(line, "dhcp-host=") {
-				parts := strings.Split(strings.TrimPrefix(line, "dhcp-host="), ",")
-				if len(parts) == 2 {
-					ip := parts[1]
-					if newBinding, exists := newBindings[ip]; exists {
-						// 使用新的绑定记录替换旧的
-						s.log.Infof("using new binding for IP %s, old mac %s, new mac %s", ip, parts[0], newBinding)
-						finalLines = append(finalLines, newBinding)
-						delete(newBindings, ip)
-					} else {
-						// 保留旧的绑定记录
-						// keep existing line
-						finalLines = append(finalLines, line)
-					}
-				}
-			} else {
-				// keep existing line
-				finalLines = append(finalLines, line)
-			}
-		}
-
-		// 添加剩余的新绑定记录
-		for _, binding := range newBindings {
-			s.log.Infof("adding new binding: %s", binding)
-			finalLines = append(finalLines, binding)
-		}
-
-		// 写入更新后的配置
-		if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(strings.Join(finalLines, "\n")+"\n"), 0644); err != nil {
-			return false, fmt.Errorf("failed to write bindings file: %v", err)
-		}
-
 	}
 
 	return needReload, nil
+}
+
+// UpdateDhcpBindings updates the dhcp-host configuration file by:
+// 1. For ipMacMapAdded: if IP exists, update its MAC; if IP doesn't exist, add new binding
+// 2. For ipMacMapDeleted: delete binding only if both IP and MAC match exactly
+func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[string]string) error {
+	s.log.Debugf("processing dhcp bindings, added: %+v, deleted: %+v", ipMacMapAdded, ipMacMapDeleted)
+
+	s.lockConfigUpdate.Lock()
+	defer s.lockConfigUpdate.Unlock()
+
+	// 读取现有的配置文件
+	content, err := os.ReadFile(s.HostIpBindingsConfigPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// make sure the bindings file exists
+			if s.subnet.Spec.Feature.EnableBindDhcpIP {
+				// 如果文件不存在，创建文件
+				if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
+					s.log.Panicf("failed to create directory for bindings file: %v", err)
+				}
+				if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
+					s.log.Panicf("failed to create bindings file: %v", err)
+				}
+				s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
+			} else {
+				s.log.Debugf("bindings file does not exist: %s, skip to process dhcp bindings", s.HostIpBindingsConfigPath)
+				return nil
+			}
+		} else {
+			return fmt.Errorf("failed to read bindings file, err: %v", err)
+
+		}
+	}
+
+	var finalLines []string
+	processedIPs := make(map[string]bool)
+	lines := strings.Split(string(content), "\n")
+
+	// 遍历每一行，处理现有的绑定
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// 检查是否是 dhcp-host 配置行
+		if strings.HasPrefix(line, "dhcp-host=") {
+			// 解析 MAC 和 IP
+			parts := strings.Split(line, "=")[1]
+			fields := strings.Split(parts, ",")
+			if len(fields) < 2 {
+				s.log.Warnf("invalid dhcp-host line format: %s", line)
+				continue
+			}
+
+			mac := fields[0]
+			ip := fields[1]
+
+			// 检查是否需要删除这行配置
+			if expectedMac, exists := ipMacMapDeleted[ip]; exists && expectedMac == mac {
+				s.log.Infof("removing dhcp-host binding for IP %s, MAC %s", ip, mac)
+				continue
+			}
+
+			// 检查是否需要更新 MAC
+			if newMac, exists := ipMacMapAdded[ip]; exists {
+				s.log.Infof("updating dhcp-host binding for IP %s: old MAC %s -> new MAC %s", ip, mac, newMac)
+				finalLines = append(finalLines, fmt.Sprintf("dhcp-host=%s,%s", newMac, ip))
+				processedIPs[ip] = true
+				continue
+			}
+
+			// 保持原有配置不变
+			finalLines = append(finalLines, line)
+			processedIPs[ip] = true
+		} else {
+			// 非 dhcp-host 配置行保持不变
+			finalLines = append(finalLines, line)
+		}
+	}
+
+	// 添加新的绑定（仅处理尚未处理的IP）
+	for ip, mac := range ipMacMapAdded {
+		if !processedIPs[ip] {
+			s.log.Infof("adding new dhcp-host binding for IP %s, MAC %s", ip, mac)
+			finalLines = append(finalLines, fmt.Sprintf("dhcp-host=%s,%s", mac, ip))
+		}
+	}
+
+	// 写入更新后的配置
+	if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(strings.Join(finalLines, "\n")+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write bindings file: %v", err)
+	}
+
+	return nil
 }

@@ -27,11 +27,12 @@ type AgentConfig struct {
 	StoragePathDhcpLog                  string
 	StoragePathDhcpLease                string
 	StoragePathDhcpConfig               string
-	StoragePathZtp                      string
+	StoragePathHttp                     string
+	StoragePathHttpZtp                  string
+	StoragePathHttpIso                  string
 	StoragePathTftp                     string
 	StoragePathTftpRelativeDirForPxeEfi string
 	StoragePathTftpAbsoluteDirForPxeEfi string
-	StoragePathIso                      string
 
 	// dnsmasq config template path
 	DhcpConfigTemplatePath string
@@ -128,21 +129,23 @@ func (c *AgentConfig) initStorageDirectory() error {
 	c.StoragePathDhcpLease = filepath.Join(c.StoragePath, "dhcp/lease")
 	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcp/config")
 	c.StoragePathDhcpLog = filepath.Join(c.StoragePath, "dhcp/log")
-	c.StoragePathZtp = filepath.Join(c.StoragePath, "ztp")
 	c.StoragePathTftp = filepath.Join(c.StoragePath, "tftp")
 	c.StoragePathTftpRelativeDirForPxeEfi = "boot/grub/x86_64-efi"
 	c.StoragePathTftpAbsoluteDirForPxeEfi = filepath.Join(c.StoragePathTftp, c.StoragePathTftpRelativeDirForPxeEfi)
-	c.StoragePathIso = filepath.Join(c.StoragePath, "iso")
+	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
+	c.StoragePathHttpZtp = filepath.Join(c.StoragePathHttp, "ztp")
+	c.StoragePathHttpIso = filepath.Join(c.StoragePathHttp, "iso")
 
 	// List of required subdirectories
 	subdirs := []string{
 		c.StoragePathDhcpLease,
 		c.StoragePathDhcpConfig,
 		c.StoragePathDhcpLog,
-		c.StoragePathZtp,
 		c.StoragePathTftp,
 		c.StoragePathTftpAbsoluteDirForPxeEfi,
-		c.StoragePathIso,
+		c.StoragePathHttp,
+		c.StoragePathHttpIso,
+		c.StoragePathHttpZtp,
 	}
 
 	// Check and create each subdirectory if it doesn't exist

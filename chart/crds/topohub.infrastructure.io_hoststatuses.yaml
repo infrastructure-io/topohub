@@ -76,6 +76,8 @@ spec:
                     type: string
                   secretNamespace:
                     type: string
+                  subnetName:
+                    type: string
                   type:
                     type: string
                 required:

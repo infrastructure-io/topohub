@@ -126,7 +126,7 @@ tolerations:
 
 ## this is used to manage the files for the administrator
 httpServer:
-  enabled: true
+  enabled: false
   
   image:
     registry: "docker.io"

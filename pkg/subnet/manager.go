@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
@@ -21,6 +23,7 @@ type SubnetManager interface {
 	SetupWithManager(mgr ctrl.Manager) error
 	Stop()
 	GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
+	GetHostStatusEvents() chan dhcpserver.DhcpClientInfo
 }
 
 type subnetManager struct {
@@ -29,8 +32,14 @@ type subnetManager struct {
 	config     *config.AgentConfig
 	cache      *SubnetCache
 
+	log *zap.SugaredLogger
+
+	// 本模块往其中添加数据，关于 dhcp client 变化信息。由 hoststatus 模块来消费使用
 	addedDhcpClient   chan dhcpserver.DhcpClientInfo
 	deletedDhcpClient chan dhcpserver.DhcpClientInfo
+
+	// hoststatus 往其中添加数据，关于 hoststatus 被删除信息。由本模块来消费使用
+	deletedHostStatus chan dhcpserver.DhcpClientInfo
 
 	// lock
 	lockLeader     lock.RWMutex
@@ -46,14 +55,16 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 		lockLeader:        lock.RWMutex{},
 		addedDhcpClient:   make(chan dhcpserver.DhcpClientInfo, 100),
 		deletedDhcpClient: make(chan dhcpserver.DhcpClientInfo, 100),
+		deletedHostStatus: make(chan dhcpserver.DhcpClientInfo, 100),
 		leader:            false,
 		dhcpServerList:    make(map[string]dhcpserver.DhcpServer),
+		log:               log.Logger.Named("subnetManager"),
 	}
 }
 
 // Reconcile handles the reconciliation of Subnet objects
 func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.Logger.Named("subnetReconcile/" + req.Name)
+	logger := s.log.With(zap.String("subnet", req.Name))
 
 	// Get the Subnet instance
 	subnet := &topohubv1beta1.Subnet{}
@@ -117,10 +128,10 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 
 	// start all dhcp server when we are the leader
 	go func() {
-		log.Logger.Info("waiting for the election of leader")
+		s.log.Info("waiting for the election of leader")
 		select {
 		case <-mgr.Elected():
-			log.Logger.Info("Elected as leader, begin to start all controllers")
+			s.log.Info("Elected as leader, begin to start all controllers")
 
 			s.lockLeader.Lock()
 			defer s.lockLeader.Unlock()
@@ -129,7 +140,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 			// 获取所有的 Subnet 实例并启动 DHCP 服务器
 			var subnetList topohubv1beta1.SubnetList
 			if err := mgr.GetClient().List(context.Background(), &subnetList); err != nil {
-				log.Logger.Errorf("Failed to list subnets: %v", err)
+				s.log.Errorf("Failed to list subnets: %v", err)
 				return
 			}
 
@@ -146,14 +157,18 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 
 					// 启动 DHCP 服务器
 					if err := dhcpServer.Run(); err != nil {
-						log.Logger.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
+						s.log.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
 					} else {
-						log.Logger.Infof("Started DHCP server for subnet %s", subnet.Name)
+						s.log.Infof("Started DHCP server for subnet %s", subnet.Name)
 						s.dhcpServerList[subnet.Name] = dhcpServer
 					}
 				}
 			}
 		}
+	}()
+
+	go func() {
+		s.processHostStatusEvents()
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -164,11 +179,39 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 func (s *subnetManager) Stop() {
 	// Clean up any resources if needed
 	for name, server := range s.dhcpServerList {
-		log.Logger.Infof("Stopping DHCP server for subnet %s", name)
+		s.log.Infof("Stopping DHCP server for subnet %s", name)
 		server.Stop()
 	}
 }
 
+// this module send event to the channel, and hoststatus module consume it
 func (s *subnetManager) GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
 	return s.addedDhcpClient, s.deletedDhcpClient
+}
+
+// hoststatus module send event to this channel and this module consume it
+func (s *subnetManager) GetHostStatusEvents() chan dhcpserver.DhcpClientInfo {
+	return s.deletedDhcpClient
+}
+
+// DHCP manager 把 dhcp client 事件告知后，进行 hoststatus 更新
+func (s *subnetManager) processHostStatusEvents() {
+	s.log.Infof("begin to process host status events for deleting binding setting")
+
+	for {
+		select {
+		case event, ok := <-s.deletedDhcpClient:
+			if !ok {
+				s.log.Panic("deletedDhcpClient channel closed")
+			}
+			s.log.Debugf("process host status events: %+v", event)
+			if c, exists := s.dhcpServerList[event.SubnetName]; !exists {
+				s.log.Errorf("subnet %s is not running, skip to process host status events: %+v", event.SubnetName, event)
+			} else {
+				if err := c.DeleteDhcpBinding(event.IP, event.MAC); err != nil {
+					s.log.Errorf("failed to delete dhcp binding for ip %s, err: %v", event.IP, err)
+				}
+			}
+		}
+	}
 }

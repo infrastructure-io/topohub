@@ -49,6 +49,10 @@ nodeAffinity:
         operator: In
         values:
         - "true"
+
+httpServer:
+  enabled: true
+  port: 10080
 EOF
 
 IMAGE_LIST=$( helm template topohub ${PROJECT_ROOT_PATH}/chart -f /tmp/topo.yaml  | grep "image:" | awk '{print $2}' | tr -d '"' )

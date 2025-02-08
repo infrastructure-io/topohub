@@ -20,18 +20,18 @@ func (s *dhcpServer) startDnsmasq() error {
 		return fmt.Errorf("failed to setup interface: %v", err)
 	}
 
-	configFilePath, err := s.generateDnsmasqConfig()
+	err := s.generateDnsmasqConfig()
 	if err != nil {
 		return fmt.Errorf("failed to generate dnsmasq config: %v", err)
 	}
-	s.log.Infof("dnsmasq config file %s", configFilePath)
+	s.log.Infof("dnsmasq config file %s", s.configPath)
 
 	// 创建 context 用于进程管理
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cmdCancel = cancel
 
 	// 启动 dnsmasq
-	cmd := exec.Command("dnsmasq", "-C", configFilePath, "-d")
+	cmd := exec.Command("dnsmasq", "-C", s.configPath, "-d")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -67,8 +67,8 @@ func (s *dhcpServer) startDnsmasq() error {
 
 // UpdateService updates the subnet configuration and restarts the DHCP server
 func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.lockData.Lock()
+	defer s.lockData.Unlock()
 
 	// 更新 subnet
 	s.subnet = &subnet
@@ -108,6 +108,7 @@ func (s *dhcpServer) monitor() {
 	for {
 		needRestart := false
 		needReload := false
+		needRenewConfig := false
 
 		select {
 		case <-s.stopCh:
@@ -130,6 +131,7 @@ func (s *dhcpServer) monitor() {
 				} else {
 					if reloadConfig {
 						needReload = true
+						needRenewConfig = true
 						s.log.Infof("client ip or mac changed, so dhcp server reload after binding new ip")
 					} else {
 						s.log.Infof("client expiration is updated, so dhcp server does not need to reload")
@@ -137,9 +139,23 @@ func (s *dhcpServer) monitor() {
 				}
 			}
 
-		// reconcile notify subnet changes
+		case event, ok := <-s.deletedHostStatus:
+			if !ok {
+				s.log.Panic("deletedHostStatus channel closed")
+			}
+			s.log.Debugf("process hostStatus deleting events, delete dhcp binding, ip %s, mac %s", event.IP, event.MAC)
+			if err := s.UpdateDhcpBindings(nil, map[string]string{event.IP: event.MAC}); err != nil {
+				s.log.Errorf("failed to delete dhcp binding for ip %s, err: %v", event.IP, err)
+				continue
+			}
+			needReload = true
+			// it has been renew the config
+			needRenewConfig = false
+
+		// reconcile notify subnet spec changes
 		case <-s.restartCh:
 			needReload = true
+			needRenewConfig = true
 			s.log.Infof("dhcp server reload after the spec of subnet is updated")
 
 		// check the process
@@ -149,37 +165,41 @@ func (s *dhcpServer) monitor() {
 				if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
 					s.log.Errorf("DHCP server process check failed: %v", err)
 					needRestart = true
+					needRenewConfig = true
 				} else {
 					s.log.Debugf("dhcp server for %s is running", s.subnet.Name)
 				}
 			} else {
 				needRestart = true
+				needRenewConfig = true
 				s.log.Infof("dhcp server for %s is dead, restart it", s.subnet.Name)
 			}
 		}
 
-		if needRestart || needReload {
-			configFilePath, err := s.generateDnsmasqConfig()
-			if err != nil {
+		if needRenewConfig {
+			if err := s.generateDnsmasqConfig(); err != nil {
 				s.log.Errorf("Failed to update dnsmasq config: %v", err)
 				continue
 			}
+		}
 
-			if needReload {
-				s.log.Infof("reload dhcp server")
-				// 重新加载 dnsmasq 配置
-				if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
-					s.log.Errorf("failed to reload dnsmasq: %v", err)
-					continue
-				}
-				s.log.Infof("Reloaded dnsmasq config: %s", configFilePath)
-			} else {
-				s.log.Infof("restarting dhcp server")
-				s.startDnsmasq()
+		if needReload {
+			s.log.Infof("reload dhcp server")
+			// 重新加载 dnsmasq 配置
+			if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
+				s.log.Errorf("failed to reload dnsmasq: %v", err)
+				continue
 			}
+			s.log.Infof("Reloaded dnsmasq config: %s", s.configPath)
+			// update the status of subnet
+			s.statusUpdateCh <- struct{}{}
 
+		} else if needRestart {
+			s.log.Infof("restarting dhcp server")
+			s.startDnsmasq()
 			// update the status of subnet
 			s.statusUpdateCh <- struct{}{}
 		}
+
 	}
 }

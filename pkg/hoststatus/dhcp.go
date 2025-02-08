@@ -153,6 +153,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 			Https:            c.config.RedfishHttps,
 			ActiveDhcpClient: true,
 			ClusterName:      client.ClusterName,
+			SubnetName:       &client.SubnetName,
 			DhcpExpireTime: func() *string {
 				expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
 				return &expireTimeStr
