@@ -28,10 +28,10 @@ type AgentConfig struct {
 	StoragePathDhcpLease                string
 	StoragePathDhcpConfig               string
 	StoragePathZtp                      string
-	StoragePathSftp                     string
-	StoragePathSftpRelativeDirForPxeEfi string
-	StoragePathSftpAbsoluteDirForPxeEfi string
-	StoragePathHttp                     string
+	StoragePathTftp                     string
+	StoragePathTftpRelativeDirForPxeEfi string
+	StoragePathTftpAbsoluteDirForPxeEfi string
+	StoragePathIso                      string
 
 	// dnsmasq config template path
 	DhcpConfigTemplatePath string
@@ -129,10 +129,10 @@ func (c *AgentConfig) initStorageDirectory() error {
 	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcp/config")
 	c.StoragePathDhcpLog = filepath.Join(c.StoragePath, "dhcp/log")
 	c.StoragePathZtp = filepath.Join(c.StoragePath, "ztp")
-	c.StoragePathSftp = filepath.Join(c.StoragePath, "sftp")
-	c.StoragePathSftpRelativeDirForPxeEfi = "boot/grub/x86_64-efi"
-	c.StoragePathSftpAbsoluteDirForPxeEfi = filepath.Join(c.StoragePathSftp, c.StoragePathSftpRelativeDirForPxeEfi)
-	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
+	c.StoragePathTftp = filepath.Join(c.StoragePath, "tftp")
+	c.StoragePathTftpRelativeDirForPxeEfi = "boot/grub/x86_64-efi"
+	c.StoragePathTftpAbsoluteDirForPxeEfi = filepath.Join(c.StoragePathTftp, c.StoragePathTftpRelativeDirForPxeEfi)
+	c.StoragePathIso = filepath.Join(c.StoragePath, "iso")
 
 	// List of required subdirectories
 	subdirs := []string{
@@ -140,9 +140,9 @@ func (c *AgentConfig) initStorageDirectory() error {
 		c.StoragePathDhcpConfig,
 		c.StoragePathDhcpLog,
 		c.StoragePathZtp,
-		c.StoragePathSftp,
-		c.StoragePathSftpAbsoluteDirForPxeEfi,
-		c.StoragePathHttp,
+		c.StoragePathTftp,
+		c.StoragePathTftpAbsoluteDirForPxeEfi,
+		c.StoragePathIso,
 	}
 
 	// Check and create each subdirectory if it doesn't exist
@@ -154,18 +154,18 @@ func (c *AgentConfig) initStorageDirectory() error {
 		}
 	}
 
-	// Set ownership and permissions for SFTP directory
-	if err := os.Chown(c.StoragePathSftp, 65534, 65534); err != nil { // 65534 is nobody:nogroup
-		return fmt.Errorf("failed to change ownership of SFTP directory: %v", err)
+	// Set ownership and permissions for TFTP directory
+	if err := os.Chown(c.StoragePathTftp, 65534, 65534); err != nil { // 65534 is nobody:nogroup
+		return fmt.Errorf("failed to change ownership of TFTP directory: %v", err)
 	}
-	if err := os.Chmod(c.StoragePathSftp, 0777); err != nil {
-		return fmt.Errorf("failed to change permissions of SFTP directory: %v", err)
+	if err := os.Chmod(c.StoragePathTftp, 0777); err != nil {
+		return fmt.Errorf("failed to change permissions of TFTP directory: %v", err)
 	}
 
 	// Copy core.efi file if it exists
 	sourceFile := "/files/core.efi"
 	if _, err := os.Stat(sourceFile); err == nil {
-		targetFile := filepath.Join(c.StoragePathSftpAbsoluteDirForPxeEfi, "core.efi")
+		targetFile := filepath.Join(c.StoragePathTftpAbsoluteDirForPxeEfi, "core.efi")
 		log.Logger.Infof("%s exists, copying to %s", sourceFile, targetFile)
 
 		input, err := os.ReadFile(sourceFile)

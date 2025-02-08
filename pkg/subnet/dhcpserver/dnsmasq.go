@@ -104,10 +104,6 @@ func (s *dhcpServer) monitor() {
 	tickerProcess := time.NewTicker(3 * time.Second)
 	defer tickerProcess.Stop()
 
-	// watch the lease file at an interval for dhcp expiration
-	tickerLease := time.NewTicker(10 * time.Minute)
-	defer tickerLease.Stop()
-
 	// 开始监控
 	for {
 		needRestart := false
@@ -129,21 +125,22 @@ func (s *dhcpServer) monitor() {
 			}
 			s.log.Debugf("watcher event: %+v", event)
 			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
-				needReload = true
-				s.log.Infof("dhcp server reload after binding new ip")
+				if reloadConfig, err := s.processLeaseAndUpdateBindings(true); err != nil {
+					s.log.Errorf("failed to processLeaseAndUpdateBindings: %v", err)
+				} else {
+					if reloadConfig {
+						needReload = true
+						s.log.Infof("client ip or mac changed, so dhcp server reload after binding new ip")
+					} else {
+						s.log.Infof("client expiration is updated, so dhcp server does not need to reload")
+					}
+				}
 			}
 
 		// reconcile notify subnet changes
 		case <-s.restartCh:
 			needReload = true
 			s.log.Infof("dhcp server reload after the spec of subnet is updated")
-
-		// check the dhcp expiration in the lease file
-		case <-tickerLease.C:
-			// try to update the dhcp expiration time from the lease file to hoststatus
-			if err := s.processLeaseAndUpdateBindings(true, true); err != nil {
-				s.log.Errorf("failed to update dhcp expiration time: %v", err)
-			}
 
 		// check the process
 		case <-tickerProcess.C:

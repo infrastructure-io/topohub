@@ -66,6 +66,9 @@ return the image
 */}}
 {{- define "topohub.image" -}}
 {{- $registryName := .Values.image.registry -}}
+{{- if .Values.registryOverride }}
+{{- $registryName = .Values.registryOverride }}
+{{- end }}
 {{- $repositoryName := .Values.image.repository -}}
 {{- printf "%s/%s" $registryName $repositoryName -}}
 {{- if .Values.image.digest }}
@@ -74,5 +77,22 @@ return the image
     {{- printf ":%s" (toString .Values.image.tag) -}}
 {{- else -}}
     {{- printf ":v%s" .Chart.AppVersion -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+return the image
+*/}}
+{{- define "httpServer.image" -}}
+{{- $registryName := .Values.httpServer.image.registry -}}
+{{- if .Values.registryOverride }}
+{{- $registryName = .Values.registryOverride }}
+{{- end }}
+{{- $repositoryName := .Values.httpServer.image.repository -}}
+{{- printf "%s/%s" $registryName $repositoryName -}}
+{{- if .Values.httpServer.image.digest }}
+    {{- print "@" .Values.httpServer.image.digest -}}
+{{- else if .Values.httpServer.image.tag -}}
+    {{- printf ":%s" (toString .Values.httpServer.image.tag) -}}
 {{- end -}}
 {{- end -}}

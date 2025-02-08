@@ -77,11 +77,15 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 				name, updated.Status.Basic.Mac, client.MAC)
 			updated.Status.Basic.Mac = client.MAC
 		}
-		if updated.Status.Basic.DhcpExpireTime == nil || *updated.Status.Basic.DhcpExpireTime != client.DhcpExpireTime.Format(time.RFC3339) {
+		expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
+		if updated.Status.Basic.DhcpExpireTime == nil || *updated.Status.Basic.DhcpExpireTime != expireTimeStr {
+			oldTime := ""
+			if updated.Status.Basic.DhcpExpireTime != nil {
+				oldTime = *updated.Status.Basic.DhcpExpireTime
+			}
 			// DHCP expire time changed, update the object
-			log.Logger.Infof("Updating HostStatus %s: DHCP expire time changed from %s to %s",
-				name, updated.Status.Basic.DhcpExpireTime, client.DhcpExpireTime.Format(time.RFC3339))
-			expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
+			log.Logger.Infof("Updating HostStatus %s: DHCP ip %s expire time changed from %s to %s",
+				name, &client.IP, oldTime, expireTimeStr)
 			updated.Status.Basic.DhcpExpireTime = &expireTimeStr
 		}
 

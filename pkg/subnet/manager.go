@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/infrastructure-io/topohub/pkg/lock"
-	"go.uber.org/zap"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -54,9 +53,7 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 
 // Reconcile handles the reconciliation of Subnet objects
 func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.Logger.With(
-		zap.String("subnet", req.Name),
-	)
+	logger := log.Logger.Named("subnetReconcile/" + req.Name)
 
 	// Get the Subnet instance
 	subnet := &topohubv1beta1.Subnet{}

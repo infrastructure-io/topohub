@@ -297,9 +297,7 @@ func (c *hostStatusController) processHostStatus(hostStatus *topohubv1beta1.Host
 // Reconcile 实现 reconcile.Reconciler 接口
 // 负责在 hoststatus 创建后 redfish 信息的第一次更新（后续的更新由 UpdateHostStatusAtInterval 完成）
 func (c *hostStatusController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.Logger.With(
-		zap.String("hoststatus", req.Name),
-	)
+	logger := log.Logger.Named("hoststatusReconcile/" + req.Name)
 
 	logger.Debugf("Reconciling HostStatus %s", req.Name)
 
@@ -308,7 +306,12 @@ func (c *hostStatusController) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := c.client.Get(ctx, req.NamespacedName, hostStatus); err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debugf("HostStatus not found, delete from cache")
-			hoststatusdata.HostCacheDatabase.Delete(req.Name)
+			data := hoststatusdata.HostCacheDatabase.Get(req.Name)
+			if data != nil {
+				logger.Infof("delete hostStatus %s from cache, %+v", req.Name, *data)
+				// try to delete the binding setting in dhcp server config
+				hoststatusdata.HostCacheDatabase.Delete(req.Name)
+			}
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Failed to get HostStatus")

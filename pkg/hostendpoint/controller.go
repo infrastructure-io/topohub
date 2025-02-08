@@ -36,9 +36,7 @@ func NewHostEndpointReconciler(mgr ctrl.Manager, kubeClient kubernetes.Interface
 // 只有 leader 才会执行 Reconcile
 // Reconcile handles the reconciliation of HostEndpoint objects
 func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.Logger.With(
-		zap.String("hostendpoint", req.Name),
-	)
+	logger := log.Logger.Named("hostendpointReconcile/" + req.Name)
 
 	// 获取 HostEndpoint
 	hostEndpoint := &topohubv1beta1.HostEndpoint{}

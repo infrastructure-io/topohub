@@ -77,8 +77,8 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 		EnableBindDhcpIP:         s.subnet.Spec.Feature.EnableBindDhcpIP,
 		Name:                     s.subnet.Name,
 		SelfIP:                   strings.Split(s.subnet.Spec.Interface.IPv4, "/")[0],
-		TftpServerDir:            s.config.StoragePathSftp,
-		PxeEfiInTftpServerDir:    s.config.StoragePathSftpRelativeDirForPxeEfi,
+		TftpServerDir:            s.config.StoragePathTftp,
+		PxeEfiInTftpServerDir:    s.config.StoragePathTftpAbsoluteDirForPxeEfi,
 		HostIpBindingsConfigPath: s.HostIpBindingsConfigPath,
 	}
 
@@ -105,7 +105,7 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 	}
 
 	// update the binding config
-	err = s.processLeaseAndUpdateBindings(true, false)
+	_, err = s.processLeaseAndUpdateBindings(true)
 	if err != nil {
 		return "", fmt.Errorf("failed to write binding config: %v", err)
 	}
@@ -130,8 +130,9 @@ func (s *dhcpServer) generateDnsmasqConfig() (string, error) {
 }
 
 // processLeaseFile reads and processes the lease file
-func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bool) error {
+func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError bool) (needReload bool, finalErr error) {
 	leaseFile := s.leasePath
+	needReload = false
 
 	existingContent := []byte("")
 	var err error
@@ -143,10 +144,10 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bo
 		if err != nil && os.IsNotExist(err) {
 			// 如果文件不存在，创建文件
 			if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
-				return fmt.Errorf("failed to create directory for bindings file: %v", err)
+				return needReload, fmt.Errorf("failed to create directory for bindings file: %v", err)
 			}
 			if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
-				return fmt.Errorf("failed to create bindings file: %v", err)
+				return needReload, fmt.Errorf("failed to create bindings file: %v", err)
 			}
 			s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
 		}
@@ -155,11 +156,11 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bo
 	// 读取租约文件
 	content, err := os.ReadFile(leaseFile)
 	if err != nil {
-		if os.IsNotExist(err) && ignoreLease {
+		if os.IsNotExist(err) && ignoreLeaseExistenceError {
 			s.log.Debugf("ignore lease file: %s", leaseFile)
-			return nil
+			return needReload, nil
 		}
-		return fmt.Errorf("failed to read lease file: %v", err)
+		return needReload, fmt.Errorf("failed to read lease file: %v", err)
 	}
 
 	lines := strings.Split(string(content), "\n")
@@ -203,25 +204,34 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bo
 			SubnetName:     s.subnet.Name,
 			ClusterName:    clusterName,
 		}
-		currentClients[clientInfo.MAC] = clientInfo
+		currentClients[clientInfo.IP] = clientInfo
 
 		// 检查是否为新增客户端
 		if s.subnet.Spec.Feature.EnableBindDhcpIP {
-			if _, exists := previousClients[clientInfo.MAC]; !exists {
+			if data, exists := previousClients[clientInfo.IP]; !exists {
 				s.addedDhcpClient <- *clientInfo
 				s.log.Infof("send event to add dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+				// bind new client to config and reload the server
+				needReload = true
 			} else {
-				if clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.MAC].DhcpExpireTime) {
+				if data.MAC != clientInfo.MAC {
 					s.addedDhcpClient <- *clientInfo
-					s.log.Infof("send event to update the ExpireTime for dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, ip=%s", data.MAC, clientInfo.MAC, clientInfo.IP)
+					// bind new client to conf
+					needReload = true
+				} else {
+					if clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
+						s.addedDhcpClient <- *clientInfo
+						s.log.Infof("send event to update the ExpireTime for dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+					}
 				}
 			}
 		}
 	}
 
 	// 检查删除的客户端
-	for mac, client := range previousClients {
-		if _, exists := currentClients[mac]; !exists {
+	for _, client := range previousClients {
+		if _, exists := currentClients[client.IP]; !exists {
 			client.Active = false
 			if s.subnet.Spec.Feature.EnableBindDhcpIP {
 				s.deletedDhcpClient <- *client
@@ -233,7 +243,7 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bo
 	// 更新客户端缓存和统计信息
 	s.currentClients = currentClients
 
-	if !ignoreBinding && s.subnet.Spec.Feature.EnableBindDhcpIP {
+	if s.subnet.Spec.Feature.EnableBindDhcpIP && needReload {
 		s.log.Infof("EnableBindDhcpIP is true, generate bindings file: %s", s.HostIpBindingsConfigPath)
 		var existingLines []string
 
@@ -295,9 +305,10 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLease, ignoreBinding bo
 
 		// 写入更新后的配置
 		if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(strings.Join(finalLines, "\n")+"\n"), 0644); err != nil {
-			return fmt.Errorf("failed to write bindings file: %v", err)
+			return false, fmt.Errorf("failed to write bindings file: %v", err)
 		}
+
 	}
 
-	return nil
+	return needReload, nil
 }
