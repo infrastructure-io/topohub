@@ -1,0 +1,24 @@
+apiVersion: v1
+entries:
+  topohub:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2025-02-08T13:18:29.12658612Z"
+    description: A Helm chart for Topohub
+    digest: 869c9ca82ebb513e2b951c670f7b23f6096e8e9a7620908eff79a1a4c1b84584
+    keywords:
+    - kubernetes
+    - bmc
+    - server
+    - infrastructure
+    - switch
+    - network
+    maintainers:
+    - name: infrastructure-io
+      url: https://github.com/infrastructure-io/topohub
+    name: topohub
+    type: application
+    urls:
+    - https://infrastructure-io.github.io/topohub/charts/topohub-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-02-08T13:18:29.125788233Z"
