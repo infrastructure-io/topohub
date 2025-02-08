@@ -75,7 +75,9 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			s.cache.Delete(req.Name)
 			if server, exists := s.dhcpServerList[req.Name]; exists {
 				logger.Infof("Stopping DHCP server for subnet %s", req.Name)
-				server.Stop()
+				if err := server.Stop(); err != nil {
+					logger.Errorf("Failed to stop DHCP server for subnet %s: %v", req.Name, err)
+				}
 				delete(s.dhcpServerList, req.Name)
 			}
 			return reconcile.Result{}, nil
@@ -112,7 +114,10 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 				}
 			} else {
 				logger.Infof("updated DHCP server for subnet %s", subnet.Name)
-				s.dhcpServerList[subnet.Name].UpdateService(*subnet)
+				if err := s.dhcpServerList[subnet.Name].UpdateService(*subnet); err != nil {
+					logger.Errorf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
+					return reconcile.Result{}, err
+				}
 				s.cache.Set(subnet)
 			}
 		} else {
@@ -128,47 +133,41 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 
 	// start all dhcp server when we are the leader
 	go func() {
-		s.log.Info("waiting for the election of leader")
-		select {
-		case <-mgr.Elected():
-			s.log.Info("Elected as leader, begin to start all controllers")
+		<-mgr.Elected()
+		s.log.Info("Elected as leader, begin to start all controllers")
+		// Start subnet manager
+		go s.processHostStatusEvents()
+		s.lockLeader.Lock()
+		defer s.lockLeader.Unlock()
+		s.leader = true
 
-			s.lockLeader.Lock()
-			defer s.lockLeader.Unlock()
-			s.leader = true
+		// 获取所有的 Subnet 实例并启动 DHCP 服务器
+		var subnetList topohubv1beta1.SubnetList
+		if err := mgr.GetClient().List(context.Background(), &subnetList); err != nil {
+			s.log.Errorf("Failed to list subnets: %v", err)
+			return
+		}
 
-			// 获取所有的 Subnet 实例并启动 DHCP 服务器
-			var subnetList topohubv1beta1.SubnetList
-			if err := mgr.GetClient().List(context.Background(), &subnetList); err != nil {
-				s.log.Errorf("Failed to list subnets: %v", err)
-				return
+		// 初始化并启动 DHCP 服务器
+		for _, subnet := range subnetList.Items {
+			if subnet.DeletionTimestamp != nil {
+				continue
 			}
 
-			// 初始化并启动 DHCP 服务器
-			for _, subnet := range subnetList.Items {
-				if subnet.DeletionTimestamp != nil {
-					continue
-				}
+			// 检查是否已经存在对应的 DHCP 服务器
+			if _, exists := s.dhcpServerList[subnet.Name]; !exists {
+				// 创建新的 DHCP 服务器实例
+				dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
 
-				// 检查是否已经存在对应的 DHCP 服务器
-				if _, exists := s.dhcpServerList[subnet.Name]; !exists {
-					// 创建新的 DHCP 服务器实例
-					dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
-
-					// 启动 DHCP 服务器
-					if err := dhcpServer.Run(); err != nil {
-						s.log.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
-					} else {
-						s.log.Infof("Started DHCP server for subnet %s", subnet.Name)
-						s.dhcpServerList[subnet.Name] = dhcpServer
-					}
+				// 启动 DHCP 服务器
+				if err := dhcpServer.Run(); err != nil {
+					s.log.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
+				} else {
+					s.log.Infof("Started DHCP server for subnet %s", subnet.Name)
+					s.dhcpServerList[subnet.Name] = dhcpServer
 				}
 			}
 		}
-	}()
-
-	go func() {
-		s.processHostStatusEvents()
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -177,10 +176,11 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (s *subnetManager) Stop() {
-	// Clean up any resources if needed
+	s.log.Info("Stopping subnet manager")
 	for name, server := range s.dhcpServerList {
-		s.log.Infof("Stopping DHCP server for subnet %s", name)
-		server.Stop()
+		if err := server.Stop(); err != nil {
+			s.log.Errorf("Failed to stop DHCP server for subnet %s: %v", name, err)
+		}
 	}
 }
 
@@ -198,20 +198,15 @@ func (s *subnetManager) GetHostStatusEvents() chan dhcpserver.DhcpClientInfo {
 func (s *subnetManager) processHostStatusEvents() {
 	s.log.Infof("begin to process host status events for deleting binding setting")
 
-	for {
-		select {
-		case event, ok := <-s.deletedDhcpClient:
-			if !ok {
-				s.log.Panic("deletedDhcpClient channel closed")
-			}
-			s.log.Debugf("process host status events: %+v", event)
-			if c, exists := s.dhcpServerList[event.SubnetName]; !exists {
-				s.log.Errorf("subnet %s is not running, skip to process host status events: %+v", event.SubnetName, event)
-			} else {
-				if err := c.DeleteDhcpBinding(event.IP, event.MAC); err != nil {
-					s.log.Errorf("failed to delete dhcp binding for ip %s, err: %v", event.IP, err)
-				}
+	for event := range s.deletedDhcpClient {
+		s.log.Debugf("process host status events: %+v", event)
+		if c, exists := s.dhcpServerList[event.SubnetName]; !exists {
+			s.log.Errorf("subnet %s is not running, skip to process host status events: %+v", event.SubnetName, event)
+		} else {
+			if err := c.DeleteDhcpBinding(event.IP, event.MAC); err != nil {
+				s.log.Errorf("failed to delete dhcp binding: %v", err)
 			}
 		}
 	}
+	s.log.Panic("deletedDhcpClient channel closed")
 }

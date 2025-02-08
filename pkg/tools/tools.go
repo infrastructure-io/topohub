@@ -15,7 +15,7 @@ func ValidateIPInSubnet(ip net.IP, subnet *net.IPNet) bool {
 
 // ValidateIPWithSubnetMatch checks if an IP/CIDR has the same subnet as the given subnet
 func ValidateIPWithSubnetMatch(ipCIDR string, subnet *net.IPNet) error {
-	ip, ipNet, err := net.ParseCIDR(ipCIDR)
+	ip, _, err := net.ParseCIDR(ipCIDR)
 	if err != nil {
 		return fmt.Errorf("invalid CIDR format: %v", err)
 	}
@@ -30,10 +30,9 @@ func ValidateIPWithSubnetMatch(ipCIDR string, subnet *net.IPNet) error {
 		IP:   ip.Mask(subnet.Mask),
 		Mask: subnet.Mask,
 	}
-	ipNet = &ipNetValue
 
 	// Compare the network parts
-	if !ipNet.IP.Equal(subnet.IP.Mask(subnet.Mask)) {
+	if !ipNetValue.IP.Equal(subnet.IP.Mask(subnet.Mask)) {
 		return fmt.Errorf("IP %s does not match subnet network %s", ip, subnet)
 	}
 

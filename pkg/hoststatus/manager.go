@@ -77,14 +77,12 @@ func (c *hostStatusController) Stop() {
 func (c *hostStatusController) SetupWithManager(mgr ctrl.Manager) error {
 
 	go func() {
-		select {
-		case <-mgr.Elected():
-			c.log.Info("Elected as leader, begin to start all controllers")
-			// 启动 DHCP 事件处理
-			go c.processDHCPEvents()
-			// 启动 hoststatus spec.info 的	周期更新
-			go c.UpdateHostStatusAtInterval()
-		}
+		<-mgr.Elected()
+		c.log.Info("Elected as leader, begin to start all controllers")
+		// 启动 DHCP 事件处理
+		go c.processDHCPEvents()
+		// 启动 hoststatus spec.info 的	周期更新
+		go c.UpdateHostStatusAtInterval()
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).

@@ -81,7 +81,7 @@ func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 // monitor monitors the lease file and updates status
 func (s *dhcpServer) monitor() {
 
-	watcher := &fsnotify.Watcher{Events: make(chan fsnotify.Event, 0)}
+	watcher := &fsnotify.Watcher{Events: make(chan fsnotify.Event)}
 	var err error
 	if s.subnet.Spec.Feature.EnableBindDhcpIP {
 		s.log.Infof(" bind dhcp ip is enabled, and watch lease file")
@@ -196,7 +196,9 @@ func (s *dhcpServer) monitor() {
 
 		} else if needRestart {
 			s.log.Infof("restarting dhcp server")
-			s.startDnsmasq()
+			if err := s.startDnsmasq(); err != nil {
+				s.log.Errorf("Failed to restart dnsmasq: %v", err)
+			}
 			// update the status of subnet
 			s.statusUpdateCh <- struct{}{}
 		}

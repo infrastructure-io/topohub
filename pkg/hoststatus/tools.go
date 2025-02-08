@@ -2,7 +2,6 @@ package hoststatus
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -30,7 +29,7 @@ func (c *hostStatusController) getSecretData(secretName, secretNamespace string)
 }
 
 func formatHostStatusName(ip string) string {
-	return fmt.Sprintf("%s", strings.ReplaceAll(ip, ".", "-"))
+	return strings.ReplaceAll(ip, ".", "-")
 }
 
 // 比较两个Status的内容是否相同，忽略指针等问题

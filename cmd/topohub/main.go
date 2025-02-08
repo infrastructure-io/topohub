@@ -217,10 +217,8 @@ func main() {
 
 	go func() {
 		log.Logger.Infof("waiting for leader elected")
-		select {
-		case <-mgr.Elected():
-			log.Logger.Infof("I am elected as the Leader")
-		}
+		<-mgr.Elected()
+		log.Logger.Infof("I am elected as the Leader")
 	}()
 
 	// Setup signal handling for graceful shutdown

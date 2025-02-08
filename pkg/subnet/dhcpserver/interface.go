@@ -162,11 +162,11 @@ func (s *dhcpServer) cleanupAllInterface() error {
 	return nil
 }
 
-// checkInterface checks if the network interface exists
-func (s *dhcpServer) checkInterface(name string) error {
-	_, err := netlink.LinkByName(name)
-	if err != nil {
-		return fmt.Errorf("interface %s does not exist", name)
-	}
-	return nil
-}
+// // checkInterface checks if the network interface exists
+// func (s *dhcpServer) checkInterface(name string) error {
+// 	_, err := netlink.LinkByName(name)
+// 	if err != nil {
+// 		return fmt.Errorf("interface %s does not exist", name)
+// 	}
+// 	return nil
+// }
