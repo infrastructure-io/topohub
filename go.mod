@@ -3,6 +3,7 @@ module github.com/infrastructure-io/topohub
 go 1.23.5
 
 require (
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
 	github.com/sasha-s/go-deadlock v0.3.5
@@ -15,7 +16,6 @@ require (
 	k8s.io/code-generator v0.32.0
 	sigs.k8s.io/controller-runtime v0.19.3
 	sigs.k8s.io/controller-tools v0.16.5
-	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -85,4 +85,5 @@ require (
 	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
+	sigs.k8s.io/yaml v1.4.0 // indirect
 )

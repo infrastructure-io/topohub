@@ -64,9 +64,15 @@ spec:
               else
                 echo " renew dhcpClient on {{ .Values.networkInterface }}" 
                 while true ; do
-                    dhclient -v {{ .Values.networkInterface }}
-                    echo "finish dhcpClient on {{ .Values.networkInterface }}"
+                    dhclient -v {{ .Values.networkInterface }} |& tee /tmp/response
+                    DHCP_SERVER_IP=$(cat /tmp/response | grep "DHCPACK of" | grep -Eo "from [0-9.]+ " | grep -Eo "[0-9.]+" )
+                    echo "finish dhcpClient on {{ .Values.networkInterface }} from dhcp server ${DHCP_SERVER_IP}"
                     touch /tmp/ready
+                    if tftp ${DHCP_SERVER_IP} -c get boot/grub/x86_64-efi/core.efi ; then
+                      echo "tftp is ok, succeeded to get core.efi from tftp server ${DHCP_SERVER_IP}"        
+                    else
+                      echo "error!, tftp is bad, failed to get core.efi from tftp server ${DHCP_SERVER_IP}"        
+                    fi
                     ip a
                     sleep 60
                 done

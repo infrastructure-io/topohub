@@ -9,6 +9,7 @@ RUN apt-get update && \
     iputils-ping \
     curl \
     net-tools \
+    tftp-hpa \
     && rm -rf /var/lib/apt/lists/*
 
 # Set default command

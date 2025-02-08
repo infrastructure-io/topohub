@@ -9,10 +9,10 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="SUBNET",type="string",JSONPath=".spec.ipv4Subnet.subnet"
-// +kubebuilder:printcolumn:name="TOTAL",type="integer",JSONPath=".status.IpTotalAmount"
-// +kubebuilder:printcolumn:name="AVAILABLE",type="integer",JSONPath=".status.IpAvailableAmount"
-// +kubebuilder:printcolumn:name="ASSIGNED",type="integer",JSONPath=".status.IpAssignAmount"
-// +kubebuilder:printcolumn:name="RESERVED",type="integer",JSONPath=".status.IpReservedAmount"
+// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.feature.enableSyncEndpoint.defaultClusterName"
+// +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
+// +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
+// +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpReservedAmount"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
 // +kubebuilder:printcolumn:name="ZTP",type="boolean",JSONPath=".spec.feature.enableZtp"
 // +kubebuilder:subresource:status
@@ -73,15 +73,15 @@ type FeatureSpec struct {
 	// +optional
 	EnableSyncEndpoint *EnableSyncEndpointSpec `json:"enableSyncEndpoint,omitempty"`
 
-	// Enable DHCP IP binding
+	// Enable Automatically bind DHCP Client IP in the dhcp server config
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
 	EnableBindDhcpIP bool `json:"enableBindDhcpIP"`
 
-	// Enable reservation for non-DHCP IPs
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	EnableReserveNoneDhcpIP bool `json:"enableReserveNoneDhcpIP"`
+	// // Enable reservation for non-DHCP IPs
+	// // +kubebuilder:validation:Required
+	// // +kubebuilder:default=false
+	// EnableReserveNoneDhcpIP bool `json:"enableReserveNoneDhcpIP"`
 
 	// Enable PXE boot support
 	// +kubebuilder:validation:Required
@@ -96,15 +96,15 @@ type FeatureSpec struct {
 
 // EnableSyncEndpointSpec defines the sync endpoint configuration
 type EnableSyncEndpointSpec struct {
-	// Enable DHCP client-based endpoint sync
+	// Enable automatically create the hoststatus object for the dhcp client. Notice, it will not be deleted automatically
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=true
 	DhcpClient bool `json:"dhcpClient"`
 
-	// Enable subnet scan-based endpoint sync
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	ScanEndpoint bool `json:"scanEndpoint"`
+	// // Enable subnet scan-based endpoint sync
+	// // +kubebuilder:validation:Required
+	// // +kubebuilder:default=false
+	// ScanEndpoint bool `json:"scanEndpoint"`
 
 	// Default cluster name
 	// +optional
@@ -134,17 +134,34 @@ type SubnetSpec struct {
 
 // SubnetStatus defines the observed state of Subnet
 type SubnetStatus struct {
+	// Dhcp ip status
+	// +optional
+	DhcpStatus *DhcpStatusSpec `json:"dhcpStatus,omitempty"`
+
+	// the name of the node who hosts the subnet
+	HostNode *string `json:"hostNode,omitempty"`
+
+	// Conditions represent the latest available observations of an object's state
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+}
+
+type DhcpStatusSpec struct {
 	// Total number of IP addresses in the subnet
-	DhcpIpTotalAmount int32 `json:"dhcpIpTotalAmount"`
+	DhcpIpTotalAmount uint64 `json:"dhcpIpTotalAmount"`
 
 	// Number of available IP addresses
-	DhcpIpAvailableAmount int32 `json:"dhcpIpAvailableAmount"`
+	DhcpIpAvailableAmount uint64 `json:"dhcpIpAvailableAmount"`
 
 	// Number of assigned IP addresses
-	DhcpIpAssignAmount int32 `json:"dhcpIpAssignAmount"`
+	DhcpIpAssignAmount uint64 `json:"dhcpIpAssignAmount"`
 
 	// Number of reserved IP addresses
-	DhcpIpReservedAmount int32 `json:"dhcpIpReservedAmount"`
+	DhcpIpReservedAmount uint64 `json:"dhcpIpReservedAmount"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

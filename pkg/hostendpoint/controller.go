@@ -22,6 +22,7 @@ type HostEndpointReconciler struct {
 	client     client.Client
 	kubeClient kubernetes.Interface
 	config     *config.AgentConfig
+	log        *zap.SugaredLogger
 }
 
 // NewHostEndpointReconciler creates a new HostEndpoint reconciler
@@ -30,15 +31,14 @@ func NewHostEndpointReconciler(mgr ctrl.Manager, kubeClient kubernetes.Interface
 		client:     mgr.GetClient(),
 		kubeClient: kubeClient,
 		config:     config,
+		log:        log.Logger.Named("hostendpointReconcile"),
 	}, nil
 }
 
 // 只有 leader 才会执行 Reconcile
 // Reconcile handles the reconciliation of HostEndpoint objects
 func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.Logger.With(
-		zap.String("hostendpoint", req.Name),
-	)
+	logger := r.log.With("hostendpoint", req.Name)
 
 	// 获取 HostEndpoint
 	hostEndpoint := &topohubv1beta1.HostEndpoint{}
@@ -221,13 +221,29 @@ func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointS
 	if spec.ClusterName != nil {
 		clusterName = *spec.ClusterName
 	}
+	t1 := false
+	if spec.SecretName != nil && basic.SecretName == *spec.SecretName {
+		t1 = true
+	}
+	t2 := false
+	if spec.SecretNamespace != nil && basic.SecretNamespace == *spec.SecretNamespace {
+		t2 = true
+	}
+	t3 := false
+	if spec.HTTPS != nil && basic.Https == *spec.HTTPS {
+		t3 = true
+	}
+	t4 := false
+	if spec.Port != nil && basic.Port == *spec.Port {
+		t4 = true
+	}
 
 	return basic.IpAddr == spec.IPAddr &&
-		basic.SecretName == *spec.SecretName &&
-		basic.SecretNamespace == *spec.SecretNamespace &&
-		basic.Https == *spec.HTTPS &&
-		basic.Port == *spec.Port &&
-		basic.ClusterName == clusterName
+		t1 &&
+		t2 &&
+		t3 &&
+		t4 &&
+		clusterName == basic.ClusterName
 }
 
 // SetupWithManager sets up the controller with the Manager

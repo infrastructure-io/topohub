@@ -11,3 +11,6 @@ data:
   redfishSecretNamespace: {{ .Release.Namespace }}
   redfishHostStatusUpdateInterval: {{ .Values.defaultConfig.redfish.hostStatusUpdateInterval | quote }}
   dhcpServerInterface: {{ .Values.defaultConfig.dhcpServer.interface | quote }}
+  httpServerPort: {{ .Values.defaultConfig.httpServer.port | quote }}
+  httpServerEnabled: {{ .Values.defaultConfig.httpServer.enabled | quote }}
+

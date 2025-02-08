@@ -9,7 +9,7 @@ const (
 	LabelClientMode   = GroupName + "/mode"
 	LabelClientActive = GroupName + "/dhcp-ip-active"
 	LabelClusterName  = GroupName + "/cluster-name"
-	LabelSubnet       = GroupName + "/subnet"
+	LabelSubnetName   = GroupName + "/subnet-name"
 
 	HostTypeDHCP     = "dhcp"
 	HostTypeEndpoint = "hostendpoint"
@@ -67,7 +67,9 @@ type BasicInfo struct {
 	Mac             string `json:"mac,omitempty"`
 	// ActiveDhcpClient specifies this host is an active dhcp client when type is dhcp
 	// +optional
-	ActiveDhcpClient bool `json:"activeDhcpClient,omitempty"`
+	ActiveDhcpClient bool    `json:"activeDhcpClient,omitempty"`
+	DhcpExpireTime   *string `json:"dhcpExpireTime,omitempty"`
+	SubnetName       *string `json:"subnetName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -20,11 +20,11 @@ import (
 const (
 	// selfishThresholdSec is the number of seconds that should be used when
 	// detecting if a lock was held for more than the specified time.
-	selfishThresholdSec = 1
+	selfishThresholdSec = 3
 
 	// Waiting for a lock for longer than DeadlockTimeout is considered a deadlock.
 	// Ignored is DeadlockTimeout <= 0.
-	deadLockTimeout = 3 * time.Second
+	deadLockTimeout = 10 * time.Second
 )
 
 func init() {
@@ -98,7 +98,7 @@ func printStackTo(sec float64, stack []byte, writer io.Writer) {
 		goRoutineNumber = stack[:goroutineLine]
 	}
 
-	fmt.Printf("goroutine=%v : Goroutine took lock %v seconds for more than %.2f seconds\n",
+	fmt.Printf("goroutine=%v : Goroutine took lock %v seconds for more than %v seconds\n",
 		string(goRoutineNumber[len("goroutine"):len(goRoutineNumber)-1]), sec, selfishThresholdSec)
 
 	// A stack trace is usually in the following format:

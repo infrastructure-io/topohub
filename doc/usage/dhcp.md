@@ -2,35 +2,51 @@
 
 ## 功能说明
 
-Agent 中的 DHCP server，支持把 DHCP client 的 IP 固定到 DHCP server 的配置中， 从而实现 DHCP client 的 IP 固定。
+topohub 可以创建 subnet 对象，实现在不同子网上启动 DHCP server 服务，它能够做到如下功能
 
-### DHCP server 的配置
+* 分配 IP 地址
+* 支持把 DHCP client 的 IP 固定到 DHCP server 的配置中， 从而实现 DHCP client 的 IP 固定。
+* 支持在分配 IP 的响应中提供 PXE 服务选项，能开启 tftp 服务，从而支持 PXE 安装操作系统
+* 支持交换机的 ZTP 配置服务
 
-DHCP server 的配置文件，位于 confimap bmc-dhcp-config 中，若有修改需求，设置后，再重启 agent pod
+## 快速开始
 
-### DHCP client 的 IP 固定
+## 功能说明
 
-当`EnableDhcpDiscovery`功能开启时：
+### 同步维护 dhcp client 的 hoststatus 
 
-1. **普通动态分配** (`EnableBindDhcpIP = false`)：
-   - DHCP服务器动态分配IP地址
-   - IP分配变化会实时同步到 hoststatus 对象
-   - 当网络中的 dhcp client 进行 IP 释放时，对应的 hoststatus 对象会被自动删除
+```
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: Subnet
+spec:
+  feature:
+    enableSyncEndpoint:
+      dhcpClient: true
+      defaultClusterName: cluster1
+      endpointType: hoststatus
+```
 
-2. **固定IP绑定** (`EnableBindDhcpIP = true`)：
-   - 所有已分配的 DHCP IP 会被固化到 DHCP server 的配置中，其中实现 IP 地址和 MAC 地址的绑定
-   - 当网络中的 dhcp client 进行新 IP 分配时，会创建对应的hoststatus对象
-   - 当网络中的 dhcp client 进行 IP 释放时，不会自动删除对应的 hoststatus 对象
-   - 当需解除 DHCP server 配置中的 IP 和 MAC 地址的绑定，可按照如下流程：
-     首先，进入 agent pod 中，查看 DHCP server 的实时 IP 分配文件 /var/lib/dhcp/bmc-clusteragent-dhcpd.leases ， 确认和删除其中期望解除绑定的 IP 地址；其次，`kubectl get hoststatus -l status.basic.ipAddr=<IP>` 查看 hoststatus 对象，确认其中的 IP 和 MAC 地址符合删除预期，然后手动删除对应的 hoststatus 对象 `kubectl delete hoststatus -l status.basic.ipAddr=192.168.0.101` ；最终，后端会自动更新 DHCP server 的配置，实现 IP 和 MAC 地址的解绑 ( 可进入 agent pod 中，查看 文件 /etc/dhcp/dhcpd.conf 确认)
+spec.enableBindDhcpIP 开启时，每当 DHCP server 分配一个 IP 地址后，同时会把该 client 的 IP 和 mac 地址的绑定关系写入到 dhcp server 的配置文件中，实现 IP 地址的固定。只有删除相应的 hoststatus 对象后，才会删除 dhcp server 的配置中的绑定关系。
 
-### 通过 hostendpoint 对象创建的静态 IP 的固定
+### 固定 dhcp client 的 IP 
 
-当手动创建 hostendpoint 对象时，如果 hostendpoint 的 IP 地址在 DHCP 服务器的子网范围内，且`EnableBindStaticIP`选项开启， 那么该 IP 地址会被自动添加到 DHCP 服务器的固定IP配置中
+```
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: Subnet
+spec:
+  feature:
+    enableBindDhcpIP: true
+```
 
-虽然这些静态 IP 不是通过 DHCP 服务器分配的，但是通过 hostendpoint 对象创建的静态 IP 也可以被固定到 DHCP 服务器的配置中， 从而实现 IP 固定，或者避免 IP 分配的冲突。
+spec.enableBindDhcpIP 开启时，每当 DHCP server 分配一个 IP 地址后，同时会把该 client 的 IP 和 mac 地址的绑定关系写入到 dhcp server 的配置文件中，实现 IP 地址的固定。
 
-## 故障排查
+只有删除相应的 hoststatus 对象后，才会删除 dhcp server 的配置中的绑定关系。不过请注意的是，对于 dhcp client 的 hoststatus，如果它还活跃在网络中，那么 spec.feature.enableSyncEndpoint.dhcpClient 的开启也会重新创建出 hoststatus 对象。因此，当某个主机活跃于网络中时，删除 IP 地址的绑定关系才有意义。
 
-agent 的 DHCP 服务器的配置，存储在 Agent 的 /etc/dhcp/dhcpd.conf 文件中
+### 故障排查
+
+如果 POD 使用 hostpath 存储，则 DHCP server 的目录默认位于 /var/lib/topohub/dhcp/, 否则位于 PVC 中
+存储目录的 dhcp 目录下，有如下子目录
+1. config目录：目录中存储了以 subnet 名字命名的 DHCP server 的配置文件
+2. leases目录：目录中存储了以 subnet 名字命名的 lease 文件，存储了 DHCP client 的 IP 分配记录
+3. log 目录：目录中存储了以 subnet 名字命名的日志文件
 

@@ -2,36 +2,34 @@ package hoststatus
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/infrastructure-io/topohub/pkg/log"
 	"go.uber.org/zap"
 )
 
 // getSecretData 从 Secret 中获取用户名和密码
 func (c *hostStatusController) getSecretData(secretName, secretNamespace string) (string, string, error) {
-	log.Logger.Debugf("Attempting to get secret data for %s/%s", secretNamespace, secretName)
+	c.log.Debugf("Attempting to get secret data for %s/%s", secretNamespace, secretName)
 
-	log.Logger.Debugf("Fetching secret from Kubernetes API for %s/%s", secretNamespace, secretName)
+	c.log.Debugf("Fetching secret from Kubernetes API for %s/%s", secretNamespace, secretName)
 	// 如果不同，从 Secret 中获取认证信息
 	secret, err := c.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
-		log.Logger.Errorf("Failed to get secret %s/%s: %v", secretNamespace, secretName, err)
+		c.log.Errorf("Failed to get secret %s/%s: %v", secretNamespace, secretName, err)
 		return "", "", err
 	}
 
 	username := string(secret.Data["username"])
 	password := string(secret.Data["password"])
-	log.Logger.Debugf("Successfully retrieved secret data for %s/%s", secretNamespace, secretName)
+	c.log.Debugf("Successfully retrieved secret data for %s/%s", secretNamespace, secretName)
 	return username, password, nil
 }
 
 func formatHostStatusName(ip string) string {
-	return fmt.Sprintf("%s", strings.ReplaceAll(ip, ".", "-"))
+	return strings.ReplaceAll(ip, ".", "-")
 }
 
 // 比较两个Status的内容是否相同，忽略指针等问题

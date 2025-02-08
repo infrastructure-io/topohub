@@ -3,6 +3,8 @@ package hoststatus
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,10 +21,12 @@ import (
 // HostStatusWebhook validates HostStatus resources
 type HostStatusWebhook struct {
 	Client client.Client
+	log    *zap.SugaredLogger
 }
 
 func (w *HostStatusWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	w.Client = mgr.GetClient()
+	w.log = log.Logger.Named("hoststatusWebhook")
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&topohubv1beta1.HostStatus{}).
 		WithValidator(w).
@@ -35,22 +39,31 @@ func (w *HostStatusWebhook) Default(ctx context.Context, obj runtime.Object) err
 	hoststatus, ok := obj.(*topohubv1beta1.HostStatus)
 	if !ok {
 		err := fmt.Errorf("object is not a HostStatus")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return err
 	}
 
-	log.Logger.Debugf("Setting initial values for nil fields in HostStatus %s", hoststatus.Name)
+	w.log.Debugf("Processing Default webhook for HostStatus %s", hoststatus.Name)
 
-	if hoststatus.Status.Basic.ClusterName != "" {
-		if hoststatus.ObjectMeta.Labels == nil {
-			hoststatus.ObjectMeta.Labels = make(map[string]string)
-		}
-		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = hoststatus.Status.Basic.ClusterName
+	if hoststatus.ObjectMeta.Labels == nil {
+		hoststatus.ObjectMeta.Labels = make(map[string]string)
+	}
+	// cluster name
+	hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = hoststatus.Status.Basic.ClusterName
+	// ip
+	IpAddr := strings.Split(hoststatus.Status.Basic.IpAddr, "/")[0]
+	hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
+	// mode
+	if hoststatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP {
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
 	} else {
-		if hoststatus.ObjectMeta.Labels == nil {
-			hoststatus.ObjectMeta.Labels = make(map[string]string)
-		}
-		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = ""
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeEndpoint
+	}
+	// dhcp
+	if hoststatus.Status.Basic.ActiveDhcpClient {
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
+	} else {
+		hoststatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "false"
 	}
 
 	return nil
@@ -61,11 +74,11 @@ func (w *HostStatusWebhook) ValidateCreate(ctx context.Context, obj runtime.Obje
 	hoststatus, ok := obj.(*topohubv1beta1.HostStatus)
 	if !ok {
 		err := fmt.Errorf("object is not a HostStatus")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Validating creation of HostStatus %s", hoststatus.Name)
+	w.log.Debugf("Validating creation of HostStatus %s", hoststatus.Name)
 
 	return nil, nil
 }
@@ -75,11 +88,11 @@ func (w *HostStatusWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj r
 	hoststatus, ok := newObj.(*topohubv1beta1.HostStatus)
 	if !ok {
 		err := fmt.Errorf("object is not a HostStatus")
-		log.Logger.Error(err.Error())
+		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Validating update of HostStatus %s", hoststatus.Name)
+	w.log.Debugf("Validating update of HostStatus %s", hoststatus.Name)
 
 	return nil, nil
 }

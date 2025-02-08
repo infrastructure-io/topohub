@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
@@ -16,16 +17,23 @@ type AgentConfig struct {
 	// pod namespace
 	PodNamespace string
 
+	// node name
+	NodeName string
+
 	// webhook cert dir
 	WebhookCertDir string
 
 	// storage path
-	StoragePath           string
-	StoragePathDhcpLease  string
-	StoragePathDhcpConfig string
-	StoragePathZtp        string
-	StoragePathSftp       string
-	StoragePathHttp       string
+	StoragePath                         string
+	StoragePathDhcpLog                  string
+	StoragePathDhcpLease                string
+	StoragePathDhcpConfig               string
+	StoragePathHttp                     string
+	StoragePathHttpZtp                  string
+	StoragePathHttpIso                  string
+	StoragePathTftp                     string
+	StoragePathTftpRelativeDirForPxeEfi string
+	StoragePathTftpAbsoluteDirForPxeEfi string
 
 	// dnsmasq config template path
 	DhcpConfigTemplatePath string
@@ -40,6 +48,9 @@ type AgentConfig struct {
 	RedfishHostStatusUpdateInterval int
 	// DHCP server configuration
 	DhcpServerInterface string
+
+	HttpEnabled bool
+	HttpPort    string
 }
 
 // LoadFeatureConfig loads feature configuration from the config file
@@ -98,6 +109,19 @@ func (c *AgentConfig) loadFeatureConfig() error {
 		return fmt.Errorf("failed to find dhcpServer Interface %s: %v", c.DhcpServerInterface, err)
 	}
 
+	// http
+	httpPortBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "httpServerPort"))
+	if err != nil {
+		return fmt.Errorf("failed to read httpServerPort: %v", err)
+	}
+	c.HttpPort = string(httpPortBytes)
+
+	httpEnabledBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "httpServerEnabled"))
+	if err != nil {
+		return fmt.Errorf("failed to read httpServerEnabled: %v", err)
+	}
+	c.HttpEnabled = strings.ToLower(string(httpEnabledBytes)) == "true"
+
 	return nil
 }
 
@@ -113,37 +137,65 @@ func (c *AgentConfig) verifyWebhookCertDir() error {
 	return nil
 }
 
-// ensureStoragePath ensures that the storage path exists
-func (c *AgentConfig) ensureStoragePath() error {
-	if err := os.MkdirAll(c.StoragePath, 0755); err != nil {
-		return fmt.Errorf("failed to create storage path %s: %v", c.StoragePath, err)
-	}
-	return nil
-}
-
 func (c *AgentConfig) initStorageDirectory() error {
 	// Check if main storage directory exists
 	if _, err := os.Stat(c.StoragePath); err != nil {
 		return fmt.Errorf("did not exist storage path %s: %v", c.StoragePath, err)
 	}
 
-	c.StoragePathDhcpLease = filepath.Join(c.StoragePath, "dhcpLease")
-	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcpConfig")
-	c.StoragePathZtp = filepath.Join(c.StoragePath, "ztp")
-	c.StoragePathSftp = filepath.Join(c.StoragePath, "sftp")
+	c.StoragePathDhcpLease = filepath.Join(c.StoragePath, "dhcp/lease")
+	c.StoragePathDhcpConfig = filepath.Join(c.StoragePath, "dhcp/config")
+	c.StoragePathDhcpLog = filepath.Join(c.StoragePath, "dhcp/log")
+	c.StoragePathTftp = filepath.Join(c.StoragePath, "tftp")
+	c.StoragePathTftpRelativeDirForPxeEfi = "boot/grub/x86_64-efi"
+	c.StoragePathTftpAbsoluteDirForPxeEfi = filepath.Join(c.StoragePathTftp, c.StoragePathTftpRelativeDirForPxeEfi)
 	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
+	c.StoragePathHttpZtp = filepath.Join(c.StoragePathHttp, "ztp")
+	c.StoragePathHttpIso = filepath.Join(c.StoragePathHttp, "iso")
 
 	// List of required subdirectories
-	subdirs := []string{c.StoragePathDhcpLease, c.StoragePathDhcpConfig, c.StoragePathZtp, c.StoragePathSftp, c.StoragePathHttp}
+	subdirs := []string{
+		c.StoragePathDhcpLease,
+		c.StoragePathDhcpConfig,
+		c.StoragePathDhcpLog,
+		c.StoragePathTftp,
+		c.StoragePathTftpAbsoluteDirForPxeEfi,
+		c.StoragePathHttp,
+		c.StoragePathHttpIso,
+		c.StoragePathHttpZtp,
+	}
 
 	// Check and create each subdirectory if it doesn't exist
 	for _, dir := range subdirs {
-		subPath := filepath.Join(c.StoragePath, dir)
-		if _, err := os.Stat(subPath); os.IsNotExist(err) {
-			if err := os.MkdirAll(subPath, 0755); err != nil {
-				return fmt.Errorf("failed to create subdirectory %s: %v", subPath, err)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("failed to create subdirectory %s: %v", dir, err)
 			}
 		}
+	}
+
+	// Set ownership and permissions for TFTP directory
+	if err := os.Chown(c.StoragePathTftp, 65534, 65534); err != nil { // 65534 is nobody:nogroup
+		return fmt.Errorf("failed to change ownership of TFTP directory: %v", err)
+	}
+	if err := os.Chmod(c.StoragePathTftp, 0777); err != nil {
+		return fmt.Errorf("failed to change permissions of TFTP directory: %v", err)
+	}
+
+	// Copy core.efi file if it exists
+	sourceFile := "/files/core.efi"
+	if _, err := os.Stat(sourceFile); err == nil {
+		targetFile := filepath.Join(c.StoragePathTftpAbsoluteDirForPxeEfi, "core.efi")
+		log.Logger.Infof("%s exists, copying to %s", sourceFile, targetFile)
+
+		input, err := os.ReadFile(sourceFile)
+		if err != nil {
+			return fmt.Errorf("failed to read core.efi: %v", err)
+		}
+		if err := os.WriteFile(targetFile, input, 0644); err != nil {
+			return fmt.Errorf("failed to copy core.efi to %s: %v", targetFile, err)
+		}
+		log.Logger.Infof("Successfully copied core.efi to %s", targetFile)
 	}
 
 	return nil
@@ -156,6 +208,11 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	agentConfig.PodNamespace = os.Getenv("POD_NAMESPACE")
 	if agentConfig.PodNamespace == "" {
 		return nil, fmt.Errorf("POD_NAMESPACE environment variable not set")
+	}
+
+	agentConfig.NodeName = os.Getenv("NODE_NAME")
+	if agentConfig.NodeName == "" {
+		return nil, fmt.Errorf("NODE_NAME environment variable not set")
 	}
 
 	agentConfig.WebhookCertDir = os.Getenv("WEBHOOK_CERT_DIR")
@@ -189,7 +246,7 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	}
 
 	// Ensure storage path exists
-	if err := agentConfig.ensureStoragePath(); err != nil {
+	if err := agentConfig.initStorageDirectory(); err != nil {
 		return nil, fmt.Errorf("failed to ensure storage path: %v", err)
 	}
 

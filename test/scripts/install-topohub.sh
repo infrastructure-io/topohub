@@ -15,11 +15,6 @@ CLUSTER_NAME=${CLUSTER_NAME:-"topohub"}
 
 #====================================
 
-echo "loading $IMAGE_NAME"
-docker inspect $IMAGE_NAME &>/dev/null || { echo "error, failed to find image $IMAGE_NAME"; exit 1; }
-kind load docker-image $IMAGE_NAME --name ${CLUSTER_NAME}
-echo "Images loaded successfully"
-
 echo "Deploying application using Helm chart..."
 
 helm uninstall topohub -n topohub --wait &>/dev/null || true
@@ -32,7 +27,7 @@ cat <<EOF >/tmp/topo.yaml
 replicaCount: 1
 logLevel: "debug"
 image:
-  tag: ${IMAGE_VERSION}
+  tag: "${IMAGE_VERSION}"
 
 defaultConfig:
   redfish:
@@ -54,16 +49,21 @@ nodeAffinity:
         operator: In
         values:
         - "true"
+
+httpServer:
+  enabled: true
+  port: 10080
 EOF
 
-		# --set clusterAgent.feature.dhcpServerConfig.subnet="192.168.0.0/24" \
-		# --set clusterAgent.feature.dhcpServerConfig.ipRange="192.168.0.100-192.168.0.200" \
-		# --set clusterAgent.feature.dhcpServerConfig.gateway="192.168.0.1" \
-		# --set clusterAgent.feature.dhcpServerConfig.selfIp="192.168.0.2/24" \
+IMAGE_LIST=$( helm template topohub ${PROJECT_ROOT_PATH}/chart -f /tmp/topo.yaml  | grep "image:" | awk '{print $2}' | tr -d '"' )
+for IMAGE in $IMAGE_LIST; do
+    echo "loading $IMAGE"
+    docker inspect $IMAGE &>/dev/null || docker pull $IMAGE  
+    kind load docker-image $IMAGE --name ${CLUSTER_NAME}
+done
 
 helm install topohub ${PROJECT_ROOT_PATH}/chart \
     --namespace topohub \
     --create-namespace \
     --debug \
     --wait -f /tmp/topo.yaml
-

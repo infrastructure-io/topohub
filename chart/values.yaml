@@ -4,6 +4,8 @@ replicaCount: 2
 # Available values: debug, info, error
 logLevel: "info"
 
+registryOverride: ""
+
 image:
   registry: "ghcr.io"
   repository: "infrastructure-io/topohub"
@@ -38,6 +40,12 @@ defaultConfig:
   dhcpServer:
     # 宿主机网卡名，最好是 trunck 模式接入网络，从而接入到各种子网中
     interface: "eth0"  
+
+  # for iso and ztp in dchp subnet
+  httpServer:
+    enabled: true
+    # Port for the endpoint (default: 10080)
+    port: 80
 
 # Storage configuration for DHCP lease files、DHCP configuration files、sftp storage、http storage（ISO）
 storage:
@@ -115,3 +123,28 @@ nodeAffinity: {}
 ## @skip spiderpoolAgent.tolerations
 tolerations:
   - operator: Exists
+
+
+## this is used to manage the files for the administrator
+httpServer:
+  enabled: false
+  
+  image:
+    registry: "docker.io"
+    repository: "filebrowser/filebrowser"
+    pullPolicy: IfNotPresent
+    # tag will be overridden by version from Chart.yaml
+    tag: "v2.32.0"
+    # Optional: image digest
+    digest: ""
+
+  port: 10080
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+

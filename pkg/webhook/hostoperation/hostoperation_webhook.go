@@ -3,6 +3,7 @@ package hostoperation
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 
 	//"time"
 
@@ -17,10 +18,12 @@ import (
 
 type HostOperationWebhook struct {
 	Client client.Client
+	log    *zap.SugaredLogger
 }
 
 func (h *HostOperationWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	h.Client = mgr.GetClient()
+	h.log = log.Logger.Named("hostoperationWebhook")
 	log.Logger.Info("Setting up HostOperation webhook")
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&topohubv1beta1.HostOperation{}).
@@ -35,13 +38,13 @@ func (h *HostOperationWebhook) Default(ctx context.Context, obj runtime.Object) 
 	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", obj)
-		log.Logger.Error(err.Error())
+		h.log.Error(err.Error())
 		return err
 	}
 
-	log.Logger.Debugf("Processing Default webhook for HostOperation %s", hostOp.Name)
+	h.log.Debugf("Processing Default webhook for HostOperation %s", hostOp.Name)
 
-	log.Logger.Debugf("Successfully processed Default webhook for HostOperation %s", hostOp.Name)
+	h.log.Debugf("Successfully processed Default webhook for HostOperation %s", hostOp.Name)
 	return nil
 }
 
@@ -51,27 +54,27 @@ func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.O
 	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", obj)
-		log.Logger.Error(err.Error())
+		h.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Processing ValidateCreate webhook for HostOperation %s", hostOp.Name)
+	h.log.Debugf("Processing ValidateCreate webhook for HostOperation %s", hostOp.Name)
 
 	// 验证 hostStatusName 对应的 HostStatus 是否存在且健康
 	var hostStatus topohubv1beta1.HostStatus
 	if err := h.Client.Get(ctx, client.ObjectKey{Name: hostOp.Spec.HostStatusName}, &hostStatus); err != nil {
 		err = fmt.Errorf("hostStatus %s not found: %v", hostOp.Spec.HostStatusName, err)
-		log.Logger.Errorf(err.Error())
+		h.log.Error(err.Error())
 		return nil, err
 	}
 
 	if !hostStatus.Status.Healthy {
 		err := fmt.Errorf("hostStatus %s is not healthy, so it is not allowed to create hostOperation %s", hostOp.Spec.HostStatusName, hostOp.Name)
-		log.Logger.Errorf(err.Error())
+		h.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Successfully validated HostOperation %s creation", hostOp.Name)
+	h.log.Debugf("Successfully validated HostOperation %s creation", hostOp.Name)
 	return nil, nil
 }
 
@@ -79,10 +82,10 @@ func (h *HostOperationWebhook) ValidateUpdate(ctx context.Context, oldObj, newOb
 	hostOp, ok := oldObj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", oldObj)
-		log.Logger.Error(err.Error())
+		h.log.Error(err.Error())
 		return nil, err
 	}
-	log.Logger.Debugf("Rejecting update of HostOperation %s: updates are not allowed", hostOp.Name)
+	h.log.Debugf("Rejecting update of HostOperation %s: updates are not allowed", hostOp.Name)
 	return nil, fmt.Errorf("updates to HostOperation resources are not allowed")
 }
 
@@ -90,10 +93,10 @@ func (h *HostOperationWebhook) ValidateDelete(ctx context.Context, obj runtime.O
 	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
 	if !ok {
 		err := fmt.Errorf("expected a HostOperation but got a %T", obj)
-		log.Logger.Error(err.Error())
+		h.log.Error(err.Error())
 		return nil, err
 	}
 
-	log.Logger.Debugf("Processing ValidateDelete webhook for HostOperation %s", hostOp.Name)
+	h.log.Debugf("Processing ValidateDelete webhook for HostOperation %s", hostOp.Name)
 	return nil, nil
 }

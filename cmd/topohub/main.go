@@ -22,10 +22,12 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
 	"github.com/infrastructure-io/topohub/pkg/hostoperation"
 	"github.com/infrastructure-io/topohub/pkg/hoststatus"
+	"github.com/infrastructure-io/topohub/pkg/httpserver"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/secret"
+	"github.com/infrastructure-io/topohub/pkg/subnet"
 	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
 	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
 	hoststatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/hoststatus"
@@ -114,8 +116,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup DhcpSubnet webhook
-	if err = (&subnetwebhook.SubnetWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+	// Setup Subnet webhook
+	if err = (&subnetwebhook.SubnetWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
 		log.Logger.Errorf("unable to create webhook %s: %v", "DhcpSubnet", err)
 		os.Exit(1)
 	}
@@ -126,9 +128,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// todo: subnet manager
+	subnetMgr := subnet.NewSubnetReconciler(*agentConfig, k8sClient)
+	if err = subnetMgr.SetupWithManager(mgr); err != nil {
+		log.Logger.Errorf("Failed to setup subnet manager: %v", err)
+		os.Exit(1)
+	}
+	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEvents()
+	deleteHostStatusChan := subnetMgr.GetHostStatusEvents()
 	// Initialize hoststatus controller
-	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr)
-
+	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan, deleteHostStatusChan)
 	if err = hostStatusCtrl.SetupWithManager(mgr); err != nil {
 		log.Logger.Errorf("Unable to create hoststatus controller: %v", err)
 		os.Exit(1)
@@ -168,7 +177,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// todo: subnet manager
+	// start http server for pxe and ztp
+	if agentConfig.HttpEnabled {
+		log.Logger.Info("Http server is enabled for pxe and ztp")
+		httpServer := httpserver.NewHttpServer(*agentConfig)
+		httpServer.Run()
+	} else {
+		log.Logger.Info("Http server is disabled for pxe and ztp")
+	}
 
 	// Add health check
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -201,10 +217,8 @@ func main() {
 
 	go func() {
 		log.Logger.Infof("waiting for leader elected")
-		select {
-		case <-mgr.Elected():
-			log.Logger.Infof("I am elected as the Leader")
-		}
+		<-mgr.Elected()
+		log.Logger.Infof("I am elected as the Leader")
 	}()
 
 	// Setup signal handling for graceful shutdown
