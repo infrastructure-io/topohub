@@ -104,6 +104,9 @@ func (c *AgentConfig) loadFeatureConfig() error {
 		return fmt.Errorf("failed to read dhcpServerInterface: %v", err)
 	}
 	c.DhcpServerInterface = string(interfaceBytes)
+	if len(c.DhcpServerInterface) == 0 {
+		return fmt.Errorf("dhcpServerInterface is empty")
+	}
 	// Validate interface exists on the system
 	if err := tools.ValidateInterfaceExists(c.DhcpServerInterface); err != nil {
 		return fmt.Errorf("failed to find dhcpServer Interface %s: %v", c.DhcpServerInterface, err)

@@ -4,11 +4,11 @@ nodes:
 - role: control-plane
 - role: worker
   extraPortMappings:
-  - containerPort: 10080
+  - containerPort: 8080
     hostPort: 30080
     listenAddress: "0.0.0.0"
 - role: worker
   extraPortMappings:
-  - containerPort: 10080
+  - containerPort: 8080
     hostPort: 30081
     listenAddress: "0.0.0.0"
