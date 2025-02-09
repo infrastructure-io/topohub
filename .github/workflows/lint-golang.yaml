@@ -84,7 +84,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.23.5
+          go-version: 1.23.6
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -106,7 +106,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.23.5
+          go-version: 1.23.6
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -155,7 +155,7 @@ jobs:
   #     - name: Install Go
   #       uses: actions/setup-go@v4
   #       with:
-  #         go-version: 1.23.5
+  #         go-version: 1.23.6
 
   #     - name: Checkout code
   #       uses: actions/checkout@v3
