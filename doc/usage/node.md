@@ -100,6 +100,47 @@ status:
 
 > * topohub 在连接每个基于 dhcp 接入的主机时，都是会使用 helm 安装 topohub 时的 helm 选项 defaultConfig.redfish.username 和 defaultConfig.redfish.password 来连接 BMC 主机，这些认证信息存储在 secret topohub-redfish-auth 中，您可以通过修改该 secret 来修改默认的认证信息。
 
+3. 查看 subnet 中 dhcp 分配 ip 的用量信息
+
+```bash
+~# kubectl get subnet net0 -o yaml
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: Subnet
+metadata:
+  name: net0
+spec:
+  feature:
+    enableBindDhcpIP: true
+    enablePxe: true
+    enableSyncEndpoint:
+      defaultClusterName: cluster1
+      dhcpClient: true
+      endpointType: hoststatus
+    enableZtp: false
+  interface:
+    interface: eth1
+    ipv4: 192.168.1.3/24
+    vlanId: 0
+  ipv4Subnet:
+    dns: 192.168.1.2
+    gateway: 192.168.1.1
+    ipRange: 192.168.1.100-192.168.1.200
+    subnet: 192.168.1.0/24
+status:
+  conditions:
+  - lastTransitionTime: "2025-02-08T12:24:09Z"
+    message: dhcp server is hosted by node topohub-worker2
+    reason: hostChange
+    status: "True"
+    type: DhcpServer
+  dhcpStatus:
+    dhcpIpAssignAmount: 2
+    dhcpIpAvailableAmount: 99
+    dhcpIpReservedAmount: 0
+    dhcpIpTotalAmount: 101
+  hostNode: topohub-worker2
+```
+
 ### 手动创建主机对象来管理 BMC 主机
 
 对于已经分配 IP 地址的 BMC 主机，您可以使用以下方式创建主机对象

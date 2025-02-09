@@ -75,7 +75,7 @@ type FeatureSpec struct {
 
 	// Enable Automatically bind DHCP Client IP in the dhcp server config
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
+	// +kubebuilder:default=true
 	EnableBindDhcpIP bool `json:"enableBindDhcpIP"`
 
 	// // Enable reservation for non-DHCP IPs
@@ -98,7 +98,7 @@ type FeatureSpec struct {
 type EnableSyncEndpointSpec struct {
 	// Enable automatically create the hoststatus object for the dhcp client. Notice, it will not be deleted automatically
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	DhcpClient bool `json:"dhcpClient"`
 
 	// // Enable subnet scan-based endpoint sync
