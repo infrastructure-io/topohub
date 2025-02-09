@@ -3,9 +3,9 @@ entries:
   topohub:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2025-02-08T13:18:29.12658612Z"
+    created: "2025-02-09T02:09:10.073837472Z"
     description: A Helm chart for Topohub
-    digest: 869c9ca82ebb513e2b951c670f7b23f6096e8e9a7620908eff79a1a4c1b84584
+    digest: 0131a4348a15518654c1178b2c821f5ca02b5bf9901370b0c142f78ce80f15ef
     keywords:
     - kubernetes
     - bmc
@@ -21,4 +21,4 @@ entries:
     urls:
     - https://infrastructure-io.github.io/topohub/charts/topohub-0.1.0.tgz
     version: 0.1.0
-generated: "2025-02-08T13:18:29.125788233Z"
+generated: "2025-02-09T02:09:10.073007204Z"
