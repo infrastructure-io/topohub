@@ -34,6 +34,7 @@ type dhcpServer struct {
 	lockData       *lock.RWMutex
 	subnet         *topohubv1beta1.Subnet
 	currentClients map[string]*DhcpClientInfo
+	bindClients map[string]*DhcpClientInfo
 
 	lockConfigUpdate *lock.RWMutex
 
@@ -77,6 +78,7 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 		restartCh:                make(chan struct{}),
 		log:                      log.Logger.Named("dhcpServer/" + subnet.Name),
 		currentClients:           make(map[string]*DhcpClientInfo),
+		bindClients: 			  make(map[string]*DhcpClientInfo),
 		configTemplatePath:       filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
 		configPath:               filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
 		HostIpBindingsConfigPath: filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s-bindIp.conf", subnet.Name)),

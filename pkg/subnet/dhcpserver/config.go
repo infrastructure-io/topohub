@@ -235,6 +235,12 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 			s.log.Errorf("failed to add dhcp bindings: %v", err)
 			return false, err
 		}
+	}else {
+		// just update the newest binding information
+		if err := s.UpdateDhcpBindings(nil, nil); err != nil {
+			s.log.Errorf("failed to update dhcp bindings: %v", err)
+		}
+
 	}
 
 	return needReload, nil
@@ -248,6 +254,8 @@ func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[strin
 
 	s.lockConfigUpdate.Lock()
 	defer s.lockConfigUpdate.Unlock()
+
+	bindClients := map[string]*DhcpClientInfo{}
 
 	// 读取现有的配置文件
 	content, err := os.ReadFile(s.HostIpBindingsConfigPath)
@@ -308,12 +316,20 @@ func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[strin
 				s.log.Infof("updating dhcp-host binding for IP %s: old MAC %s -> new MAC %s", ip, mac, newMac)
 				finalLines = append(finalLines, fmt.Sprintf("dhcp-host=%s,%s", newMac, ip))
 				processedIPs[ip] = true
+				bindClients[ip] = &DhcpClientInfo{
+					MAC: newMac,
+					IP:  ip,
+				}
 				continue
 			}
 
 			// 保持原有配置不变
 			finalLines = append(finalLines, line)
 			processedIPs[ip] = true
+			bindClients[ip] = &DhcpClientInfo{
+				MAC: mac,
+				IP:  ip,
+			}
 		} else {
 			// 非 dhcp-host 配置行保持不变
 			finalLines = append(finalLines, line)
@@ -325,6 +341,10 @@ func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[strin
 		if !processedIPs[ip] {
 			s.log.Infof("adding new dhcp-host binding for IP %s, MAC %s", ip, mac)
 			finalLines = append(finalLines, fmt.Sprintf("dhcp-host=%s,%s", mac, ip))
+			bindClients[ip] = &DhcpClientInfo{
+				MAC: mac,
+				IP:  ip,
+			}
 		}
 	}
 
@@ -332,6 +352,9 @@ func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[strin
 	if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(strings.Join(finalLines, "\n")+"\n"), 0644); err != nil {
 		return fmt.Errorf("failed to write bindings file: %v", err)
 	}
+
+	// update the bind clients
+	s.bindClients = bindClients
 
 	return nil
 }
