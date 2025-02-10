@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	vlanInterfaceFormat = "%s.topohub.%d"
+	vlanInterfaceFormat = "%s.%d"
 	//macvlanInterfaceFormat = "%s.topohub"
 )
 
@@ -71,6 +71,7 @@ func (s *dhcpServer) createVlanInterface(parent netlink.Link, name string, vlanI
 		},
 		VlanId: vlanId,
 	}
+	s.log.Infof("Creating VLAN interface: %+v",  vlan )
 
 	if err := netlink.LinkAdd(vlan); err != nil {
 		return fmt.Errorf("failed to create VLAN interface: %v", err)
