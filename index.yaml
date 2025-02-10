@@ -2,8 +2,28 @@ apiVersion: v1
 entries:
   topohub:
   - apiVersion: v2
+    appVersion: 0.2.1
+    created: "2025-02-10T09:15:31.319277376Z"
+    description: A Helm chart for Topohub
+    digest: fdfdedfb2944b4c20c73717c37f6900b88edd6ecbef494195d3b6786a730325c
+    keywords:
+    - kubernetes
+    - bmc
+    - server
+    - infrastructure
+    - switch
+    - network
+    maintainers:
+    - name: infrastructure-io
+      url: https://github.com/infrastructure-io/topohub
+    name: topohub
+    type: application
+    urls:
+    - https://infrastructure-io.github.io/topohub/charts/topohub-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v2
     appVersion: 0.2.0
-    created: "2025-02-10T08:19:55.113600505Z"
+    created: "2025-02-10T09:15:31.318582862Z"
     description: A Helm chart for Topohub
     digest: 713250439cd58c4b801ef4527372c61b3b56fb70db06394187220df5082f8ddc
     keywords:
@@ -23,7 +43,7 @@ entries:
     version: 0.2.0
   - apiVersion: v2
     appVersion: 0.1.1
-    created: "2025-02-10T08:19:55.112968481Z"
+    created: "2025-02-10T09:15:31.317922343Z"
     description: A Helm chart for Topohub
     digest: 46506ab7d3edbc2d7e726de45e96e9098b1c4c35af914e399920ff268e447b27
     keywords:
@@ -43,7 +63,7 @@ entries:
     version: 0.1.1
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2025-02-10T08:19:55.112308665Z"
+    created: "2025-02-10T09:15:31.317262434Z"
     description: A Helm chart for Topohub
     digest: 0131a4348a15518654c1178b2c821f5ca02b5bf9901370b0c142f78ce80f15ef
     keywords:
@@ -61,4 +81,4 @@ entries:
     urls:
     - https://infrastructure-io.github.io/topohub/charts/topohub-0.1.0.tgz
     version: 0.1.0
-generated: "2025-02-10T08:19:55.111514297Z"
+generated: "2025-02-10T09:15:31.316410456Z"
