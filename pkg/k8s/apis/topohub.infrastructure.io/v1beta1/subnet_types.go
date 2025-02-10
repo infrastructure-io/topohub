@@ -9,10 +9,12 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="SUBNET",type="string",JSONPath=".spec.ipv4Subnet.subnet"
-// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.feature.enableSyncEndpoint.defaultClusterName"
 // +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
 // +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
 // +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpReservedAmount"
+// +kubebuilder:printcolumn:name="SYNC_ENDPOINT",type="boolean",JSONPath=".spec.feature.enableSyncEndpoint.enable"
+// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.feature.enableSyncEndpoint.defaultClusterName"
+// +kubebuilder:printcolumn:name="BIND_DHCP_IP",type="boolean",JSONPath=".spec.feature.enableBindDhcpIP"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
 // +kubebuilder:printcolumn:name="ZTP",type="boolean",JSONPath=".spec.feature.enableZtp"
 // +kubebuilder:subresource:status
