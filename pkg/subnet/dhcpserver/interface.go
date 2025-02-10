@@ -55,12 +55,17 @@ func (s *dhcpServer) createVlanInterface(parent netlink.Link, name string, vlanI
 		return netlink.LinkSetUp(link)
 	}
 
+	// Ensure VLAN ID is within valid range (0-4094)
+	if vlanID < 0 || vlanID > 4094 {
+		return fmt.Errorf("invalid VLAN ID %d: must be between 0 and 4094", vlanID)
+	}
+
 	vlan := &netlink.Vlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:        name,
 			ParentIndex: parent.Attrs().Index,
 		},
-		VlanId: int(vlanID),
+		VlanId: int(vlanID), // Keep as int to match netlink.Vlan field type
 	}
 
 	if err := netlink.LinkAdd(vlan); err != nil {
