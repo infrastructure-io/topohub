@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	// note, the letter length of the interface must be less than 15
 	vlanInterfaceFormat = "%s.%d"
 	//macvlanInterfaceFormat = "%s.topohub"
 )
@@ -72,6 +73,10 @@ func (s *dhcpServer) createVlanInterface(parent netlink.Link, name string, vlanI
 		VlanId: vlanId,
 	}
 	s.log.Infof("Creating VLAN interface: %+v",  vlan )
+
+	if len(name)>15 {
+		return fmt.Errorf("interface name %s is too long, it is must be less than 15 letters", name)
+	}
 
 	if err := netlink.LinkAdd(vlan); err != nil {
 		return fmt.Errorf("failed to create VLAN interface: %v", err)
