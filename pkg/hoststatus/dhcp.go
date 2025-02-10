@@ -183,17 +183,9 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	IpAddr := strings.Split(hostStatus.Status.Basic.IpAddr, "/")[0]
 	hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
 	// mode
-	if hostStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP {
-		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
-	} else {
-		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeEndpoint
-	}
+	hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
 	// dhcp
-	if hostStatus.Status.Basic.ActiveDhcpClient {
-		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
-	} else {
-		hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "false"
-	}
+	hostStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
 
 	if err := c.client.Status().Update(context.Background(), hostStatus); err != nil {
 		c.log.Errorf("Failed to update status of HostStatus %s: %v", name, err)

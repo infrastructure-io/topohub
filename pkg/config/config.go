@@ -104,6 +104,9 @@ func (c *AgentConfig) loadFeatureConfig() error {
 		return fmt.Errorf("failed to read dhcpServerInterface: %v", err)
 	}
 	c.DhcpServerInterface = string(interfaceBytes)
+	if len(c.DhcpServerInterface) == 0 {
+		return fmt.Errorf("dhcpServerInterface is empty")
+	}
 	// Validate interface exists on the system
 	if err := tools.ValidateInterfaceExists(c.DhcpServerInterface); err != nil {
 		return fmt.Errorf("failed to find dhcpServer Interface %s: %v", c.DhcpServerInterface, err)
@@ -184,18 +187,21 @@ func (c *AgentConfig) initStorageDirectory() error {
 
 	// Copy core.efi file if it exists
 	sourceFile := "/files/core.efi"
-	if _, err := os.Stat(sourceFile); err == nil {
-		targetFile := filepath.Join(c.StoragePathTftpAbsoluteDirForPxeEfi, "core.efi")
-		log.Logger.Infof("%s exists, copying to %s", sourceFile, targetFile)
-
-		input, err := os.ReadFile(sourceFile)
-		if err != nil {
-			return fmt.Errorf("failed to read core.efi: %v", err)
+	targetFile := filepath.Join(c.StoragePathTftpAbsoluteDirForPxeEfi, "core.efi")
+	if _, err := os.Stat(targetFile); err!=nil && os.IsNotExist(err) {
+		if _, err := os.Stat(sourceFile); err == nil {
+			log.Logger.Infof("%s exists, copying to %s", sourceFile, targetFile)
+			input, err := os.ReadFile(sourceFile)
+			if err != nil {
+				return fmt.Errorf("failed to read core.efi: %v", err)
+			}
+			if err := os.WriteFile(targetFile, input, 0644); err != nil {
+				return fmt.Errorf("failed to copy core.efi to %s: %v", targetFile, err)
+			}
+			log.Logger.Infof("Successfully copied core.efi to %s", targetFile)
+		}else{
+			return fmt.Errorf("source core.efi not found")
 		}
-		if err := os.WriteFile(targetFile, input, 0644); err != nil {
-			return fmt.Errorf("failed to copy core.efi to %s: %v", targetFile, err)
-		}
-		log.Logger.Infof("Successfully copied core.efi to %s", targetFile)
 	}
 
 	return nil

@@ -20,11 +20,10 @@ topohub pod 可使用 pvc 或者 hostPath 来持久化存储数据，默认挂�
 
 ## filebrowser 服务
 
-在安装 topohub 时，helm 安装可开启了 values.httpServer.enabled，会启动 filebrowser 服务，它是一个 http 的文件浏览器，它是为了方便管理员管理 topohub POD 的 `/var/lib/topohub/` 目录下所有文件:
+在安装 topohub 时，helm 安装可开启了 values.fileBrowser.enabled，会启动 filebrowser 服务，它是一个 http 的文件浏览器，它是为了方便管理员管理 topohub POD 的 `/var/lib/topohub/` 目录下所有文件:
 
 * 例如，在 http 目录中上传 ISO 镜像文件。
-
+ 
 filebrowser 服务默认的 IP 地址是 “ topohub pod 所在主机的 IP + 8080 端口”，它的默认登录账户是 admin，密码是 admin，在登录  filebrowser 后，请在管理页面中及时修改密码
 
 filebrowser 默认可参考 [官方文档](https://github.com/filebrowser/filebrowser)
-

@@ -48,9 +48,9 @@ func init() {
 
 func main() {
 	// Parse command line flags
-	metricsPort := flag.String("metrics-port", "8080", "The address the metric endpoint binds to.")
 	probePort := flag.String("health-probe-port", "8081", "The address the probe endpoint binds to.")
 	webhookPort := flag.String("webhook-port", "8082", "The address the probe endpoint binds to.")
+	metricsPort := flag.String("metrics-port", "8083", "The address the metric endpoint binds to.")
 	flag.Parse()
 
 	// Initialize logger
