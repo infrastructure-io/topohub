@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	vlanInterfaceFormat = "%s.topohub.%d"
+	// note, the letter length of the interface must be less than 15
+	vlanInterfaceFormat = "%s.%d"
 	//macvlanInterfaceFormat = "%s.topohub"
 )
 
@@ -20,7 +21,7 @@ func (s *dhcpServer) setupInterface() error {
 	// 获取基础接口
 	parent, err := netlink.LinkByName(baseInterface)
 	if err != nil {
-		return fmt.Errorf("base interface %s not found: %v", baseInterface, err)
+		return fmt.Errorf("base interface %s goes wrong: %v", baseInterface, err)
 	}
 
 	// 根据配置创建接口
@@ -49,18 +50,32 @@ func (s *dhcpServer) setupInterface() error {
 
 // createVlanInterface creates a VLAN interface
 func (s *dhcpServer) createVlanInterface(parent netlink.Link, name string, vlanID int32) error {
-	// 检查接口是否已存在
+	// Check if interface already exists
 	if link, err := netlink.LinkByName(name); err == nil {
 		s.log.Debugf("Interface %s already exists", name)
 		return netlink.LinkSetUp(link)
 	}
+
+	// Ensure VLAN ID is within valid range (0-4094)
+	if vlanID < 0 || vlanID > 4094 {
+		return fmt.Errorf("invalid VLAN ID %d: must be between 0 and 4094", vlanID)
+	}
+
+	// Convert to int explicitly to match netlink.Vlan field type
+	// This is safe because we've already validated the range
+	vlanId := int(vlanID)
 
 	vlan := &netlink.Vlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:        name,
 			ParentIndex: parent.Attrs().Index,
 		},
-		VlanId: int(vlanID),
+		VlanId: vlanId,
+	}
+	s.log.Infof("Creating VLAN interface: %+v",  vlan )
+
+	if len(name)>15 {
+		return fmt.Errorf("interface name %s is too long, it is must be less than 15 letters", name)
 	}
 
 	if err := netlink.LinkAdd(vlan); err != nil {
