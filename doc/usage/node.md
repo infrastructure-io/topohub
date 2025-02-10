@@ -297,6 +297,7 @@ EOF
 访问 topohub 运行的主机 IP，即可访问 file browser 的 webui 服务，在 http/iso 目录下上传 ISO 文件
 
 > 注：安装 topohub 后，file browser 默认认证账户为 admin，密码为 admin
+> 注：subnet 对象开启了 spec.feature.enablePxe == true ，会开启 tftp 服务，它的工作目录位默认挂载到 POD 的 `/var/lib/topohub/tftp` 目录下，且该目录下默认内置了一个引导文件 "/var/lib/topohub/tftp/boot/grub/x86_64-efi/core.efi"
 
 2. 对于新接入的主机，就会自动镜像 PXE 装机
 

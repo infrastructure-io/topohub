@@ -148,6 +148,9 @@ type SubnetStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// Dhcp client details
+	DhcpClientDetails string `json:"dhcpClientDetails"`
 }
 
 type DhcpStatusSpec struct {
@@ -157,10 +160,10 @@ type DhcpStatusSpec struct {
 	// Number of available IP addresses
 	DhcpIpAvailableAmount uint64 `json:"dhcpIpAvailableAmount"`
 
-	// Number of assigned IP addresses
-	DhcpIpAssignAmount uint64 `json:"dhcpIpAssignAmount"`
+	// Number of assigned IP addresses which is in use in the lease file
+	DhcpIpActiveAmount uint64 `json:"dhcpIpActiveAmount"`
 
-	// Number of reserved IP addresses
+	// Number of reserved IP addresses which is bond to MAC address
 	DhcpIpReservedAmount uint64 `json:"dhcpIpReservedAmount"`
 }
 

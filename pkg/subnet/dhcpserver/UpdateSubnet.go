@@ -2,6 +2,7 @@ package dhcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"time"
 
@@ -74,9 +75,57 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			if updated.Status.DhcpStatus == nil {
 				updated.Status.DhcpStatus = &topohubv1beta1.DhcpStatusSpec{}
 			}
+
+			// GetDhcpClient returns a string representation of all DHCP clients with their binding status
+			updateClientFunc := func(dhcpClient, bindClients map[string]*DhcpClientInfo) (string, uint64) {
+
+				type clientInfo struct {
+					Mac  string `json:"mac"`
+					Bind bool   `json:"bind"`
+				}
+
+				clientMap := make(map[string]clientInfo)
+				counter := uint64(0)
+
+				// Add all current clients first
+				for ip, client := range dhcpClient {
+					clientMap[ip] = clientInfo{
+						Mac:  client.MAC,
+						Bind: false,
+					}
+					counter++
+				}
+
+				// Update or add bind clients
+				for ip, client := range bindClients {
+					if _, existed := clientMap[ip]; !existed {
+						counter++
+					}
+					clientMap[ip] = clientInfo{
+						Mac:  client.MAC,
+						Bind: true,
+					}
+				}
+
+				if len(clientMap) == 0 {
+					return "{}", 0
+				}
+
+				// Convert map to JSON string
+				jsonBytes, err := json.Marshal(clientMap)
+				if err != nil {
+					s.log.Errorf("failed to marshal client map to JSON: %v", err)
+					return "{}", 0
+				}
+
+				return string(jsonBytes), counter
+			}
+			clientDetails, usedIpAmount := updateClientFunc(s.currentClients, s.bindClients)
+			updated.Status.DhcpClientDetails = clientDetails
+			updated.Status.DhcpStatus.DhcpIpAvailableAmount =  totalIPs - usedIpAmount
 			updated.Status.DhcpStatus.DhcpIpTotalAmount = totalIPs
-			updated.Status.DhcpStatus.DhcpIpAssignAmount = uint64(len(s.currentClients))
-			updated.Status.DhcpStatus.DhcpIpAvailableAmount = totalIPs - uint64(len(s.currentClients))
+			updated.Status.DhcpStatus.DhcpIpActiveAmount = uint64(len(s.currentClients))
+			updated.Status.DhcpStatus.DhcpIpReservedAmount = uint64(len(s.bindClients))
 
 			if updated.Status.HostNode == nil || *updated.Status.HostNode != s.config.NodeName {
 				s.log.Infof("update host node %s to subnet %s", s.config.NodeName, s.subnet.Name)
