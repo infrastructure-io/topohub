@@ -39,7 +39,7 @@ defaultConfig:
     interface: "eth1"
 
 storage:
-    type: "hostPath"
+  type: "hostPath"
 
 nodeAffinity:
   requiredDuringSchedulingIgnoredDuringExecution:
