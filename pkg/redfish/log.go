@@ -6,6 +6,7 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
+// redfish url: /redfish/v1/Systems/Self/LogServices
 func (c *redfishClient) GetLog() ([]*redfish.LogEntry, error) {
 
 	result := []*redfish.LogEntry{}
