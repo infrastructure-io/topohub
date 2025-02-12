@@ -33,6 +33,7 @@ func (c *redfishClient) Power(bootCmd string) error {
 		}
 		c.logger.Debugf("system %s, boot options: %+v", system.Name, bootOptions)
 		c.logger.Debugf("system %s, boot : %+v", system.Name, system.Boot)
+		// url: /redfish/v1/Systems/Self/ResetActionInfo
 		c.logger.Debugf("system %s, supported reset types: %+v", system.Name, system.SupportedResetTypes)
 
 		switch bootCmd {
