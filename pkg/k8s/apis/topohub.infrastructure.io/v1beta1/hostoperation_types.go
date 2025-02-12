@@ -8,7 +8,7 @@ import (
 const (
 	HostOperationStatusPending = "pending"
 	HostOperationStatusSuccess = "success"
-	HostOperationStatusFailed  = "failed"
+	HostOperationStatusFailed  = "failure"
 )
 
 const (

@@ -62,7 +62,7 @@ func (c *redfishClient) Power(bootCmd string) error {
 			c.logger.Infof("pxe reboot %s for System: %+v \n", c.config.Endpoint, system.Name)
 			err = system.SetBoot(bootOverride)
 			if err != nil {
-				return fmt.Errorf("failed to set boot option")
+				return fmt.Errorf("failed to set boot option error:%+v", err)
 			}
 			err = system.Reset(redfish.ForceRestartResetType)
 
@@ -71,7 +71,7 @@ func (c *redfishClient) Power(bootCmd string) error {
 			return fmt.Errorf("unknown boot cmd: %+v", bootCmd)
 		}
 		if err != nil {
-			c.logger.Errorf("failed to operate system %+v: %+v \n", system, err)
+			c.logger.Errorf("failed to operate system %+v: %+v , the host support reset type: %+v\n", system, err, system.SupportedResetTypes)
 			return fmt.Errorf("failed to operate ")
 		}
 	}
