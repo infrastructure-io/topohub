@@ -70,6 +70,15 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	setData(result, "SyatemStatus", string(system.Status.Health))
 	setData(result, "RedfishVersion", service.RedfishVersion)
 	setData(result, "Vendor", service.Vendor)
+	joinStr := ""
+	for _, item := range system.SupportedResetTypes {
+		if len(joinStr) > 0 {
+			joinStr += ","
+		}
+		joinStr += string(item)
+	}
+	setData(result, "SupportedReset", joinStr)
+	setData(result, "SupportedReset", joinStr )
 
 	// cpu info
 	setData(result, "CpuPhysicalCore", fmt.Sprintf("%d", system.ProcessorSummary.Count))
