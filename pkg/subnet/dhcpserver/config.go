@@ -9,9 +9,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
-	"net"
-	"reflect"
-	"github.com/infrastructure-io/topohub/pkg/tools"
+
 )
 
 // generateDnsmasqConfig generates the dnsmasq configuration file
@@ -150,6 +148,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 	return nil
 }
 
+
 // processLeaseFile reads and processes the lease file
 func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdateBindings bool, finalErr error) {
 	leaseFile := s.leasePath
@@ -252,77 +251,9 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 	return needUpdateBindings, nil
 }
 
-func (s *dhcpServer) processDhcpManualBindings() (needUpdateBindings bool, finalErr error) {
-	dstFile := s.manualBindingConfigPath
-
-	//
-	content, err := os.ReadFile(dstFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to read lease file: %v", err)
-	}
-
-	lines := strings.Split(string(content), "\n")
-	clients := make(map[string]*DhcpClientInfo)
-
-	s.lockData.Lock()
-	defer s.lockData.Unlock()
-	previousClients := s.currentManualBindingClients
-
-	// 处理每一行租约记录
-	// line format: IP Mac Hostname
-	for _, line := range lines {
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) != 3 {
-			s.log.Warnf("invalid line: %s", line)
-			continue
-		}
-
-		IpAddr := fields[0]
-		MacAddr := fields[1]
-		Hostname := fields[2]
-
-		if !tools.IsValidIPv4(IpAddr) {
-			s.log.Warnf("invalid ip address: %s", IpAddr)
-			continue
-		}
-		if !tools.IsValidUnicastMAC(MacAddr) {
-			s.log.Warnf("invalid mac address: %s", MacAddr)
-			continue
-		}
-
-		if tools.IsIPInRange(net.ParseIP(IpAddr), s.subnet.Spec.IPv4Subnet.IPRange) {
-			s.log.Debugf("ip %s is in subnet %s", IpAddr, s.subnet.Spec.IPv4Subnet.Subnet)
-			if item, existed:= s.currentManualBindingClients[IpAddr]; existed && item.MAC != MacAddr {
-				s.log.Errorf("ip %s is already bound to a different mac address %s by the dhcp lease way", IpAddr, MacAddr)
-			}else{
-				clients[IpAddr] = &DhcpClientInfo{
-					IP:   IpAddr,
-					MAC:  MacAddr,
-					Hostname: Hostname,
-				}
-			}
-		} else {
-			s.log.Debugf("ignore, ip %s is not in subnet %s", IpAddr, s.subnet.Spec.IPv4Subnet.Subnet)
-			continue
-		}
-	}
-
-	if reflect.DeepEqual(previousClients, clients) {
-		needUpdateBindings = false
-	} else {
-		needUpdateBindings = true
-		// 更新客户端缓存和统计信息
-		s.currentManualBindingClients = clients
-	}
-
-	return needUpdateBindings, nil
+func (s *dhcpServer) processDhcpManualBindings( ) (needUpdateBindings bool, finalErr error) {
+	// update s.currentManualBindingClients
+	return false , nil 
 }
 
 // UpdateDhcpBindings updates the dhcp-host configuration file by:

@@ -11,6 +11,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// BindingIps returns a BindingIpInformer.
+	BindingIps() BindingIpInformer
 	// HostEndpoints returns a HostEndpointInformer.
 	HostEndpoints() HostEndpointInformer
 	// HostOperations returns a HostOperationInformer.
@@ -30,6 +32,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// BindingIps returns a BindingIpInformer.
+func (v *version) BindingIps() BindingIpInformer {
+	return &bindingIpInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // HostEndpoints returns a HostEndpointInformer.

@@ -115,8 +115,6 @@ func (s *dhcpServer) monitor() {
 		// watch error of lease file
 		case err := <-leaseWatcher.Errors:
 			s.log.Errorf("Lease file watcher error: %v", err)
-		case err := <-bindingWatcher.Errors:
-			s.log.Errorf("Lease file watcher error: %v", err)
 
 		// lease file event
 		case event, ok := <-leaseWatcher.Events:

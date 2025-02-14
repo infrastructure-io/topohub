@@ -5,6 +5,8 @@
 
 package v1beta1
 
+type BindingIpExpansion interface{}
+
 type HostEndpointExpansion interface{}
 
 type HostOperationExpansion interface{}

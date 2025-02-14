@@ -38,6 +38,8 @@ rules:
   - hostoperations/status
   - subnets
   - subnets/status
+  - bindingips
+  - bindingips/status
   verbs:
   - "*"
 - apiGroups:

@@ -57,6 +57,8 @@ show:
 		kubectl get subnets -o wide
 	@echo "" ; echo "kubectl get hoststatuses -o wide" ; \
 		kubectl get hoststatuses -o wide
+	@echo "" ; echo "kubectl get bindingips -o wide" ; \
+		kubectl get bindingips -o wide
 
 # Clean up kind cluster
 clean:
