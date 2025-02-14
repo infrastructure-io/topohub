@@ -179,6 +179,7 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 		clientInfo := &DhcpClientInfo{
 			MAC:            fields[1],
 			IP:             fields[2],
+			Hostname:       fields[3],
 			Active:         true,
 			DhcpExpireTime: expireTime,
 			Subnet:         s.subnet.Spec.IPv4Subnet.Subnet,
@@ -195,9 +196,9 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 				// bind new client to config and reload the server
 				needReload = true
 			} else {
-				if data.MAC != clientInfo.MAC {
+				if data.MAC != clientInfo.MAC || data.Hostname != clientInfo.Hostname {
 					s.addedDhcpClient <- *clientInfo
-					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, ip=%s", data.MAC, clientInfo.MAC, clientInfo.IP)
+					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, old hostname=%s, new hostname=%s, ip=%s", data.MAC, clientInfo.MAC, data.Hostname, clientInfo.Hostname, clientInfo.IP)
 					// bind new client to conf
 					needReload = true
 				} else {
@@ -235,7 +236,7 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 			s.log.Errorf("failed to add dhcp bindings: %v", err)
 			return false, err
 		}
-	}else {
+	} else {
 		// just update the newest binding information
 		if err := s.UpdateDhcpBindings(nil, nil); err != nil {
 			s.log.Errorf("failed to update dhcp bindings: %v", err)
@@ -249,8 +250,8 @@ func (s *dhcpServer) processLeaseAndUpdateBindings(ignoreLeaseExistenceError boo
 // UpdateDhcpBindings updates the dhcp-host configuration file by:
 // 1. For ipMacMapAdded: if IP exists, update its MAC; if IP doesn't exist, add new binding
 // 2. For ipMacMapDeleted: delete binding only if both IP and MAC match exactly
-func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[string]string) error {
-	s.log.Debugf("processing dhcp bindings, added: %+v, deleted: %+v", ipMacMapAdded, ipMacMapDeleted)
+func (s *dhcpServer) UpdateDhcpBindings(added, deleted map[string]*DhcpClientInfo) error {
+	s.log.Debugf("processing dhcp bindings, added: %+v, deleted: %+v", added, deleted)
 
 	s.lockConfigUpdate.Lock()
 	defer s.lockConfigUpdate.Unlock()
@@ -306,13 +307,13 @@ func (s *dhcpServer) UpdateDhcpBindings(ipMacMapAdded, ipMacMapDeleted map[strin
 			ip := fields[1]
 
 			// 检查是否需要删除这行配置
-			if expectedMac, exists := ipMacMapDeleted[ip]; exists && expectedMac == mac {
+			if expectedMac, exists := deleted[ip]; exists && expectedMac == mac {
 				s.log.Infof("removing dhcp-host binding for IP %s, MAC %s", ip, mac)
 				continue
 			}
 
 			// 检查是否需要更新 MAC
-			if newMac, exists := ipMacMapAdded[ip]; exists {
+			if item, exists := added[ip]; exists {
 				s.log.Infof("updating dhcp-host binding for IP %s: old MAC %s -> new MAC %s", ip, mac, newMac)
 				finalLines = append(finalLines, fmt.Sprintf("dhcp-host=%s,%s", newMac, ip))
 				processedIPs[ip] = true

@@ -7,6 +7,7 @@ import "time"
 type DhcpClientInfo struct {
 	MAC            string    `json:"mac"`
 	IP             string    `json:"ip"`
+	Hostname       string    `json:"hostname"`
 	Active         bool      `json:"active"`
 	DhcpExpireTime time.Time `json:"dhcpExpireTime"` // When the DHCP lease expires
 	Subnet         string    `json:"subnet"`
