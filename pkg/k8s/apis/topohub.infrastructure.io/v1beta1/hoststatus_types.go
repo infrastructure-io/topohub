@@ -70,6 +70,7 @@ type BasicInfo struct {
 	ActiveDhcpClient bool    `json:"activeDhcpClient,omitempty"`
 	DhcpExpireTime   *string `json:"dhcpExpireTime,omitempty"`
 	SubnetName       *string `json:"subnetName,omitempty"`
+	Hostname         *string `json:"hostname,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

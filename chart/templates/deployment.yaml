@@ -95,8 +95,6 @@ spec:
           mountPath: /var/lib/feature  
         - name: dhcp-config
           mountPath: /var/lib/dhcp
-        - name: manual-binding
-          mountPath: /var/lib/manualbinding
         livenessProbe:
           httpGet:
             path: /healthz
@@ -149,9 +147,6 @@ spec:
       - name: dhcp-config
         configMap:
           name: {{ include "topohub.fullname" . }}-dhcp
-      - name: manual-binding
-        configMap:
-          name: {{ include "topohub.fullname" . }}-manualbinding    
       - name: feature-config
         configMap:
           name: {{ include "topohub.fullname" . }}-feature

@@ -81,18 +81,15 @@ func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 // monitor monitors the lease file and updates status
 func (s *dhcpServer) monitor() {
 
-	watcher := &fsnotify.Watcher{Events: make(chan fsnotify.Event)}
-	var err error
+	leaseWatcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		s.log.Errorf("Failed to create lease file watcher: %v", err)
+		return
+	}
+	defer leaseWatcher.Close()
 	if s.subnet.Spec.Feature.EnableBindDhcpIP {
 		s.log.Infof(" bind dhcp ip is enabled, and watch lease file")
-		// 添加 lease 文件监控
-		watcher, err = fsnotify.NewWatcher()
-		if err != nil {
-			s.log.Errorf("Failed to create lease file watcher: %v", err)
-			return
-		}
-		defer watcher.Close()
-		if err := watcher.Add(filepath.Dir(s.leasePath)); err != nil {
+		if err := leaseWatcher.Add(filepath.Dir(s.leasePath)); err != nil {
 			s.log.Errorf("Failed to watch lease file: %v", err)
 			return
 		}
@@ -116,27 +113,42 @@ func (s *dhcpServer) monitor() {
 			return
 
 		// watch error of lease file
-		case err := <-watcher.Errors:
+		case err := <-leaseWatcher.Errors:
+			s.log.Errorf("Lease file watcher error: %v", err)
+		case err := <-bindingWatcher.Errors:
 			s.log.Errorf("Lease file watcher error: %v", err)
 
 		// lease file event
-		case event, ok := <-watcher.Events:
+		case event, ok := <-leaseWatcher.Events:
 			if !ok {
 				s.log.Panicf("Lease file watcher channel closed")
 			}
-			s.log.Debugf("watcher event: %+v", event)
+			
 			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
-				if reloadConfig, err := s.processLeaseAndUpdateBindings(true); err != nil {
-					s.log.Errorf("failed to processLeaseAndUpdateBindings: %v", err)
+				s.log.Infof("watcher lease file event: %+v", event)
+
+				if reloadConfig, err := s.processDhcpLease(true); err != nil {
+					s.log.Errorf("failed to processDhcpLease: %v", err)
 				} else {
 					if reloadConfig {
+						newClients:=make(map[string]*DhcpClientInfo)
+						for _, client := range s.currentLeaseClients {
+							newClients[client.IP] = client
+						}
+						if err := s.UpdateDhcpBindings(newClients, nil); err != nil {
+							s.log.Errorf("failed to add dhcp bindings: %v", err)
+							continue
+						}
+
+						needRenewConfig = false
 						needReload = true
-						needRenewConfig = true
 						s.log.Infof("client ip or mac changed, so dhcp server reload after binding new ip")
 					} else {
 						s.log.Infof("client expiration is updated, so dhcp server does not need to reload")
 					}
 				}
+			}else{
+				s.log.Debugf("watcher invalid file event: %+v", event)
 			}
 
 		case event, ok := <-s.deletedHostStatus:
@@ -144,18 +156,21 @@ func (s *dhcpServer) monitor() {
 				s.log.Panic("deletedHostStatus channel closed")
 			}
 			s.log.Debugf("process hostStatus deleting events, delete dhcp binding, ip %s, mac %s", event.IP, event.MAC)
-			if err := s.UpdateDhcpBindings(nil, map[string]string{event.IP: event.MAC}); err != nil {
+			deleted := map[string]*DhcpClientInfo{
+				event.IP: {MAC: event.MAC},
+			}
+			if err := s.UpdateDhcpBindings(nil, deleted); err != nil {
 				s.log.Errorf("failed to delete dhcp binding for ip %s, err: %v", event.IP, err)
 				continue
 			}
-			needReload = true
 			// it has been renew the config
 			needRenewConfig = false
+			needReload = true
 
 		// reconcile notify subnet spec changes
 		case <-s.restartCh:
-			needReload = true
 			needRenewConfig = true
+			needReload = true
 			s.log.Infof("dhcp server reload after the spec of subnet is updated")
 
 		// check the process
@@ -164,14 +179,14 @@ func (s *dhcpServer) monitor() {
 			if !isDead {
 				if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
 					s.log.Errorf("DHCP server process check failed: %v", err)
-					needRestart = true
 					needRenewConfig = true
+					needRestart = true
 				} else {
 					s.log.Debugf("dhcp server for %s is running", s.subnet.Name)
 				}
 			} else {
-				needRestart = true
 				needRenewConfig = true
+				needRestart = true
 				s.log.Infof("dhcp server for %s is dead, restart it", s.subnet.Name)
 			}
 		}

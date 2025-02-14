@@ -24,10 +24,10 @@ spec:
     - jsonPath: .status.dhcpStatus.dhcpIpAvailableAmount
       name: IP_AVAILABLE
       type: integer
-    - jsonPath: .status.dhcpStatus.dhcpIpReservedAmount
+    - jsonPath: .status.dhcpStatus.dhcpIpBindAmount
       name: IP_RESERVED
       type: integer
-    - jsonPath: .spec.feature.enableSyncEndpoint.enable
+    - jsonPath: .spec.feature.enableSyncEndpoint.dhcpClient
       name: SYNC_ENDPOINT
       type: boolean
     - jsonPath: .spec.feature.enableSyncEndpoint.defaultClusterName
@@ -231,13 +231,19 @@ spec:
                       the lease file
                     format: int64
                     type: integer
+                  dhcpIpAutoBindAmount:
+                    format: int64
+                    type: integer
                   dhcpIpAvailableAmount:
                     description: Number of available IP addresses
                     format: int64
                     type: integer
-                  dhcpIpReservedAmount:
+                  dhcpIpBindAmount:
                     description: Number of reserved IP addresses which is bond to
                       MAC address
+                    format: int64
+                    type: integer
+                  dhcpIpManualBindAmount:
                     format: int64
                     type: integer
                   dhcpIpTotalAmount:
@@ -246,8 +252,10 @@ spec:
                     type: integer
                 required:
                 - dhcpIpActiveAmount
+                - dhcpIpAutoBindAmount
                 - dhcpIpAvailableAmount
-                - dhcpIpReservedAmount
+                - dhcpIpBindAmount
+                - dhcpIpManualBindAmount
                 - dhcpIpTotalAmount
                 type: object
               hostNode:

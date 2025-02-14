@@ -9,11 +9,22 @@ import (
 )
 
 // ValidateIPInSubnet checks if an IP address is within a subnet
+// Example:
+//   - Input:
+//     ip: net.ParseIP("192.168.1.100")
+//     subnet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}
+//   - Returns: true (because 192.168.1.100 is within 192.168.1.0/24)
 func ValidateIPInSubnet(ip net.IP, subnet *net.IPNet) bool {
 	return subnet.Contains(ip)
 }
 
 // ValidateIPWithSubnetMatch checks if an IP/CIDR has the same subnet as the given subnet
+// Example:
+//   - Input:
+//     ipCIDR: "192.168.1.100/24"
+//     subnet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}
+//   - Returns: nil (because 192.168.1.100/24 matches subnet 192.168.1.0/24)
+//   - Error case: Returns error if IP is not in subnet or network parts don't match
 func ValidateIPWithSubnetMatch(ipCIDR string, subnet *net.IPNet) error {
 	ip, _, err := net.ParseCIDR(ipCIDR)
 	if err != nil {
@@ -40,6 +51,12 @@ func ValidateIPWithSubnetMatch(ipCIDR string, subnet *net.IPNet) error {
 }
 
 // ValidateIPRange checks if all IPs in a range are within a subnet
+// Example:
+//   - Input:
+//     ipRange: "192.168.1.10-192.168.1.20,192.168.1.30"
+//     subnet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}
+//   - Returns: nil if all IPs are within subnet
+//   - Error case: Returns error if any IP is outside subnet or format is invalid
 func ValidateIPRange(ipRange string, subnet *net.IPNet) error {
 	ranges := strings.Split(ipRange, ",")
 	for _, r := range ranges {
@@ -82,8 +99,14 @@ func ValidateIPRange(ipRange string, subnet *net.IPNet) error {
 	return nil
 }
 
-// ValidateIPRangeExpansion 检查新的 IP 范围是否完全覆盖了旧的 IP 范围
-// 返回 error 如果新范围缩小了任何一个旧范围
+// ValidateIPRangeExpansion checks if new IP range fully covers the old IP range
+// Example:
+//   - Input:
+//     oldIPRange: "192.168.1.10-192.168.1.20,192.168.1.30"
+//     newIPRange: "192.168.1.5-192.168.1.25"
+//     subnet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}
+//   - Returns: nil (because new range fully covers old range)
+//   - Error case: Returns error if new range shrinks any part of old range
 func ValidateIPRangeExpansion(oldIPRange, newIPRange string, subnet *net.IPNet) error {
 	// 首先验证新旧 IP 范围的格式
 	if err := ValidateIPRange(oldIPRange, subnet); err != nil {
@@ -143,7 +166,11 @@ func ValidateIPRangeExpansion(oldIPRange, newIPRange string, subnet *net.IPNet) 
 	return nil
 }
 
-// IsValidInterfaceName checks if the interface name is valid
+// IsValidInterfaceName checks if the interface name is valid according to Linux naming conventions
+// Example:
+//   - Input: "eth0" -> Returns: true
+//   - Input: "my@interface" -> Returns: false
+//   - Rules: Must be alphanumeric with underscore/hyphen, max 15 chars
 func IsValidInterfaceName(name string) bool {
 	// Interface name validation based on Linux interface naming conventions
 	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, name)
@@ -151,6 +178,10 @@ func IsValidInterfaceName(name string) bool {
 }
 
 // ValidateInterfaceExists checks if a network interface exists on the system
+// Example:
+//   - Input: "eth0"
+//   - Returns: nil if interface exists
+//   - Error case: Returns error if interface doesn't exist or system error occurs
 func ValidateInterfaceExists(ifaceName string) error {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -167,15 +198,23 @@ func ValidateInterfaceExists(ifaceName string) error {
 }
 
 // CompareIP compares two IP addresses
-// Returns:
-//   -1 if ip1 < ip2
-//    0 if ip1 == ip2
-//    1 if ip1 > ip2
+// Example:
+//   - Input:
+//     ip1: net.ParseIP("192.168.1.1")
+//     ip2: net.ParseIP("192.168.1.2")
+//   - Returns: -1 (because 192.168.1.1 < 192.168.1.2)
+//   - Return values: -1 (ip1 < ip2), 0 (ip1 == ip2), 1 (ip1 > ip2)
 func CompareIP(ip1, ip2 net.IP) int {
 	return bytes.Compare(ip1, ip2)
 }
 
 // Int32PtrEqual compares two *int32 values for equality
+// Example:
+//   - Input:
+//     a: pointer to int32(5)
+//     b: pointer to int32(5)
+//   - Returns: true (because values are equal)
+//   - Special cases: Returns true if both nil, false if only one is nil
 func Int32PtrEqual(a, b *int32) bool {
 	if a == nil && b == nil {
 		return true
@@ -186,10 +225,11 @@ func Int32PtrEqual(a, b *int32) bool {
 	return *a == *b
 }
 
-// CountIPsInRange 计算 IP 范围中包含的 IP 地址数量
-// 对于 "192.168.1.1-192.168.1.10" 返回 10
-// 对于 "192.168.1.1" 返回 1
-// 对于 "192.168.1.1-192.168.1.10,192.168.1.20" 返回 11
+// CountIPsInRange calculates the number of IP addresses in a given range
+// Example:
+//   - Input: "192.168.1.1-192.168.1.10,192.168.1.20"
+//   - Returns: 11 (10 IPs from range + 1 single IP)
+//   - Error case: Returns error if range format is invalid
 func CountIPsInRange(ipRange string) (uint64, error) {
 	ranges := strings.Split(ipRange, ",")
 	var total uint64 = 0
@@ -243,7 +283,116 @@ func CountIPsInRange(ipRange string) (uint64, error) {
 	return total, nil
 }
 
-// ipToUint32 将 IPv4 地址转换为 uint32
+// IsValidIPv4 checks if a string represents a valid IPv4 address
+// Example:
+//   - Input: "192.168.1.1" -> Returns: true
+//   - Input: "256.1.2.3" -> Returns: false
+//   - Input: "192.168.1" -> Returns: false
+//   - Input: "192.168.1.1.1" -> Returns: false
+func IsValidIPv4(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	// Convert to IPv4 format and check if it's not nil
+	return ip.To4() != nil
+}
+
+// IsValidUnicastMAC checks if a string represents a valid unicast MAC address
+// Example:
+//   - Input: "00:11:22:33:44:55" -> Returns: true
+//   - Input: "01:00:5e:00:00:00" -> Returns: false (multicast)
+//   - Input: "ff:ff:ff:ff:ff:ff" -> Returns: false (broadcast)
+//   - Input: "00:11:22:33:44" -> Returns: false (wrong length)
+//   - Input: "00-11-22-33-44-55" -> Returns: true (supports hyphen format)
+//   - Input: "001122334455" -> Returns: true (supports no separator format)
+func IsValidUnicastMAC(macStr string) bool {
+	// Replace hyphens with colons for consistent parsing
+	macStr = strings.ReplaceAll(macStr, "-", ":")
+	
+	// Handle MAC address without separators
+	if len(macStr) == 12 && !strings.Contains(macStr, ":") {
+		// Insert colons every 2 characters
+		var buffer bytes.Buffer
+		for i, char := range macStr {
+			if i > 0 && i%2 == 0 {
+				buffer.WriteRune(':')
+			}
+			buffer.WriteRune(char)
+		}
+		macStr = buffer.String()
+	}
+	
+	// Parse MAC address
+	mac, err := net.ParseMAC(macStr)
+	if err != nil {
+		return false
+	}
+	
+	// Check if it's a 48-bit MAC address
+	if len(mac) != 6 {
+		return false
+	}
+	
+	// Check if it's a unicast address (least significant bit of first octet is 0)
+	return (mac[0] & 1) == 0
+}
+
+// IsIPInRange checks if an IP is within a given IP range string
+// Example:
+//   - Input:
+//     ip: net.ParseIP("192.168.1.15")
+//     ipRange: "192.168.1.10-192.168.1.20,192.168.1.30"
+//   - Returns: true (because 192.168.1.15 is within 192.168.1.10-192.168.1.20)
+//   - Input:
+//     ip: net.ParseIP("192.168.1.30")
+//     ipRange: "192.168.1.10-192.168.1.20,192.168.1.30"
+//   - Returns: true (because 192.168.1.30 matches the single IP)
+//   - Input:
+//     ip: net.ParseIP("192.168.1.25")
+//     ipRange: "192.168.1.10-192.168.1.20,192.168.1.30"
+//   - Returns: false (because 192.168.1.25 is not in any range)
+func IsIPInRange(ip net.IP, ipRange string) bool {
+	ranges := strings.Split(ipRange, ",")
+	for _, r := range ranges {
+		r = strings.TrimSpace(r)
+		if strings.Contains(r, "-") {
+			// Range format: start-end
+			startEnd := strings.Split(r, "-")
+			if len(startEnd) != 2 {
+				continue
+			}
+
+			start := net.ParseIP(strings.TrimSpace(startEnd[0]))
+			end := net.ParseIP(strings.TrimSpace(startEnd[1]))
+
+			if start == nil || end == nil {
+				continue
+			}
+
+			// Check if IP is within range
+			if CompareIP(start, ip) <= 0 && CompareIP(ip, end) <= 0 {
+				return true
+			}
+		} else {
+			// Single IP format
+			rangeIP := net.ParseIP(r)
+			if rangeIP == nil {
+				continue
+			}
+			// Check if IP matches exactly
+			if ip.Equal(rangeIP) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ipToUint32 converts an IPv4 address to uint32
+// Example:
+//   - Input: net.ParseIP("192.168.1.1")
+//   - Returns: 3232235777 (binary: 11000000 10101000 00000001 00000001)
 func ipToUint32(ip net.IP) uint32 {
 	ip = ip.To4()
 	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])

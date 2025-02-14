@@ -157,6 +157,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 				expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
 				return &expireTimeStr
 			}(),
+			Hostname: &client.Hostname,
 		},
 		Info: map[string]string{},
 		Log: topohubv1beta1.LogStruct{

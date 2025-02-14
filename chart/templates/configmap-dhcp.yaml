@@ -18,7 +18,7 @@ data:
     # DHCP range configuration
     # format: <start_ip>,<end_ip>,<lease_time>  or <start_ip>,<end_ip>
     {{- "{{ range .IPRanges }}" }}
-    dhcp-range={{ "{{ . }}" }},30d
+    dhcp-range={{ "{{ . }}" }},365d
     {{- "{{ end }}" }}
 
     # Gateway configuration
