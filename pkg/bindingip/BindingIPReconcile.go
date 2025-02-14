@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync"
 	"reflect"
 	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/tools"
 	"github.com/infrastructure-io/topohub/pkg/config"
+	"github.com/infrastructure-io/topohub/pkg/lock"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,21 +18,25 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
-var bindingIPLock = &sync.Mutex{}
+var bindingIPLock = &lock.Mutex{}
 
 // bindingIPController 定义控制器结构
 type bindingIPController struct {
 	client   client.Client
 	log      *zap.SugaredLogger
 	config   *config.AgentConfig
+	addedBindingIp   chan bindingipdata.BindingIPInfo
+	deletedBindingIp chan bindingipdata.BindingIPInfo
 }
 
 // NewBindingIPController 创建新的控制器实例
-func NewBindingIPController(mgr ctrl.Manager, config *config.AgentConfig) *bindingIPController {
+func NewBindingIPController(mgr ctrl.Manager, config *config.AgentConfig, addedBindingIp chan bindingipdata.BindingIPInfo, deletedBindingIp chan bindingipdata.BindingIPInfo) *bindingIPController {
 	return &bindingIPController{
 		client:   mgr.GetClient(),
 		log:      log.Logger.Named("bindingipReconcile"),
 		config:   config,
+		addedBindingIp:   addedBindingIp,
+		deletedBindingIp: deletedBindingIp,
 	}
 }
 
@@ -46,6 +50,7 @@ func (c *bindingIPController) processBindingIP(bindingIP *topohubv1beta1.Binding
 		IPAddr:  bindingIP.Spec.IpAddr,
 		MacAddr: bindingIP.Spec.MacAddr,
 		Valid:   bindingIP.Status.Valid,
+		Hostname: bindingIP.Name,
 	}
 
 	// 更新本地缓存
@@ -56,14 +61,18 @@ func (c *bindingIPController) processBindingIP(bindingIP *topohubv1beta1.Binding
 		// 更新缓存
 		bindingipdata.BindingIPCacheDatabase.Add(name, info)
 		logger.Infof("new bindingIP added to cache: %+v", info)
+		c.addedBindingIp <- info
 
 	} else {
 		if oldData.IPAddr != bindingIP.Spec.IpAddr || oldData.MacAddr != bindingIP.Spec.MacAddr || oldData.Subnet != bindingIP.Spec.Subnet {
 			logger.Infof("bindingIP Spec changed, notify the dhcp server")
 			bindingipdata.BindingIPCacheDatabase.Add(name, info)
+			c.addedBindingIp <- info
+
 		} else if !reflect.DeepEqual(oldData, info) {
-			logger.Infof("bindingIP status changed")
+			logger.Infof("bindingIP status change to %+v", bindingIP.Status)
 			bindingipdata.BindingIPCacheDatabase.Add(name, info)
+
 		} else {
 			logger.Debugf("bindingIP does not change")
 		}
@@ -83,7 +92,14 @@ func (c *bindingIPController) Reconcile(ctx context.Context, req ctrl.Request) (
 		if errors.IsNotFound(err) {
 			// 对象已被删除，从缓存中移除
 			if bindingipdata.BindingIPCacheDatabase.Get(req.Name) != nil {
+				c.log.Infof("bindingIP deleted, notify the dhcp server")
 				bindingipdata.BindingIPCacheDatabase.Delete(req.Name)
+				c.deletedBindingIp <- bindingipdata.BindingIPInfo{
+					IPAddr:  bindingIP.Spec.IpAddr,
+					MacAddr: bindingIP.Spec.MacAddr,
+					Subnet:  bindingIP.Spec.Subnet,
+					Hostname: bindingIP.Name,
+				}
 			}
 			return ctrl.Result{}, nil
 		}

@@ -10,6 +10,7 @@ type BindingIPInfo struct {
 	IPAddr  string
 	MacAddr string
 	Valid   bool
+	Hostname string
 }
 
 // BindingIPCache 定义绑定IP缓存结构
@@ -53,13 +54,29 @@ func (c *BindingIPCache) Get(name string) *BindingIPInfo {
 }
 
 // GetAll 返回缓存中的所有绑定IP数据
-func (c *BindingIPCache) GetAll() map[string]BindingIPInfo {
+func (c *BindingIPCache) GetAll() []BindingIPInfo {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	result := make(map[string]BindingIPInfo, len(c.data))
-	for k, v := range c.data {
-		result[k] = *v
+	result := []BindingIPInfo{}
+	for _, v := range c.data {
+		result = append(result, *v)
+	}
+
+	return result
+}
+
+// GetInfoForSubnet 返回指定子网下的所有绑定IP数据
+func (c *BindingIPCache) GetInfoForSubnet(subnetName string) []BindingIPInfo {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	result := []BindingIPInfo{}
+	for _, v := range c.data {
+		if v.Subnet != subnetName {
+			continue
+		}
+		result = append(result, *v)
 	}
 
 	return result

@@ -144,6 +144,7 @@ func main() {
 	}
 	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEvents()
 	deleteHostStatusChan := subnetMgr.GetHostStatusEvents()
+	addBindingIpChan, deleteBindingIpChan := subnetMgr.GetBindingIpEvents()
 	// Initialize hoststatus controller
 	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan, deleteHostStatusChan)
 	if err = hostStatusCtrl.SetupWithManager(mgr); err != nil {
@@ -186,7 +187,7 @@ func main() {
 	}
 
 	// Initialize bindingIP controller
-	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig)
+	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig, addBindingIpChan, deleteBindingIpChan )
 	if err != nil {
 		log.Logger.Errorf("Failed to create bindingip controller: %v", err)
 		os.Exit(1)

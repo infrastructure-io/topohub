@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,6 +25,7 @@ type SubnetManager interface {
 	Stop()
 	GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
 	GetHostStatusEvents() chan dhcpserver.DhcpClientInfo
+	GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo)
 }
 
 type subnetManager struct {
@@ -41,6 +43,10 @@ type subnetManager struct {
 	// hoststatus 往其中添加数据，关于 hoststatus 被删除信息。由本模块来消费使用
 	deletedHostStatus chan dhcpserver.DhcpClientInfo
 
+	// bindingip 模块 往其中添加数据，关于 bindingip 。由本模块来消费使用
+	addedBindingIp   chan bindingipdata.BindingIPInfo
+	deletedBindingIp chan bindingipdata.BindingIPInfo
+
 	// lock
 	lockLeader     lock.RWMutex
 	leader         bool
@@ -53,9 +59,11 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 		kubeClient:        kubeClient,
 		cache:             NewSubnetCache(),
 		lockLeader:        lock.RWMutex{},
-		addedDhcpClient:   make(chan dhcpserver.DhcpClientInfo, 100),
-		deletedDhcpClient: make(chan dhcpserver.DhcpClientInfo, 100),
-		deletedHostStatus: make(chan dhcpserver.DhcpClientInfo, 100),
+		addedDhcpClient:   make(chan dhcpserver.DhcpClientInfo, 1000),
+		deletedDhcpClient: make(chan dhcpserver.DhcpClientInfo, 1000),
+		deletedHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
+		addedBindingIp:   make(chan bindingipdata.BindingIPInfo, 1000),
+		deletedBindingIp: make(chan bindingipdata.BindingIPInfo, 1000),
 		leader:            false,
 		dhcpServerList:    make(map[string]dhcpserver.DhcpServer),
 		log:               log.Logger.Named("subnetManager"),
@@ -112,6 +120,17 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 					s.dhcpServerList[subnet.Name] = t
 					s.cache.Set(subnet)
 				}
+
+				// get all binding ip
+				bindingIPInfoList := bindingipdata.BindingIPCacheDatabase.GetInfoForSubnet(subnet.Name)
+				if len(bindingIPInfoList) > 0 {
+					logger.Infof("add binding ip events for subnet %s: %+v", subnet.Name, bindingIPInfoList)
+					if err := s.dhcpServerList[subnet.Name].UpdateBindingIpEvents(bindingIPInfoList, nil ); err != nil {
+						logger.Errorf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
+						return reconcile.Result{}, err
+					}
+				}
+
 			} else {
 				logger.Infof("updated DHCP server for subnet %s", subnet.Name)
 				if err := s.dhcpServerList[subnet.Name].UpdateService(*subnet); err != nil {
@@ -135,8 +154,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 	go func() {
 		<-mgr.Elected()
 		s.log.Info("Elected as leader, begin to start all controllers")
-		// Start subnet manager
-		go s.processHostStatusEvents()
+
 		s.lockLeader.Lock()
 		defer s.lockLeader.Unlock()
 		s.leader = true
@@ -168,6 +186,13 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			}
 		}
+		
+		// after all server is started , start to process binding ip event
+		time.Sleep(2 * time.Second)
+		go s.processBindingIpEvents()
+		// Start subnet manager
+		go s.processHostStatusEvents()
+
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -209,4 +234,38 @@ func (s *subnetManager) processHostStatusEvents() {
 		}
 	}
 	s.log.Panic("deletedDhcpClient channel closed")
+}
+
+func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo) {
+	return s.addedBindingIp, s.deletedBindingIp
+}
+
+func (s *subnetManager) processBindingIpEvents(){
+
+	s.log.Infof("begin to process binding ip events")
+	for {
+		select {
+		case event := <-s.addedBindingIp:
+			s.log.Debugf("receive adding binding ip event: %+v", event)
+			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
+				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
+			} else {
+				s.log.Infof("process binding ip adding events for subnet %s: %+v", event.Subnet, event)
+				if err := c.UpdateBindingIpEvents([]bindingipdata.BindingIPInfo{event}, nil); err != nil {
+					s.log.Errorf("failed to add dhcp binding: %v", err)
+				}
+			}
+
+		case event := <-s.deletedBindingIp:
+			s.log.Debugf("receive deleting binding ip event: %+v", event)
+			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
+				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
+			} else {
+				s.log.Infof("process binding ip deleting events for subnet %s: %+v", event.Subnet, event)
+				if err := c.UpdateBindingIpEvents(nil, []bindingipdata.BindingIPInfo{event}); err != nil {
+					s.log.Errorf("failed to delete dhcp binding: %v", err)
+				}
+			}
+		}
+	}
 }

@@ -165,6 +165,53 @@ func (s *dhcpServer) monitor() {
 			needRenewConfig = false
 			needReload = true
 
+		case info := <-s.addedBindingIp:
+			s.log.Debugf("process binding ip adding events for subnet %s: %+v", info.Subnet, info)
+			//note: currently, it does not consider whether the ip is belonged to the ip range or not, which make it simple to handle the subnet changes
+			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok {
+               if item.MAC != info.MacAddr {
+					s.currentManualBindingClients[info.IPAddr] = &DhcpClientInfo{
+						IP: info.IPAddr, 
+						MAC: info.MacAddr, 
+						Hostname: info.Hostname,
+					}
+					s.log.Infof("update binding ip %s: old mac %s, new mac %s, hostname %s", info.IPAddr, item.MAC, info.MacAddr, info.Hostname)
+			   }else{
+					continue	
+			   }
+			}else{
+				s.currentManualBindingClients[info.IPAddr] = &DhcpClientInfo{
+					IP: info.IPAddr, 
+					MAC: info.MacAddr, 
+					Hostname: info.Hostname,
+				}
+				s.log.Infof("add new binding ip %s: %+v", info.IPAddr, info)
+			}
+			if err := s.UpdateDhcpBindings(s.currentManualBindingClients, nil); err != nil {
+				s.log.Errorf("failed to add dhcp bindings: %v", err)
+				continue
+			}
+			// it has been renew the config
+			needRenewConfig = false
+			needReload = true
+
+		case info := <-s.deletedBindingIp:
+			s.log.Debugf("process binding ip deleting events for subnet %s: %+v", info.Subnet, info)
+			//note: currently, it does not consider whether the ip is belonged to the ip range or not, which make it simple to handle the subnet changes
+			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok && item.MAC == info.MacAddr {
+				delete(s.currentManualBindingClients, info.IPAddr)
+				s.log.Infof("delete binding ip %s: %+v", info.IPAddr, info)
+			}else{
+				continue
+			}
+			if err := s.UpdateDhcpBindings(s.currentManualBindingClients, nil); err != nil {
+				s.log.Errorf("failed to delete dhcp bindings: %v", err)
+				continue
+			}
+			// it has been renew the config
+			needRenewConfig = false
+			needReload = true
+
 		// reconcile notify subnet spec changes
 		case <-s.restartCh:
 			needRenewConfig = true

@@ -47,7 +47,7 @@ func (w *BindingIPWebhook) Default(ctx context.Context, obj runtime.Object) erro
 	if bindingIP.ObjectMeta.Labels == nil {
 		bindingIP.ObjectMeta.Labels = make(map[string]string)
 	}
-	bindingIP.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = bindingIP.Spec.Subnet
+	bindingIP.ObjectMeta.Labels[topohubv1beta1.LabelSubnetName] = bindingIP.Spec.Subnet
 
 	w.log.Debugf("Setting initial values for nil fields in BindingIP %s", bindingIP.Name)
 	return nil

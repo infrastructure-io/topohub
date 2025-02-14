@@ -119,10 +119,6 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 	if _, err := s.processDhcpLease(true); err != nil {
 		return fmt.Errorf("failed to process lease file: %v", err)
 	}
-	// update the manual binding
-	if _, err := s.processDhcpManualBindings(); err != nil {
-		return fmt.Errorf("failed to process manual binding file: %v", err)
-	}
 	// finally update the binding config
 	finalNewClient := map[string]*DhcpClientInfo{}
 	for k, v := range s.currentManualBindingClients {
@@ -249,11 +245,6 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 	s.currentLeaseClients = currentLeaseClients
 
 	return needUpdateBindings, nil
-}
-
-func (s *dhcpServer) processDhcpManualBindings( ) (needUpdateBindings bool, finalErr error) {
-	// update s.currentManualBindingClients
-	return false , nil 
 }
 
 // UpdateDhcpBindings updates the dhcp-host configuration file by:

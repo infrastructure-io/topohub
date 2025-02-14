@@ -44,17 +44,52 @@ spec.enableBindDhcpIP 开启时，每当 DHCP server 分配一个 IP 地址后�
 
 ### 手动固定 dhcp client 的 IP 
 
-可编辑 configmap topohub-manualbinding 中的内容，输入如下一行样例，实现 IP 和 Mac 的绑定关系
+在主机未接入 DHCP 前，可以创建配置，基于主机的 MAC 地址来预先未绑定即将分配的 IP 地址
 
+1. 创建如下 bindingIp 对象
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: BindingIp
+metadata:
+  name: 192-168-1-199
+spec:
+  # 该值对应了希望生效的 subnet 对象的名字
+  subnet: net0
+  # 该值对应了希望绑定的 IP 地址，其务必属于 spec.subnet 对象的 ipRange
+  ipAddr: 192.168.1.199
+  # 该值对应了希望绑定的主机的网卡 MAC 地址
+  macAddr: 00:00:00:00:00:11
+EOf
 ```
-192.168.1.186 00:00:00:00:00:11 host1
+
+2. 查看子网的状态
+
+```bash
+~# kubectl get subnet net0 -o yaml
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: Subnet
+metadata:
+  name: net0
+...
+status:
+  # dhcpClientDetails 包含了所有被分配出去的 IP 地址和被绑定的 IP 地址
+  dhcpClientDetails: '{"192.168.1.114":{"mac":"02:52:5c:17:7f:95","manualBind":false,"autoBind":true,"hostname":"vlan0-dhcp-redfish-mockup-578554878-tnxbv"},"192.168.1.173":{"mac":"a6:6d:a6:e5:1f:58","manualBind":false,"autoBind":true,"hostname":"vlan0-dhcp-redfish-mockup-578554878-jsrrc"},"192.168.1.199":{"mac":"00:00:00:00:00:11","manualBind":true,"autoBind":false,"hostname":"192-168-1-199"}}'
+  dhcpStatus:
+    # 当前活跃的 DHCP client IP 数量
+    dhcpIpActiveAmount: 2
+    # 基于 spec.feature.enableBindDhcpIP 功能，对自动绑定的 Mac 绑定的 IP 数量
+    dhcpIpAutoBindAmount: 2
+    # 当前子网中可用于分配的 IP 剩余数量
+    dhcpIpAvailableAmount: 98
+    # 所有被 Mac 绑定的 IP 数量，它包含了 dhcpIpAutoBindAmount 和 dhcpIpManualBindAmount
+    dhcpIpBindAmount: 3
+    # 基于 BindingIp CRD 实例绑定的 IP 数量
+    dhcpIpManualBindAmount: 1
+    # dpch server 的 总 IP 数量
+    dhcpIpTotalAmount: 101
 ```
-
-注意，配置中的 IP 地址如果属于某个 subnet 对象的 spec.ipv4Subnet.ipRange 范围内，那么这个 IP 地址会被 DHCP server 的配置文件中的绑定关系覆盖。
-注意的，如果该手动设置的绑定关系与当前某个 DHCP client 的绑定关系不一致，该手动设定不会生效，以当前 DHCP client 的绑定关系优先生效
-
-可通过查看 subnet 对象的 status 来进一步确认绑定生效状态
-
 
 ### 故障排查
 
