@@ -15,6 +15,7 @@ import (
 
 type TopohubV1beta1Interface interface {
 	RESTClient() rest.Interface
+	BindingIpsGetter
 	HostEndpointsGetter
 	HostOperationsGetter
 	HostStatusesGetter
@@ -24,6 +25,10 @@ type TopohubV1beta1Interface interface {
 // TopohubV1beta1Client is used to interact with features provided by the topohub.infrastructure.io group.
 type TopohubV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *TopohubV1beta1Client) BindingIps() BindingIpInterface {
+	return newBindingIps(c)
 }
 
 func (c *TopohubV1beta1Client) HostEndpoints() HostEndpointInterface {

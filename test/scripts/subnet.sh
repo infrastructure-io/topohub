@@ -31,6 +31,18 @@ spec:
     enableZtp: false
 EOF
 
+cat <<EOF | kubectl apply -f -
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: BindingIp
+metadata:
+  name: 192-168-1-199
+spec:
+  subnet: ${NAME}
+  ipAddr: 192.168.1.199
+  macAddr: 00:00:00:00:00:11
+EOF
+
+#----------------------------
 
 NAME=net10
 CIDR=192.168.10.0/24

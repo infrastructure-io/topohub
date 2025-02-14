@@ -20,6 +20,7 @@ import (
 
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
+	"github.com/infrastructure-io/topohub/pkg/bindingip"
 	"github.com/infrastructure-io/topohub/pkg/hostoperation"
 	"github.com/infrastructure-io/topohub/pkg/hoststatus"
 	"github.com/infrastructure-io/topohub/pkg/httpserver"
@@ -31,6 +32,7 @@ import (
 	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
 	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
 	hoststatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/hoststatus"
+	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
 	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -122,6 +124,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// setup binding ip webhook
+	if err = (&bindingipwebhook.BindingIPWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
+		log.Logger.Errorf("unable to create webhook %s: %v", "BindingIp", err)
+		os.Exit(1)
+	}
+
 	// Setup HostStatus webhook
 	if err = (&hoststatuswebhook.HostStatusWebhook{}).SetupWebhookWithManager(mgr); err != nil {
 		log.Logger.Errorf("unable to create webhook %s: %v", "HostStatus", err)
@@ -136,6 +144,7 @@ func main() {
 	}
 	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEvents()
 	deleteHostStatusChan := subnetMgr.GetHostStatusEvents()
+	addBindingIpChan, deleteBindingIpChan := subnetMgr.GetBindingIpEvents()
 	// Initialize hoststatus controller
 	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan, deleteHostStatusChan)
 	if err = hostStatusCtrl.SetupWithManager(mgr); err != nil {
@@ -176,6 +185,18 @@ func main() {
 		log.Logger.Errorf("Unable to create hostoperation controller: %v", err)
 		os.Exit(1)
 	}
+
+	// Initialize bindingIP controller
+	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig, addBindingIpChan, deleteBindingIpChan )
+	if err != nil {
+		log.Logger.Errorf("Failed to create bindingip controller: %v", err)
+		os.Exit(1)
+	}
+	if err = bindingIPCtrl.SetupWithManager(mgr); err != nil {
+		log.Logger.Errorf("Unable to create bindingip controller: %v", err)
+		os.Exit(1)
+	}
+
 
 	// start http server for pxe and ztp
 	if agentConfig.HttpEnabled {

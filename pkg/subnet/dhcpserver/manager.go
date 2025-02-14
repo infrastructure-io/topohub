@@ -13,18 +13,25 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 )
 
 // DhcpServer defines the interface for DHCP server operations
 type DhcpServer interface {
 	// Run starts the DHCP server
 	Run() error
+
 	// Stop stops the DHCP server
 	Stop() error
+
 	// UpdateService updates the subnet configuration
 	UpdateService(subnet topohubv1beta1.Subnet) error
+
 	// DeleteDhcpBinding deletes the DHCP binding for the specified IP and MAC
 	DeleteDhcpBinding(ip, mac string) error
+
+	// UpdateBindingIpEvents updates the binding IP events
+	UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, deleted []bindingipdata.BindingIPInfo) error
 }
 
 type dhcpServer struct {
@@ -33,8 +40,10 @@ type dhcpServer struct {
 
 	lockData       *lock.RWMutex
 	subnet         *topohubv1beta1.Subnet
-	currentClients map[string]*DhcpClientInfo
-	bindClients map[string]*DhcpClientInfo
+
+	currentLeaseClients map[string]*DhcpClientInfo
+	currentManualBindingClients map[string]*DhcpClientInfo
+	currentAutoBindingClients map[string]*DhcpClientInfo
 
 	lockConfigUpdate *lock.RWMutex
 
@@ -45,6 +54,10 @@ type dhcpServer struct {
 	addedDhcpClient   chan DhcpClientInfo
 	deletedDhcpClient chan DhcpClientInfo
 	deletedHostStatus chan DhcpClientInfo
+
+	// bindingip 模块 往其中添加数据，关于 bindingip 。由本模块来消费使用
+	addedBindingIp   chan bindingipdata.BindingIPInfo
+	deletedBindingIp chan bindingipdata.BindingIPInfo
 
 	// update the status of crd
 	statusUpdateCh chan struct{}
@@ -72,13 +85,16 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 		client:                   client,
 		addedDhcpClient:          addedDhcpClient,
 		deletedDhcpClient:        deletedDhcpClient,
-		deletedHostStatus:        make(chan DhcpClientInfo, 100),
+		deletedHostStatus:        make(chan DhcpClientInfo, 1000),
+		addedBindingIp:           make(chan bindingipdata.BindingIPInfo, 1000),
+		deletedBindingIp:         make(chan bindingipdata.BindingIPInfo, 1000),
 		stopCh:                   make(chan struct{}),
 		statusUpdateCh:           make(chan struct{}),
 		restartCh:                make(chan struct{}),
 		log:                      log.Logger.Named("dhcpServer/" + subnet.Name),
-		currentClients:           make(map[string]*DhcpClientInfo),
-		bindClients: 			  make(map[string]*DhcpClientInfo),
+		currentLeaseClients:      make(map[string]*DhcpClientInfo),
+		currentManualBindingClients: make(map[string]*DhcpClientInfo),
+		currentAutoBindingClients:   make(map[string]*DhcpClientInfo),
 		configTemplatePath:       filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
 		configPath:               filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
 		HostIpBindingsConfigPath: filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s-bindIp.conf", subnet.Name)),
@@ -135,5 +151,15 @@ func (s *dhcpServer) Stop() error {
 
 func (s *dhcpServer) DeleteDhcpBinding(ip, mac string) error {
 	s.deletedHostStatus <- DhcpClientInfo{IP: ip, MAC: mac}
+	return nil
+}
+
+func (s *dhcpServer) UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, deleted []bindingipdata.BindingIPInfo) error {
+	for _, info := range added {
+		s.addedBindingIp <- info
+	}
+	for _, info := range deleted {
+		s.deletedBindingIp <- info
+	}
 	return nil
 }

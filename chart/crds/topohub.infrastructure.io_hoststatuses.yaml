@@ -63,6 +63,8 @@ spec:
                     type: string
                   dhcpExpireTime:
                     type: string
+                  hostname:
+                    type: string
                   https:
                     type: boolean
                   ipAddr:

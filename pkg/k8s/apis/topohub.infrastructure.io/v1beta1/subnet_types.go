@@ -11,8 +11,8 @@ import (
 // +kubebuilder:printcolumn:name="SUBNET",type="string",JSONPath=".spec.ipv4Subnet.subnet"
 // +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
 // +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
-// +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpReservedAmount"
-// +kubebuilder:printcolumn:name="SYNC_ENDPOINT",type="boolean",JSONPath=".spec.feature.enableSyncEndpoint.enable"
+// +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpBindAmount"
+// +kubebuilder:printcolumn:name="SYNC_ENDPOINT",type="boolean",JSONPath=".spec.feature.enableSyncEndpoint.dhcpClient"
 // +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.feature.enableSyncEndpoint.defaultClusterName"
 // +kubebuilder:printcolumn:name="BIND_DHCP_IP",type="boolean",JSONPath=".spec.feature.enableBindDhcpIP"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
@@ -166,7 +166,9 @@ type DhcpStatusSpec struct {
 	DhcpIpActiveAmount uint64 `json:"dhcpIpActiveAmount"`
 
 	// Number of reserved IP addresses which is bond to MAC address
-	DhcpIpReservedAmount uint64 `json:"dhcpIpReservedAmount"`
+	DhcpIpBindAmount uint64 `json:"dhcpIpBindAmount"`
+	DhcpIpManualBindAmount uint64 `json:"dhcpIpManualBindAmount"`
+	DhcpIpAutoBindAmount uint64 `json:"dhcpIpAutoBindAmount"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

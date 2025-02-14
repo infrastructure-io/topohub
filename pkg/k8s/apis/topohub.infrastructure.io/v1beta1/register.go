@@ -32,6 +32,9 @@ const (
 
 	// KindHostOperation is the kind name for HostOperation resource
 	KindHostOperation = "HostOperation"
+
+	// KindBindingIp is the kind name for BindingIp resource
+	KindBindingIp = "BindingIp"
 )
 
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}
@@ -61,4 +64,5 @@ func init() {
 	SchemeBuilder.Register(&HostEndpoint{}, &HostEndpointList{})
 	SchemeBuilder.Register(&HostStatus{}, &HostStatusList{})
 	SchemeBuilder.Register(&HostOperation{}, &HostOperationList{})
+	SchemeBuilder.Register(&BindingIp{}, &BindingIpList{})
 }

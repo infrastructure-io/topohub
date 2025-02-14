@@ -77,11 +77,13 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			}
 
 			// GetDhcpClient returns a string representation of all DHCP clients with their binding status
-			updateClientFunc := func(dhcpClient, bindClients map[string]*DhcpClientInfo) (string, uint64) {
+			updateClientFunc := func(dhcpClient, manualBindClients, autoBindClients map[string]*DhcpClientInfo) (string, uint64) {
 
 				type clientInfo struct {
 					Mac  string `json:"mac"`
-					Bind bool   `json:"bind"`
+					ManualBind bool   `json:"manualBind"`
+					AutoBind bool   `json:"autoBind"`
+					Hostname string `json:"hostname"`
 				}
 
 				clientMap := make(map[string]clientInfo)
@@ -91,19 +93,34 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				for ip, client := range dhcpClient {
 					clientMap[ip] = clientInfo{
 						Mac:  client.MAC,
-						Bind: false,
+						AutoBind: false,
+						Hostname: client.Hostname,
 					}
 					counter++
 				}
 
 				// Update or add bind clients
-				for ip, client := range bindClients {
+				for ip, client := range autoBindClients {
 					if _, existed := clientMap[ip]; !existed {
 						counter++
 					}
 					clientMap[ip] = clientInfo{
 						Mac:  client.MAC,
-						Bind: true,
+						ManualBind: false,
+						AutoBind: true,
+						Hostname: client.Hostname,
+					}
+				}
+				
+				for ip, client := range manualBindClients {
+					if _, existed := clientMap[ip]; !existed {
+						counter++
+					}
+					clientMap[ip] = clientInfo{
+						Mac:  client.MAC,
+						ManualBind: true,
+						AutoBind: false,
+						Hostname: client.Hostname,
 					}
 				}
 
@@ -120,12 +137,14 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 
 				return string(jsonBytes), counter
 			}
-			clientDetails, usedIpAmount := updateClientFunc(s.currentClients, s.bindClients)
+			clientDetails, usedIpAmount := updateClientFunc(s.currentLeaseClients, s.currentManualBindingClients, s.currentAutoBindingClients)
 			updated.Status.DhcpClientDetails = clientDetails
 			updated.Status.DhcpStatus.DhcpIpAvailableAmount =  totalIPs - usedIpAmount
 			updated.Status.DhcpStatus.DhcpIpTotalAmount = totalIPs
-			updated.Status.DhcpStatus.DhcpIpActiveAmount = uint64(len(s.currentClients))
-			updated.Status.DhcpStatus.DhcpIpReservedAmount = uint64(len(s.bindClients))
+			updated.Status.DhcpStatus.DhcpIpActiveAmount = uint64(len(s.currentLeaseClients))
+			updated.Status.DhcpStatus.DhcpIpManualBindAmount = uint64(len(s.currentManualBindingClients))
+			updated.Status.DhcpStatus.DhcpIpAutoBindAmount = uint64(len(s.currentAutoBindingClients))
+			updated.Status.DhcpStatus.DhcpIpBindAmount = updated.Status.DhcpStatus.DhcpIpManualBindAmount + updated.Status.DhcpStatus.DhcpIpAutoBindAmount
 
 			if updated.Status.HostNode == nil || *updated.Status.HostNode != s.config.NodeName {
 				s.log.Infof("update host node %s to subnet %s", s.config.NodeName, s.subnet.Name)

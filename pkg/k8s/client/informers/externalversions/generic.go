@@ -40,6 +40,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=topohub.infrastructure.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("bindingips"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().BindingIps().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("hostendpoints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostEndpoints().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("hostoperations"):
