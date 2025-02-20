@@ -16,6 +16,8 @@ staticMask: ""
 # Pod annotations
 underlayMultusCNI: macvlan-conf
 
+disableRedfishMockup: false
+
 # Container images
 images:
   redfishMockup:

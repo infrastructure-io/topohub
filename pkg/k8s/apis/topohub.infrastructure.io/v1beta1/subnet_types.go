@@ -4,6 +4,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const EndpointTypeHoststatus = "hoststatus"
+
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -118,6 +121,7 @@ type EnableSyncEndpointSpec struct {
 	// +kubebuilder:default=hoststatus
 	EndpointType string `json:"endpointType"`
 }
+
 
 // SubnetSpec defines the desired state of Subnet
 type SubnetSpec struct {

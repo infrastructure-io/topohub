@@ -18,9 +18,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/infrastructure-io/topohub/pkg/bindingip"
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
-	"github.com/infrastructure-io/topohub/pkg/bindingip"
 	"github.com/infrastructure-io/topohub/pkg/hostoperation"
 	"github.com/infrastructure-io/topohub/pkg/hoststatus"
 	"github.com/infrastructure-io/topohub/pkg/httpserver"
@@ -29,10 +29,10 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/secret"
 	"github.com/infrastructure-io/topohub/pkg/subnet"
+	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
 	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
 	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
 	hoststatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/hoststatus"
-	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
 	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -142,7 +142,7 @@ func main() {
 		log.Logger.Errorf("Failed to setup subnet manager: %v", err)
 		os.Exit(1)
 	}
-	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEvents()
+	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEventsForHostStatus()
 	deleteHostStatusChan := subnetMgr.GetHostStatusEvents()
 	addBindingIpChan, deleteBindingIpChan := subnetMgr.GetBindingIpEvents()
 	// Initialize hoststatus controller
@@ -187,7 +187,7 @@ func main() {
 	}
 
 	// Initialize bindingIP controller
-	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig, addBindingIpChan, deleteBindingIpChan )
+	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig, addBindingIpChan, deleteBindingIpChan)
 	if err != nil {
 		log.Logger.Errorf("Failed to create bindingip controller: %v", err)
 		os.Exit(1)
@@ -196,7 +196,6 @@ func main() {
 		log.Logger.Errorf("Unable to create bindingip controller: %v", err)
 		os.Exit(1)
 	}
-
 
 	// start http server for pxe and ztp
 	if agentConfig.HttpEnabled {

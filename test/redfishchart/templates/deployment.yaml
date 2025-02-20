@@ -26,6 +26,7 @@ spec:
       nodeName: {{ .Values.nodeName }}
       {{- end }}
       containers:
+      {{- if ne .Values.disableRedfishMockup true }}
       - name: redfish-mockup
         image: "{{ .Values.images.redfishMockup.repository }}:{{ .Values.images.redfishMockup.tag }}"
         imagePullPolicy: {{ .Values.images.redfishMockup.pullPolicy }}
@@ -36,6 +37,7 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+      {{- end }}  
       - name: dhcp
         image: "{{ .Values.images.tools.repository }}:{{ .Values.images.tools.tag }}"
         imagePullPolicy: {{ .Values.images.tools.pullPolicy }}
@@ -79,9 +81,11 @@ spec:
               fi
           )&
           sleep 5
+          {{- if ne .Values.disableRedfishMockup true }}
           echo "test redfish server"
           IP=$(ip addr show dev {{ .Values.networkInterface }} | grep "inet " | awk '{ print $2 }' | cut -d/ -f1)
           curl http://${IP}:8000/redfish/v1
+          {{- end }}
           sleep infinity
         readinessProbe:
           exec:

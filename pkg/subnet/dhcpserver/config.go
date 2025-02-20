@@ -9,7 +9,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
-
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )
 
 // generateDnsmasqConfig generates the dnsmasq configuration file
@@ -130,7 +130,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 	}
 	if err := s.UpdateDhcpBindings(finalNewClient, nil); err != nil {
 		s.log.Errorf("failed to add dhcp bindings: %v", err)
-		return  err
+		return err
 	}
 
 	//-------------------- generate the config file --------------------
@@ -143,7 +143,6 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 
 	return nil
 }
-
 
 // processLeaseFile reads and processes the lease file
 func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdateBindings bool, finalErr error) {
@@ -205,36 +204,46 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 		currentLeaseClients[clientInfo.IP] = clientInfo
 
 		// hoststatus 进行 crd 实例同步
-		if s.subnet.Spec.Feature.EnableBindDhcpIP {
-			if data, exists := previousClients[clientInfo.IP]; !exists {
+
+		if data, exists := previousClients[clientInfo.IP]; !exists {
+			if s.subnet.Spec.Feature.EnableSyncEndpoint != nil && s.subnet.Spec.Feature.EnableSyncEndpoint.DhcpClient && s.subnet.Spec.Feature.EnableSyncEndpoint.EndpointType == topohubv1beta1.EndpointTypeHoststatus {
 				// hoststatus 进行 crd 实例同步
-				s.addedDhcpClient <- *clientInfo
+				s.addedDhcpClientForHostStatus <- *clientInfo
 				s.log.Infof("send event to add dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+			}
+			if s.subnet.Spec.Feature.EnableBindDhcpIP {
 				// 进行 ip 绑定
 				needUpdateBindings = true
-			} else {
-				if data.MAC != clientInfo.MAC || data.Hostname != clientInfo.Hostname {
+			}
+		} else {
+			if data.MAC != clientInfo.MAC || data.Hostname != clientInfo.Hostname {
+				if s.subnet.Spec.Feature.EnableSyncEndpoint != nil && s.subnet.Spec.Feature.EnableSyncEndpoint.DhcpClient && s.subnet.Spec.Feature.EnableSyncEndpoint.EndpointType == topohubv1beta1.EndpointTypeHoststatus {
 					// hoststatus 进行 crd 实例同步
-					s.addedDhcpClient <- *clientInfo
+					s.addedDhcpClientForHostStatus <- *clientInfo
 					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, old hostname=%s, new hostname=%s, ip=%s", data.MAC, clientInfo.MAC, data.Hostname, clientInfo.Hostname, clientInfo.IP)
+				}
+				if s.subnet.Spec.Feature.EnableBindDhcpIP {
 					// bind new client to conf
 					needUpdateBindings = true
-				} else {
-					if clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
-						s.addedDhcpClient <- *clientInfo
-						s.log.Infof("send event to update the ExpireTime for dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+				}
+			} else {
+				if clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
+					if s.subnet.Spec.Feature.EnableSyncEndpoint != nil && s.subnet.Spec.Feature.EnableSyncEndpoint.DhcpClient && s.subnet.Spec.Feature.EnableSyncEndpoint.EndpointType == topohubv1beta1.EndpointTypeHoststatus {
+						s.addedDhcpClientForHostStatus <- *clientInfo
+						s.log.Infof("send event to update dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
 					}
 				}
 			}
 		}
+
 	}
 
 	// 检查删除的客户端
 	for _, client := range previousClients {
 		if _, exists := currentLeaseClients[client.IP]; !exists {
 			client.Active = false
-			if s.subnet.Spec.Feature.EnableBindDhcpIP {
-				s.deletedDhcpClient <- *client
+			if s.subnet.Spec.Feature.EnableSyncEndpoint != nil && s.subnet.Spec.Feature.EnableSyncEndpoint.DhcpClient && s.subnet.Spec.Feature.EnableSyncEndpoint.EndpointType == topohubv1beta1.EndpointTypeHoststatus {
+				s.deletedDhcpClientForHostStatus <- *client
 				s.log.Infof("send event to delete dhcp client: %s, %s", client.MAC, client.IP)
 				// 对于删除的 dhcp 客户端，不进行 ip 解绑，确保安全
 			}
@@ -311,36 +320,36 @@ func (s *dhcpServer) UpdateDhcpBindings(added, deleted map[string]*DhcpClientInf
 			if item, exists := deleted[ip]; exists {
 				if item.MAC == mac {
 					s.log.Infof("removing dhcp-host binding for IP %s, MAC %s", ip, mac)
-					lineHostName=""
+					lineHostName = ""
 					continue
 				}
 			}
 
 			// 检查是否需要更新 MAC
 			if item, exists := added[ip]; exists {
-				s.log.Infof("updating dhcp-host binding for IP %s: old MAC %s -> new MAC %s", ip, mac, item.MAC )
+				s.log.Infof("updating dhcp-host binding for IP %s: old MAC %s -> new MAC %s", ip, mac, item.MAC)
 				finalLines = append(finalLines, "# hostname "+item.Hostname)
-				line:=fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
+				line := fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
 				finalLines = append(finalLines, line)
 				processedIPs[ip] = true
 				bindClients[ip] = &DhcpClientInfo{
-					MAC: item.MAC,
-					IP:  ip,
+					MAC:      item.MAC,
+					IP:       ip,
 					Hostname: item.Hostname,
 				}
-				lineHostName=""
+				lineHostName = ""
 				continue
 			}
 
 			// 保持原有配置不变
-			if len(lineHostName)>0{
+			if len(lineHostName) > 0 {
 				finalLines = append(finalLines, "# hostname "+lineHostName)
 			}
 			finalLines = append(finalLines, line)
 			processedIPs[ip] = true
 			bindClients[ip] = &DhcpClientInfo{
-				MAC: mac,
-				IP:  ip,
+				MAC:      mac,
+				IP:       ip,
 				Hostname: lineHostName,
 			}
 		} else if strings.HasPrefix(line, "# hostname ") {
@@ -351,23 +360,23 @@ func (s *dhcpServer) UpdateDhcpBindings(added, deleted map[string]*DhcpClientInf
 				continue
 			}
 			lineHostName = fields[2]
-		}else{
-			lineHostName=""
+		} else {
+			lineHostName = ""
 		}
 	}
 
 	// 添加新的绑定（仅处理尚未处理的IP）
 	for ip, item := range added {
 		if !processedIPs[ip] {
-			s.log.Infof("adding new dhcp-host binding for IP %s, MAC %s", ip, item.MAC )
-			if len(item.Hostname)>0{
+			s.log.Infof("adding new dhcp-host binding for IP %s, MAC %s", ip, item.MAC)
+			if len(item.Hostname) > 0 {
 				finalLines = append(finalLines, "# hostname "+item.Hostname)
 			}
-			line:=fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
+			line := fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
 			finalLines = append(finalLines, line)
 			bindClients[ip] = &DhcpClientInfo{
-				MAC: item.MAC,
-				IP:  ip,
+				MAC:      item.MAC,
+				IP:       ip,
 				Hostname: item.Hostname,
 			}
 		}
@@ -379,11 +388,13 @@ func (s *dhcpServer) UpdateDhcpBindings(added, deleted map[string]*DhcpClientInf
 	}
 
 	// 统计 dhcp 自动绑定的客户端数量
-	for ip , item := range bindClients {
-		if _ , ok := s.currentManualBindingClients[ip]; !ok{
+	s.lockData.Lock()
+	for ip, item := range bindClients {
+		if _, ok := s.currentManualBindingClients[ip]; !ok {
 			s.currentAutoBindingClients[ip] = item
 		}
 	}
+	s.lockData.Unlock()
 
 	return nil
 }
