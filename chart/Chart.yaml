@@ -3,10 +3,10 @@ name: topohub
 description: A Helm chart for Topohub
 
 # This is the chart version, which will be taken from VERSION file
-version: 0.3.0
+version: 0.3.1
 
 # This is the version number of the application being deployed, which will be taken from VERSION file
-appVersion: "0.3.0"
+appVersion: "0.3.1"
 
 type: application
 
