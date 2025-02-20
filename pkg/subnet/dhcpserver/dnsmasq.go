@@ -68,10 +68,10 @@ func (s *dhcpServer) startDnsmasq() error {
 // UpdateService updates the subnet configuration and restarts the DHCP server
 func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 	s.lockData.Lock()
-	defer s.lockData.Unlock()
-
 	// 更新 subnet
 	s.subnet = &subnet
+	s.lockData.Unlock()
+
 	// 重启 DHCP 服务
 	s.restartCh <- struct{}{}
 
