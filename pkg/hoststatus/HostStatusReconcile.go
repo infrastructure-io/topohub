@@ -147,7 +147,7 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 	if healthy {
 		logEntrys, err := client.GetLog()
 		if err != nil {
-			c.log.Errorf("Failed to get logs of HostStatus %s: %v", name, err)
+			c.log.Warnf("Failed to get logs of HostStatus %s: %v", name, err)
 		} else {
 			lastLogTime := ""
 			if updated.Status.Log.LastestLog != nil {
@@ -223,7 +223,7 @@ func (c *hostStatusController) UpdateHostStatusInfoWrapper(name string) error {
 	if failed {
 		return fmt.Errorf("failed to update hostStatus")
 	}
-	
+
 	return nil
 }
 
@@ -287,7 +287,7 @@ func (c *hostStatusController) processHostStatus(hostStatus *topohubv1beta1.Host
 
 	if len(hostStatus.Status.Info) == 0 {
 		if err := c.UpdateHostStatusInfoWrapper(hostStatus.Name); err != nil {
-			logger.Errorf("failed to update HostStatus %s: %v", hostStatus.Name, err)
+			//logger.Errorf("failed to update HostStatus %s: %v", hostStatus.Name, err)
 			return err
 		}
 	} else {
@@ -343,7 +343,7 @@ func (c *hostStatusController) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "Failed to process HostStatus, will retry")
 		return ctrl.Result{
 			RequeueAfter: time.Second * 2,
-		}, err
+		}, nil
 	}
 
 	logger.Debugf("Successfully processed HostStatus %s", hostStatus.Name)

@@ -176,7 +176,7 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				s.log.Errorf("Failed to update subnet %s status: %v", s.subnet.Name, err)
 				return err
 			}
-			s.log.Infof("succeeded to update subnet status for %s: %v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
+			s.log.Infof("succeeded to update subnet status for %s: %+v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
 
 			return nil
 		})

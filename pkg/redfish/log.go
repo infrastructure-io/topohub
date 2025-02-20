@@ -48,7 +48,7 @@ func (c *redfishClient) GetLog() ([]*redfish.LogEntry, error) {
 
 		entries, err := t.Entries()
 		if err != nil {
-			c.logger.Errorf("failed to Query the log service entries: %+v", err)
+			c.logger.Warnf("failed to Query the log service entries: %+v", err)
 			return nil, err
 		} else if len(entries) > 0 {
 			c.logger.Debugf("log service entries amount: %d", len(entries))
