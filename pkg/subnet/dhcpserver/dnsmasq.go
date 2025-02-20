@@ -121,7 +121,7 @@ func (s *dhcpServer) monitor() {
 			if !ok {
 				s.log.Panicf("Lease file watcher channel closed")
 			}
-			
+
 			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
 				s.log.Infof("watcher lease file event: %+v", event)
 
@@ -129,7 +129,7 @@ func (s *dhcpServer) monitor() {
 					s.log.Errorf("failed to processDhcpLease: %v", err)
 				} else {
 					if reloadConfig {
-						newClients:=make(map[string]*DhcpClientInfo)
+						newClients := make(map[string]*DhcpClientInfo)
 						for _, client := range s.currentLeaseClients {
 							newClients[client.IP] = client
 						}
@@ -145,10 +145,11 @@ func (s *dhcpServer) monitor() {
 						s.log.Infof("client expiration is updated, so dhcp server does not need to reload")
 					}
 				}
-			}else{
+			} else {
 				s.log.Debugf("watcher invalid file event: %+v", event)
 			}
 
+		// 	HostStatus 模块通知来的 HostStatus 删除事件，进行 ip 解绑处理
 		case event, ok := <-s.deletedHostStatus:
 			if !ok {
 				s.log.Panic("deletedHostStatus channel closed")
@@ -169,20 +170,20 @@ func (s *dhcpServer) monitor() {
 			s.log.Debugf("process binding ip adding events for subnet %s: %+v", info.Subnet, info)
 			//note: currently, it does not consider whether the ip is belonged to the ip range or not, which make it simple to handle the subnet changes
 			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok {
-               if item.MAC != info.MacAddr {
+				if item.MAC != info.MacAddr {
 					s.currentManualBindingClients[info.IPAddr] = &DhcpClientInfo{
-						IP: info.IPAddr, 
-						MAC: info.MacAddr, 
+						IP:       info.IPAddr,
+						MAC:      info.MacAddr,
 						Hostname: info.Hostname,
 					}
 					s.log.Infof("update binding ip %s: old mac %s, new mac %s, hostname %s", info.IPAddr, item.MAC, info.MacAddr, info.Hostname)
-			   }else{
-					continue	
-			   }
-			}else{
+				} else {
+					continue
+				}
+			} else {
 				s.currentManualBindingClients[info.IPAddr] = &DhcpClientInfo{
-					IP: info.IPAddr, 
-					MAC: info.MacAddr, 
+					IP:       info.IPAddr,
+					MAC:      info.MacAddr,
 					Hostname: info.Hostname,
 				}
 				s.log.Infof("add new binding ip %s: %+v", info.IPAddr, info)
@@ -201,7 +202,7 @@ func (s *dhcpServer) monitor() {
 			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok && item.MAC == info.MacAddr {
 				delete(s.currentManualBindingClients, info.IPAddr)
 				s.log.Infof("delete binding ip %s: %+v", info.IPAddr, info)
-			}else{
+			} else {
 				continue
 			}
 			if err := s.UpdateDhcpBindings(s.currentManualBindingClients, nil); err != nil {

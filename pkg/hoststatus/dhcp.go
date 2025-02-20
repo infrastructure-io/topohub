@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	hoststatusdata "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
+	"github.com/infrastructure-io/topohub/pkg/redfish"
+
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -108,6 +111,40 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 		return err
 	}
 
+	// check connecting to the host
+	c.log.Debugf("checking connecting to the hoststatus %s", client.IP)
+	basicInfo := topohubv1beta1.BasicInfo{
+		Type:             topohubv1beta1.HostTypeDHCP,
+		IpAddr:           client.IP,
+		Mac:              client.MAC,
+		Port:             int32(c.config.RedfishPort),
+		Https:            c.config.RedfishHttps,
+		ActiveDhcpClient: true,
+		ClusterName:      client.ClusterName,
+		SubnetName:       &client.SubnetName,
+		DhcpExpireTime: func() *string {
+			expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
+			return &expireTimeStr
+		}(),
+		Hostname: &client.Hostname,
+	}
+	username, password, err := c.getSecretData(c.config.RedfishSecretName, c.config.RedfishSecretNamespace)
+	if err != nil {
+		c.log.Errorf("Failed to get secret data from secret %s/%s when creating HostStatus for %s: %v", c.config.RedfishSecretNamespace, c.config.RedfishSecretName, client.IP, err)
+		return err
+	}
+	d := hoststatusdata.HostConnectCon{
+		Info:     &basicInfo,
+		Username: username,
+		Password: password,
+		DhcpHost: true,
+	}
+	if _, err := redfish.NewClient(&d, c.log); err != nil {
+		c.log.Warnf("ignore creating hoststatus for dhcp client %s, failed to connect: %v", client.IP, err)
+		return nil
+	}
+
+	c.log.Debugf("succeed to checking the hoststatus %s, and create hoststatus for it", client.IP)
 	hostStatus := &topohubv1beta1.HostStatus{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -144,22 +181,8 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	hostStatus.Status = topohubv1beta1.HostStatusStatus{
 		Healthy:        false,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
-		Basic: topohubv1beta1.BasicInfo{
-			Type:             topohubv1beta1.HostTypeDHCP,
-			IpAddr:           client.IP,
-			Mac:              client.MAC,
-			Port:             int32(c.config.RedfishPort),
-			Https:            c.config.RedfishHttps,
-			ActiveDhcpClient: true,
-			ClusterName:      client.ClusterName,
-			SubnetName:       &client.SubnetName,
-			DhcpExpireTime: func() *string {
-				expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
-				return &expireTimeStr
-			}(),
-			Hostname: &client.Hostname,
-		},
-		Info: map[string]string{},
+		Basic:          basicInfo,
+		Info:           map[string]string{},
 		Log: topohubv1beta1.LogStruct{
 			TotalLogAccount:   0,
 			WarningLogAccount: 0,

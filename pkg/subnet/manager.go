@@ -23,7 +23,7 @@ import (
 type SubnetManager interface {
 	SetupWithManager(mgr ctrl.Manager) error
 	Stop()
-	GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
+	GetDhcpClientEventsForHostStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
 	GetHostStatusEvents() chan dhcpserver.DhcpClientInfo
 	GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo)
 }
@@ -37,8 +37,8 @@ type subnetManager struct {
 	log *zap.SugaredLogger
 
 	// 本模块往其中添加数据，关于 dhcp client 变化信息。由 hoststatus 模块来消费使用
-	addedDhcpClient   chan dhcpserver.DhcpClientInfo
-	deletedDhcpClient chan dhcpserver.DhcpClientInfo
+	addedDhcpClientForHostStatus   chan dhcpserver.DhcpClientInfo
+	deletedDhcpClientForHostStatus chan dhcpserver.DhcpClientInfo
 
 	// hoststatus 往其中添加数据，关于 hoststatus 被删除信息。由本模块来消费使用
 	deletedHostStatus chan dhcpserver.DhcpClientInfo
@@ -55,18 +55,18 @@ type subnetManager struct {
 
 func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interface) SubnetManager {
 	return &subnetManager{
-		config:            &config,
-		kubeClient:        kubeClient,
-		cache:             NewSubnetCache(),
-		lockLeader:        lock.RWMutex{},
-		addedDhcpClient:   make(chan dhcpserver.DhcpClientInfo, 1000),
-		deletedDhcpClient: make(chan dhcpserver.DhcpClientInfo, 1000),
-		deletedHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
-		addedBindingIp:    make(chan bindingipdata.BindingIPInfo, 1000),
-		deletedBindingIp:  make(chan bindingipdata.BindingIPInfo, 1000),
-		leader:            false,
-		dhcpServerList:    make(map[string]dhcpserver.DhcpServer),
-		log:               log.Logger.Named("subnetManager"),
+		config:                         &config,
+		kubeClient:                     kubeClient,
+		cache:                          NewSubnetCache(),
+		lockLeader:                     lock.RWMutex{},
+		addedDhcpClientForHostStatus:   make(chan dhcpserver.DhcpClientInfo, 1000),
+		deletedDhcpClientForHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
+		deletedHostStatus:              make(chan dhcpserver.DhcpClientInfo, 1000),
+		addedBindingIp:                 make(chan bindingipdata.BindingIPInfo, 1000),
+		deletedBindingIp:               make(chan bindingipdata.BindingIPInfo, 1000),
+		leader:                         false,
+		dhcpServerList:                 make(map[string]dhcpserver.DhcpServer),
+		log:                            log.Logger.Named("subnetManager"),
 	}
 }
 
@@ -130,7 +130,7 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 
 			// todo: start the dhcp server on the subnet
 			if _, ok := s.dhcpServerList[subnet.Name]; !ok {
-				t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
+				t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus)
 				err := t.Run()
 				if err != nil {
 					msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
@@ -199,7 +199,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 			// 检查是否已经存在对应的 DHCP 服务器
 			if _, exists := s.dhcpServerList[subnet.Name]; !exists {
 				// 创建新的 DHCP 服务器实例
-				dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
+				dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus)
 
 				// 启动 DHCP 服务器
 				if err := dhcpServer.Run(); err != nil {
@@ -234,8 +234,8 @@ func (s *subnetManager) Stop() {
 }
 
 // this module send event to the channel, and hoststatus module consume it
-func (s *subnetManager) GetDhcpClientEvents() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
-	return s.addedDhcpClient, s.deletedDhcpClient
+func (s *subnetManager) GetDhcpClientEventsForHostStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
+	return s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus
 }
 
 // hoststatus module send event to this channel and this module consume it
