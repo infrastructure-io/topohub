@@ -12,13 +12,17 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// statusUpdateWorker handles subnet status updates with retries
+// statusUpdateWorker handles subnet status updates with rate limiting
 func (s *dhcpServer) statusUpdateWorker() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	var pendingUpdate bool
+
 	for {
 		select {
 		case <-s.stopCh:
@@ -26,8 +30,16 @@ func (s *dhcpServer) statusUpdateWorker() {
 			return
 
 		case <-s.statusUpdateCh:
-			if err := s.updateSubnetWithRetry(); err != nil {
-				log.Logger.Errorf("Failed to update subnet status: %v", err)
+			// Mark that we have a pending update, but don't process immediately
+			pendingUpdate = true
+
+		case <-ticker.C:
+			// If we have a pending update when the ticker fires, process it
+			if pendingUpdate {
+				if err := s.updateSubnetWithRetry(); err != nil {
+					s.log.Errorf("Failed to update subnet status: %v", err)
+				}
+				pendingUpdate = false
 			}
 		}
 	}
@@ -57,8 +69,8 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			s.lockData.RLock()
 			defer s.lockData.RUnlock()
 
-			s.log.Debugf("it is about to update the status of subnet %s", s.subnet.Name )
-			
+			s.log.Debugf("it is about to update the status of subnet %s", s.subnet.Name)
+
 			// 获取最新的 subnet
 			current := &topohubv1beta1.Subnet{}
 			if err := s.client.Get(context.Background(), types.NamespacedName{
