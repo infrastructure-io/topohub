@@ -223,7 +223,6 @@ func (c *hostStatusController) UpdateHostStatusInfoWrapper(name string) error {
 	if failed {
 		return fmt.Errorf("failed to update hostStatus")
 	}
-
 	return nil
 }
 

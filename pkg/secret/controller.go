@@ -58,8 +58,16 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return reconcile.Result{}, err
 	}
 
+	if _, ok := secret.Data["username"]; !ok {
+		return reconcile.Result{}, nil
+	}
+	if _, ok := secret.Data["password"]; !ok {
+		return reconcile.Result{}, nil
+	}
+
 	username := string(secret.Data["username"])
 	password := string(secret.Data["password"])
+
 	logger.Debugf("retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
 	r.hostStatusController.UpdateSecret(secret.Name, secret.Namespace, username, password)
 

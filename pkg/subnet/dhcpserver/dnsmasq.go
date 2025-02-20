@@ -265,11 +265,12 @@ func (s *dhcpServer) monitor() {
 
 		} else if needRestart {
 			s.log.Infof("restarting dhcp server")
+			// in the startDnsmasq, it finish 's.statusUpdateCh <- struct{}{}'
 			if err := s.startDnsmasq(); err != nil {
 				s.log.Errorf("Failed to restart dnsmasq: %v", err)
 			}
-			// update the status of subnet
-			s.statusUpdateCh <- struct{}{}
+			// in the startDnsmasq, it finish 's.statusUpdateCh <- struct{}{}'
+			// s.statusUpdateCh <- struct{}{}
 		}
 
 	}
