@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -70,8 +69,8 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			s.lockData.RLock()
 			defer s.lockData.RUnlock()
 
-			s.log.Debugf("it is about to update the status of subnet %s", s.subnet.Name )
-			
+			s.log.Debugf("it is about to update the status of subnet %s", s.subnet.Name)
+
 			// 获取最新的 subnet
 			current := &topohubv1beta1.Subnet{}
 			if err := s.client.Get(context.Background(), types.NamespacedName{
