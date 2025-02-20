@@ -81,9 +81,11 @@ spec:
               fi
           )&
           sleep 5
+          {{- if ne .Values.disableRedfishMockup true }}
           echo "test redfish server"
           IP=$(ip addr show dev {{ .Values.networkInterface }} | grep "inet " | awk '{ print $2 }' | cut -d/ -f1)
           curl http://${IP}:8000/redfish/v1
+          {{- end }}
           sleep infinity
         readinessProbe:
           exec:

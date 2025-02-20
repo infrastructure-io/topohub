@@ -171,21 +171,25 @@ func (s *dhcpServer) monitor() {
 			//note: currently, it does not consider whether the ip is belonged to the ip range or not, which make it simple to handle the subnet changes
 			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok {
 				if item.MAC != info.MacAddr {
+					s.lockData.Lock()
 					s.currentManualBindingClients[info.IPAddr] = &DhcpClientInfo{
 						IP:       info.IPAddr,
 						MAC:      info.MacAddr,
 						Hostname: info.Hostname,
 					}
+					s.lockData.Unlock()
 					s.log.Infof("update binding ip %s: old mac %s, new mac %s, hostname %s", info.IPAddr, item.MAC, info.MacAddr, info.Hostname)
 				} else {
 					continue
 				}
 			} else {
+				s.lockData.Lock()
 				s.currentManualBindingClients[info.IPAddr] = &DhcpClientInfo{
 					IP:       info.IPAddr,
 					MAC:      info.MacAddr,
 					Hostname: info.Hostname,
 				}
+				s.lockData.Unlock()
 				s.log.Infof("add new binding ip %s: %+v", info.IPAddr, info)
 			}
 			if err := s.UpdateDhcpBindings(s.currentManualBindingClients, nil); err != nil {

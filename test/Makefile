@@ -43,7 +43,7 @@ installDepsRedfish:
 			./scripts/install-redfish-dhcp.sh
 	@echo "deploy a bad redifsh with dhcp ip "
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth1-vlan10-macvlan" \
-			HELM_NAME="vlan10-dhcp" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
+			HELM_NAME="vlan10-invalid" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			DISABLE_REDFISH_MOCKUP="true" \
 			./scripts/install-redfish-dhcp.sh
 

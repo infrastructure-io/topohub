@@ -271,6 +271,7 @@ func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, 
 
 func (s *subnetManager) processBindingIpEvents() {
 
+	// handle bindingIP crd events, and configure it in the dhcp server
 	s.log.Infof("begin to process binding ip events")
 	for {
 		select {
@@ -278,6 +279,10 @@ func (s *subnetManager) processBindingIpEvents() {
 			s.log.Debugf("receive adding binding ip event: %+v", event)
 			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
+				go func() {
+					time.Sleep(30 * time.Second)
+					s.addedBindingIp <- event
+				}()
 			} else {
 				s.log.Infof("process binding ip adding events for subnet %s: %+v", event.Subnet, event)
 				if err := c.UpdateBindingIpEvents([]bindingipdata.BindingIPInfo{event}, nil); err != nil {
@@ -289,6 +294,10 @@ func (s *subnetManager) processBindingIpEvents() {
 			s.log.Debugf("receive deleting binding ip event: %+v", event)
 			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
+				go func() {
+					time.Sleep(30 * time.Second)
+					s.deletedBindingIp <- event
+				}()
 			} else {
 				s.log.Infof("process binding ip deleting events for subnet %s: %+v", event.Subnet, event)
 				if err := c.UpdateBindingIpEvents(nil, []bindingipdata.BindingIPInfo{event}); err != nil {
