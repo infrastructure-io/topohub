@@ -26,7 +26,6 @@ func (s *dhcpServer) statusUpdateWorker() {
 			return
 
 		case <-s.statusUpdateCh:
-			s.log.Debugf("it is about to update the status of subnet %+v", s.subnet)
 			if err := s.updateSubnetWithRetry(); err != nil {
 				log.Logger.Errorf("Failed to update subnet status: %v", err)
 			}
@@ -58,6 +57,8 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			s.lockData.RLock()
 			defer s.lockData.RUnlock()
 
+			s.log.Debugf("it is about to update the status of subnet %s", s.subnet.Name )
+			
 			// 获取最新的 subnet
 			current := &topohubv1beta1.Subnet{}
 			if err := s.client.Get(context.Background(), types.NamespacedName{

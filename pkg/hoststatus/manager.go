@@ -103,5 +103,4 @@ func (c *hostStatusController) UpdateSecret(secretName, secretNamespace, usernam
 			c.log.Errorf("Failed to update host status: %v", err)
 		}
 	}
-
 }
