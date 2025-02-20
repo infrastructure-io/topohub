@@ -2,12 +2,12 @@ package subnet
 
 import (
 	"context"
-	"time"
 	"fmt"
+	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -87,13 +87,13 @@ func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason
 		LastTransitionTime: metav1.Now(),
 	})
 
-
 	if err := s.client.Status().Update(context.TODO(), updated); err != nil {
 		logger.Errorf("failed to update status: %v", err)
 		return reconcile.Result{
 			RequeueAfter: time.Second * 2,
 		}, err
 	}
+	s.log.Infof("succeeded to update subnet status for %s: %v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
 
 	return reconcile.Result{}, nil
 }
@@ -253,7 +253,7 @@ func (s *subnetManager) processHostStatusEvents() {
 	s.log.Infof("begin to process host status events for deleting binding setting")
 
 	for event := range s.deletedDhcpClientForHostStatus {
-		s.log.Debugf("process host status events: %+v", event)
+		s.log.Debugf("process host status deleted events: %+v", event)
 		if c, exists := s.dhcpServerList[event.SubnetName]; !exists {
 			s.log.Errorf("subnet %s is not running, skip to process host status events: %+v", event.SubnetName, event)
 		} else {

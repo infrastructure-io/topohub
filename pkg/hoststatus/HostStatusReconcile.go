@@ -99,7 +99,7 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 	var healthy bool
 	client, err1 := redfish.NewClient(*d, c.log)
 	if err1 != nil {
-		c.log.Errorf("Failed to create redfish client for HostStatus %s: %v", name, err1)
+		c.log.Warnf("Failed to create redfish client for HostStatus %s: %v", name, err1)
 		healthy = false
 	} else {
 		healthy = true

@@ -101,6 +101,8 @@ func (s *dhcpServer) monitor() {
 	tickerProcess := time.NewTicker(3 * time.Second)
 	defer tickerProcess.Stop()
 
+	subnetName := s.subnet.Name
+
 	// 开始监控
 	for {
 		needRestart := false
@@ -154,7 +156,7 @@ func (s *dhcpServer) monitor() {
 			if !ok {
 				s.log.Panic("deletedHostStatus channel closed")
 			}
-			s.log.Debugf("process hostStatus deleting events, delete dhcp binding, ip %s, mac %s", event.IP, event.MAC)
+			s.log.Infof("process hostStatus deleting events, delete dhcp binding, ip %s, mac %s", event.IP, event.MAC)
 			deleted := map[string]*DhcpClientInfo{
 				event.IP: {MAC: event.MAC},
 			}
@@ -232,12 +234,12 @@ func (s *dhcpServer) monitor() {
 					needRenewConfig = true
 					needRestart = true
 				} else {
-					s.log.Debugf("dhcp server for %s is running", s.subnet.Name)
+					s.log.Debugf("dhcp server for %s is running", subnetName)
 				}
 			} else {
 				needRenewConfig = true
 				needRestart = true
-				s.log.Infof("dhcp server for %s is dead, restart it", s.subnet.Name)
+				s.log.Infof("dhcp server for %s is dead, restart it", subnetName)
 			}
 		}
 

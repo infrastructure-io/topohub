@@ -85,10 +85,10 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			updateClientFunc := func(dhcpClient, manualBindClients, autoBindClients map[string]*DhcpClientInfo) (string, uint64) {
 
 				type clientInfo struct {
-					Mac  string `json:"mac"`
+					Mac        string `json:"mac"`
 					ManualBind bool   `json:"manualBind"`
-					AutoBind bool   `json:"autoBind"`
-					Hostname string `json:"hostname"`
+					AutoBind   bool   `json:"autoBind"`
+					Hostname   string `json:"hostname"`
 				}
 
 				clientMap := make(map[string]clientInfo)
@@ -97,7 +97,7 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				// Add all current clients first
 				for ip, client := range dhcpClient {
 					clientMap[ip] = clientInfo{
-						Mac:  client.MAC,
+						Mac:      client.MAC,
 						AutoBind: false,
 						Hostname: client.Hostname,
 					}
@@ -110,22 +110,22 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 						counter++
 					}
 					clientMap[ip] = clientInfo{
-						Mac:  client.MAC,
+						Mac:        client.MAC,
 						ManualBind: false,
-						AutoBind: true,
-						Hostname: client.Hostname,
+						AutoBind:   true,
+						Hostname:   client.Hostname,
 					}
 				}
-				
+
 				for ip, client := range manualBindClients {
 					if _, existed := clientMap[ip]; !existed {
 						counter++
 					}
 					clientMap[ip] = clientInfo{
-						Mac:  client.MAC,
+						Mac:        client.MAC,
 						ManualBind: true,
-						AutoBind: false,
-						Hostname: client.Hostname,
+						AutoBind:   false,
+						Hostname:   client.Hostname,
 					}
 				}
 
@@ -144,7 +144,7 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 			}
 			clientDetails, usedIpAmount := updateClientFunc(s.currentLeaseClients, s.currentManualBindingClients, s.currentAutoBindingClients)
 			updated.Status.DhcpClientDetails = clientDetails
-			updated.Status.DhcpStatus.DhcpIpAvailableAmount =  totalIPs - usedIpAmount
+			updated.Status.DhcpStatus.DhcpIpAvailableAmount = totalIPs - usedIpAmount
 			updated.Status.DhcpStatus.DhcpIpTotalAmount = totalIPs
 			updated.Status.DhcpStatus.DhcpIpActiveAmount = uint64(len(s.currentLeaseClients))
 			updated.Status.DhcpStatus.DhcpIpManualBindAmount = uint64(len(s.currentManualBindingClients))
@@ -176,7 +176,7 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				s.log.Errorf("Failed to update subnet %s status: %v", s.subnet.Name, err)
 				return err
 			}
-			s.log.Infof("updated subnet status: %v", updated.Status.DhcpStatus)
+			s.log.Infof("succeeded to update subnet status for %s: %v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
 
 			return nil
 		})
