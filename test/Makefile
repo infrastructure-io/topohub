@@ -29,14 +29,22 @@ installDepsRedfish:
 	@echo "Installing redfish..."
 	chmod +x scripts/install-redfish-dhcp.sh
 	chmod +x scripts/install-redfish-static.sh
+	@echo "deploy a mock redifsh with dhcp ip "
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME)  UNDERLAY_CNI="spiderpool/eth1-macvlan" \
 			NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			./scripts/install-redfish-static.sh  ; ./scripts/hostendpoint.sh
+	@echo "deploy a mock redifsh with statis ip "
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth1-macvlan" \
 			HELM_NAME="vlan0-dhcp" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
 			./scripts/install-redfish-dhcp.sh
+	@echo "deploy a mock redifsh with dhcp ip "
 	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth1-vlan10-macvlan" \
 			HELM_NAME="vlan10-dhcp" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
+			./scripts/install-redfish-dhcp.sh
+	@echo "deploy a bad redifsh with dhcp ip "
+	E2E_CLUSTER_NAME=$(KIND_CLUSTER_NAME) UNDERLAY_CNI="spiderpool/eth1-vlan10-macvlan" \
+			HELM_NAME="vlan10-dhcp" NODE_NAME="$(KIND_CLUSTER_NAME)-control-plane" \
+			DISABLE_REDFISH_MOCKUP="true" \
 			./scripts/install-redfish-dhcp.sh
 
 # Deploy application to kind cluster

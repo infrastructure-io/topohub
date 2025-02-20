@@ -25,6 +25,8 @@ for IMAGE in $IMAGES; do
     kind load docker-image $IMAGE --name ${E2E_CLUSTER_NAME}
 done
 
+DISABLE_REDFISH_MOCKUP=${DISABLE_REDFISH_MOCKUP:-"false"}
+
 echo "install redfish"
 helm uninstall ${HELM_NAME} -n  redfish || true 
 helm install ${HELM_NAME} ${CURRENT_DIR_PATH}/../redfishchart \
@@ -35,4 +37,5 @@ helm install ${HELM_NAME} ${CURRENT_DIR_PATH}/../redfishchart \
   --set replicaCount=2  \
   --set networkInterface=net1  \
   --set underlayMultusCNI="${UNDERLAY_CNI}" \
-  --set nodeName="${NODE_NAME}"
+  --set nodeName="${NODE_NAME}" \
+  --set disableRedfishMockup=${DISABLE_REDFISH_MOCKUP}

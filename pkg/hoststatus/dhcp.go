@@ -139,7 +139,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 		Password: password,
 		DhcpHost: true,
 	}
-	if _, err := redfish.NewClient(&d, c.log); err != nil {
+	if _, err := redfish.NewClient(d, c.log); err != nil {
 		c.log.Warnf("ignore creating hoststatus for dhcp client %s, failed to connect: %v", client.IP, err)
 		return nil
 	}

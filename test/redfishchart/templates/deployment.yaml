@@ -26,6 +26,7 @@ spec:
       nodeName: {{ .Values.nodeName }}
       {{- end }}
       containers:
+      {{- if ne .Values.disableRedfishMockup true }}
       - name: redfish-mockup
         image: "{{ .Values.images.redfishMockup.repository }}:{{ .Values.images.redfishMockup.tag }}"
         imagePullPolicy: {{ .Values.images.redfishMockup.pullPolicy }}
@@ -36,6 +37,7 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+      {{- end }}  
       - name: dhcp
         image: "{{ .Values.images.tools.repository }}:{{ .Values.images.tools.tag }}"
         imagePullPolicy: {{ .Values.images.tools.pullPolicy }}

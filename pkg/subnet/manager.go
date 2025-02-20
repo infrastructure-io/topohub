@@ -3,7 +3,9 @@ package subnet
 import (
 	"context"
 	"time"
+	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 	"go.uber.org/zap"
 
@@ -74,16 +76,19 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason, errorMsg string, logger *zap.SugaredLogger) (reconcile.Result, error) {
 
 	updated := subnet.DeepCopy()
-	updated.Status.Conditions = []topohubv1beta1.Condition{
-		{
-			Type:    topohubv1beta1.SubnetConditionReady,
-			Status:  corev1.ConditionFalse,
-			Reason:  reason,
-			Message: errorMsg,
-		},
+	if updated.Status.Conditions == nil {
+		updated.Status.Conditions = []metav1.Condition{}
 	}
+	updated.Status.Conditions = append(updated.Status.Conditions, metav1.Condition{
+		Type:               "DhcpServer",
+		Reason:             reason,
+		Message:            errorMsg,
+		Status:             "False",
+		LastTransitionTime: metav1.Now(),
+	})
 
-	if err := s.kubeClient.Status().Update(context.TODO(), updated); err != nil {
+
+	if err := s.client.Status().Update(context.TODO(), updated); err != nil {
 		logger.Errorf("failed to update status: %v", err)
 		return reconcile.Result{
 			RequeueAfter: time.Second * 2,
@@ -240,14 +245,14 @@ func (s *subnetManager) GetDhcpClientEventsForHostStatus() (chan dhcpserver.Dhcp
 
 // hoststatus module send event to this channel and this module consume it
 func (s *subnetManager) GetHostStatusEvents() chan dhcpserver.DhcpClientInfo {
-	return s.deletedDhcpClient
+	return s.deletedDhcpClientForHostStatus
 }
 
 // DHCP manager 把 dhcp client 事件告知后，进行 hoststatus 更新
 func (s *subnetManager) processHostStatusEvents() {
 	s.log.Infof("begin to process host status events for deleting binding setting")
 
-	for event := range s.deletedDhcpClient {
+	for event := range s.deletedDhcpClientForHostStatus {
 		s.log.Debugf("process host status events: %+v", event)
 		if c, exists := s.dhcpServerList[event.SubnetName]; !exists {
 			s.log.Errorf("subnet %s is not running, skip to process host status events: %+v", event.SubnetName, event)
