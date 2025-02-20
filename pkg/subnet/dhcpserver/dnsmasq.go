@@ -101,7 +101,9 @@ func (s *dhcpServer) monitor() {
 	tickerProcess := time.NewTicker(3 * time.Second)
 	defer tickerProcess.Stop()
 
+	s.lockData.RLock()
 	subnetName := s.subnet.Name
+	s.lockData.RUnlock()
 
 	// 开始监控
 	for {
