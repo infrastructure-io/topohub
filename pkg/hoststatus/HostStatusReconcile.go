@@ -99,7 +99,7 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 	var healthy bool
 	client, err1 := redfish.NewClient(*d, c.log)
 	if err1 != nil {
-		c.log.Errorf("Failed to create redfish client for HostStatus %s: %v", name, err1)
+		c.log.Warnf("Failed to create redfish client for HostStatus %s: %v", name, err1)
 		healthy = false
 	} else {
 		healthy = true
@@ -147,7 +147,7 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 	if healthy {
 		logEntrys, err := client.GetLog()
 		if err != nil {
-			c.log.Errorf("Failed to get logs of HostStatus %s: %v", name, err)
+			c.log.Warnf("Failed to get logs of HostStatus %s: %v", name, err)
 		} else {
 			lastLogTime := ""
 			if updated.Status.Log.LastestLog != nil {
@@ -175,7 +175,6 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 		c.log.Debugf("status changed, existing: %v, updated: %v", existing.Status, updated.Status)
 		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			c.log.Errorf("Failed to update status of HostStatus %s: %v", name, err)
 			return true, err
 		}
 		c.log.Infof("Successfully updated HostStatus %s status", name)
@@ -206,17 +205,23 @@ func (c *hostStatusController) UpdateHostStatusInfoWrapper(name string) error {
 		modeinfo = " during hoststatus reconcile"
 	}
 
+	failed := false
 	for item, t := range syncData {
 		c.log.Debugf("updating status of the hostStatus %s", item)
 		if updated, err := c.UpdateHostStatusInfo(item, &t); err != nil {
-			c.log.Errorf("failed to update HostStatus %s %s: %v", item, modeinfo, err)
+			c.log.Errorf("failed to update status of HostStatus %s, %s: %v", item, modeinfo, err)
+			failed = true
 		} else {
 			if updated {
-				c.log.Debugf("update status of the hostStatus %s %s", item, modeinfo)
+				c.log.Debugf("succeeded to update status of the hostStatus %s, %s", item, modeinfo)
 			} else {
-				c.log.Debugf("no need to update status of the hostStatus %s %s", item, modeinfo)
+				c.log.Debugf("no need to update status of the hostStatus %s, %s", item, modeinfo)
 			}
 		}
+	}
+
+	if failed {
+		return fmt.Errorf("failed to update hostStatus")
 	}
 
 	return nil
@@ -282,7 +287,7 @@ func (c *hostStatusController) processHostStatus(hostStatus *topohubv1beta1.Host
 
 	if len(hostStatus.Status.Info) == 0 {
 		if err := c.UpdateHostStatusInfoWrapper(hostStatus.Name); err != nil {
-			logger.Errorf("failed to update HostStatus %s: %v", hostStatus.Name, err)
+			//logger.Errorf("failed to update HostStatus %s: %v", hostStatus.Name, err)
 			return err
 		}
 	} else {
@@ -338,7 +343,7 @@ func (c *hostStatusController) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "Failed to process HostStatus, will retry")
 		return ctrl.Result{
 			RequeueAfter: time.Second * 2,
-		}, err
+		}, nil
 	}
 
 	logger.Debugf("Successfully processed HostStatus %s", hostStatus.Name)
