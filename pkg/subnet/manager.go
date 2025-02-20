@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
 	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
+	"go.uber.org/zap"
 
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,12 +62,35 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 		addedDhcpClient:   make(chan dhcpserver.DhcpClientInfo, 1000),
 		deletedDhcpClient: make(chan dhcpserver.DhcpClientInfo, 1000),
 		deletedHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
-		addedBindingIp:   make(chan bindingipdata.BindingIPInfo, 1000),
-		deletedBindingIp: make(chan bindingipdata.BindingIPInfo, 1000),
+		addedBindingIp:    make(chan bindingipdata.BindingIPInfo, 1000),
+		deletedBindingIp:  make(chan bindingipdata.BindingIPInfo, 1000),
 		leader:            false,
 		dhcpServerList:    make(map[string]dhcpserver.DhcpServer),
 		log:               log.Logger.Named("subnetManager"),
 	}
+}
+
+// update the status
+func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason, errorMsg string, logger *zap.SugaredLogger) (reconcile.Result, error) {
+
+	updated := subnet.DeepCopy()
+	updated.Status.Conditions = []topohubv1beta1.Condition{
+		{
+			Type:    topohubv1beta1.SubnetConditionReady,
+			Status:  corev1.ConditionFalse,
+			Reason:  reason,
+			Message: errorMsg,
+		},
+	}
+
+	if err := s.kubeClient.Status().Update(context.TODO(), updated); err != nil {
+		logger.Errorf("failed to update status: %v", err)
+		return reconcile.Result{
+			RequeueAfter: time.Second * 2,
+		}, err
+	}
+
+	return reconcile.Result{}, nil
 }
 
 // Reconcile handles the reconciliation of Subnet objects
@@ -110,10 +133,9 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 				t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClient, s.deletedDhcpClient)
 				err := t.Run()
 				if err != nil {
-					logger.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
-					return reconcile.Result{
-						RequeueAfter: time.Second * 2,
-					}, err
+					msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
+					logger.Errorf(msg)
+					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
 				} else {
 					logger.Infof("Started DHCP server for subnet %s", subnet.Name)
 					// Update the cache with the latest version
@@ -125,17 +147,19 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 				bindingIPInfoList := bindingipdata.BindingIPCacheDatabase.GetInfoForSubnet(subnet.Name)
 				if len(bindingIPInfoList) > 0 {
 					logger.Infof("add binding ip events for subnet %s: %+v", subnet.Name, bindingIPInfoList)
-					if err := s.dhcpServerList[subnet.Name].UpdateBindingIpEvents(bindingIPInfoList, nil ); err != nil {
-						logger.Errorf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
-						return reconcile.Result{}, err
+					if err := s.dhcpServerList[subnet.Name].UpdateBindingIpEvents(bindingIPInfoList, nil); err != nil {
+						msg := fmt.Sprintf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
+						logger.Errorf(msg)
+						return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
 					}
 				}
 
 			} else {
 				logger.Infof("updated DHCP server for subnet %s", subnet.Name)
 				if err := s.dhcpServerList[subnet.Name].UpdateService(*subnet); err != nil {
-					logger.Errorf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
-					return reconcile.Result{}, err
+					msg := fmt.Sprintf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
+					logger.Errorf(msg)
+					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
 				}
 				s.cache.Set(subnet)
 			}
@@ -186,7 +210,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			}
 		}
-		
+
 		// after all server is started , start to process binding ip event
 		time.Sleep(2 * time.Second)
 		go s.processBindingIpEvents()
@@ -240,7 +264,7 @@ func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, 
 	return s.addedBindingIp, s.deletedBindingIp
 }
 
-func (s *subnetManager) processBindingIpEvents(){
+func (s *subnetManager) processBindingIpEvents() {
 
 	s.log.Infof("begin to process binding ip events")
 	for {

@@ -24,6 +24,14 @@ func (s *dhcpServer) setupInterface() error {
 		return fmt.Errorf("base interface %s goes wrong: %v", baseInterface, err)
 	}
 
+	// 检查并确保基础接口是 up 状态
+	if parent.Attrs().OperState == netlink.OperDown {
+		s.log.Infof("Base interface %s is down, bringing it up", baseInterface)
+		if err := netlink.LinkSetUp(parent); err != nil {
+			return fmt.Errorf("failed to bring up base interface %s: %v", baseInterface, err)
+		}
+	}
+
 	// 根据配置创建接口
 	if s.subnet.Spec.Interface.VlanID != nil && *s.subnet.Spec.Interface.VlanID > 0 {
 		s.log.Infof("Creating VLAN interface: %s.topohub.%d on vlan %d", baseInterface, *s.subnet.Spec.Interface.VlanID, *s.subnet.Spec.Interface.VlanID)
