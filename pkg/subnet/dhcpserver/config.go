@@ -388,11 +388,13 @@ func (s *dhcpServer) UpdateDhcpBindings(added, deleted map[string]*DhcpClientInf
 	}
 
 	// 统计 dhcp 自动绑定的客户端数量
+	s.lockData.Lock()
 	for ip, item := range bindClients {
 		if _, ok := s.currentManualBindingClients[ip]; !ok {
 			s.currentAutoBindingClients[ip] = item
 		}
 	}
+	s.lockData.Unlock()
 
 	return nil
 }
