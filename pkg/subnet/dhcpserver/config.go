@@ -226,13 +226,11 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 					// bind new client to conf
 					needUpdateBindings = true
 				}
-			} else {
-				if clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
+			} else if ! clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
 					if s.subnet.Spec.Feature.EnableSyncEndpoint != nil && s.subnet.Spec.Feature.EnableSyncEndpoint.DhcpClient && s.subnet.Spec.Feature.EnableSyncEndpoint.EndpointType == topohubv1beta1.EndpointTypeHoststatus {
 						s.addedDhcpClientForHostStatus <- *clientInfo
-						s.log.Infof("send event to update dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
+						s.log.Infof("send event to update dhcp client for its DhcpExpireTime: %s, %s, oldDhcpExpireTime=%s, newDhcpExpireTime=%s", clientInfo.MAC, clientInfo.IP, previousClients[clientInfo.IP].DhcpExpireTime, clientInfo.DhcpExpireTime)
 					}
-				}
 			}
 		}
 

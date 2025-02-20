@@ -175,7 +175,6 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 		c.log.Debugf("status changed, existing: %v, updated: %v", existing.Status, updated.Status)
 		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			c.log.Errorf("Failed to update status of HostStatus %s: %v", name, err)
 			return true, err
 		}
 		c.log.Infof("Successfully updated HostStatus %s status", name)
@@ -206,19 +205,25 @@ func (c *hostStatusController) UpdateHostStatusInfoWrapper(name string) error {
 		modeinfo = " during hoststatus reconcile"
 	}
 
+	failed := false
 	for item, t := range syncData {
 		c.log.Debugf("updating status of the hostStatus %s", item)
 		if updated, err := c.UpdateHostStatusInfo(item, &t); err != nil {
-			c.log.Errorf("failed to update HostStatus %s %s: %v", item, modeinfo, err)
+			c.log.Errorf("failed to update status of HostStatus %s, %s: %v", item, modeinfo, err)
+			failed = true
 		} else {
 			if updated {
-				c.log.Debugf("update status of the hostStatus %s %s", item, modeinfo)
+				c.log.Debugf("succeeded to update status of the hostStatus %s, %s", item, modeinfo)
 			} else {
-				c.log.Debugf("no need to update status of the hostStatus %s %s", item, modeinfo)
+				c.log.Debugf("no need to update status of the hostStatus %s, %s", item, modeinfo)
 			}
 		}
 	}
 
+	if failed {
+		return fmt.Errorf("failed to update hostStatus")
+	}
+	
 	return nil
 }
 
