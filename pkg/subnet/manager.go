@@ -150,7 +150,7 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			bindingIPInfoList := bindingipdata.BindingIPCacheDatabase.GetInfoForSubnet(subnet.Name)
 			if len(bindingIPInfoList) > 0 {
 				logger.Infof("add binding ip events for subnet %s: %+v", subnet.Name, bindingIPInfoList)
-				if err := server.UpdateBindingIpEvents(bindingIPInfoList, nil); err != nil {
+				if err := t.UpdateBindingIpEvents(bindingIPInfoList, nil); err != nil {
 					msg := fmt.Sprintf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
 					logger.Errorf(msg)
 					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)

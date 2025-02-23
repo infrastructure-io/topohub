@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"time"
 	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/tools"
@@ -123,8 +124,9 @@ func (c *bindingIPController) Reconcile(ctx context.Context, req ctrl.Request) (
 		logger.Errorf("failed to process BindingIP: %v", err)
 		return ctrl.Result{}, fmt.Errorf("failed to process BindingIP: %v", err)
 	}
-
-	return ctrl.Result{}, nil
+ 
+	// requeue every minute, to check the status of the BindingIP
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
 // update the status of the BindingIP
@@ -152,7 +154,7 @@ func (c *bindingIPController) updateBindingIPStatus(bindingIP *topohubv1beta1.Bi
 	}
 
 	if !reflect.DeepEqual(updated.Status, bindingIP.Status) {
-		logger.Debugf("status change to %+v, updating", updated.Status)
+		logger.Infof("status change to %+v, updating", updated.Status)
 
 		// 使用 resource version 进行冲突检测更新
 		updated.ResourceVersion = bindingIP.ResourceVersion
