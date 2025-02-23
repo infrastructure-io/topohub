@@ -2,6 +2,7 @@ package subnet
 
 import (
 	"github.com/infrastructure-io/topohub/pkg/lock"
+	"reflect"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )
@@ -63,59 +64,59 @@ func (c *SubnetCache) HasSpecChanged(subnet *topohubv1beta1.Subnet) bool {
 	}
 
 	// Deep equal comparison of the specs
-	return !specEqual(cached.Spec, subnet.Spec)
+	//return !specEqual(cached.Spec, subnet.Spec)
+	return !reflect.DeepEqual(cached.Spec, subnet.Spec)
 }
 
-// specEqual compares two SubnetSpecs for equality
-func specEqual(a, b topohubv1beta1.SubnetSpec) bool {
-	// Compare IPv4Subnet
-	if a.IPv4Subnet.Subnet != b.IPv4Subnet.Subnet ||
-		a.IPv4Subnet.IPRange != b.IPv4Subnet.IPRange {
-		return false
-	}
+// // specEqual compares two SubnetSpecs for equality
+// func specEqual(a, b topohubv1beta1.SubnetSpec) bool {
+// 	// Compare IPv4Subnet
+// 	if a.IPv4Subnet.Subnet != b.IPv4Subnet.Subnet ||
+// 		a.IPv4Subnet.IPRange != b.IPv4Subnet.IPRange {
+// 		return false
+// 	}
 
-	// Compare optional fields
-	if (a.IPv4Subnet.Gateway == nil) != (b.IPv4Subnet.Gateway == nil) {
-		return false
-	}
-	if a.IPv4Subnet.Gateway != nil && b.IPv4Subnet.Gateway != nil &&
-		*a.IPv4Subnet.Gateway != *b.IPv4Subnet.Gateway {
-		return false
-	}
+// 	// Compare optional fields
+// 	if (a.IPv4Subnet.Gateway == nil) != (b.IPv4Subnet.Gateway == nil) {
+// 		return false
+// 	}
+// 	if a.IPv4Subnet.Gateway != nil && b.IPv4Subnet.Gateway != nil &&
+// 		*a.IPv4Subnet.Gateway != *b.IPv4Subnet.Gateway {
+// 		return false
+// 	}
 
-	if (a.IPv4Subnet.Dns == nil) != (b.IPv4Subnet.Dns == nil) {
-		return false
-	}
-	if a.IPv4Subnet.Dns != nil && b.IPv4Subnet.Dns != nil &&
-		*a.IPv4Subnet.Dns != *b.IPv4Subnet.Dns {
-		return false
-	}
+// 	if (a.IPv4Subnet.Dns == nil) != (b.IPv4Subnet.Dns == nil) {
+// 		return false
+// 	}
+// 	if a.IPv4Subnet.Dns != nil && b.IPv4Subnet.Dns != nil &&
+// 		*a.IPv4Subnet.Dns != *b.IPv4Subnet.Dns {
+// 		return false
+// 	}
 
-	// Compare Interface
-	if a.Interface.Interface != b.Interface.Interface ||
-		a.Interface.IPv4 != b.Interface.IPv4 {
-		return false
-	}
+// 	// Compare Interface
+// 	if a.Interface.Interface != b.Interface.Interface ||
+// 		a.Interface.IPv4 != b.Interface.IPv4 {
+// 		return false
+// 	}
 
-	if (a.Interface.VlanID == nil) != (b.Interface.VlanID == nil) {
-		return false
-	}
-	if a.Interface.VlanID != nil && b.Interface.VlanID != nil &&
-		*a.Interface.VlanID != *b.Interface.VlanID {
-		return false
-	}
+// 	if (a.Interface.VlanID == nil) != (b.Interface.VlanID == nil) {
+// 		return false
+// 	}
+// 	if a.Interface.VlanID != nil && b.Interface.VlanID != nil &&
+// 		*a.Interface.VlanID != *b.Interface.VlanID {
+// 		return false
+// 	}
 
-	// Compare Feature if present
-	if (a.Feature == nil) != (b.Feature == nil) {
-		return false
-	}
-	if a.Feature != nil && b.Feature != nil {
-		if a.Feature.EnableBindDhcpIP != b.Feature.EnableBindDhcpIP ||
-			a.Feature.EnablePxe != b.Feature.EnablePxe ||
-			a.Feature.EnableZtp != b.Feature.EnableZtp {
-			return false
-		}
-	}
+// 	// Compare Feature if present
+// 	if (a.Feature == nil) != (b.Feature == nil) {
+// 		return false
+// 	}
+// 	if a.Feature != nil && b.Feature != nil {
+// 		if a.Feature.EnablePxe != b.Feature.EnablePxe ||
+// 			a.Feature.EnableZtp != b.Feature.EnableZtp {
+// 			return false
+// 		}
+// 	}
 
-	return true
-}
+// 	return true
+// }

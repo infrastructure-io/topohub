@@ -13,6 +13,7 @@ type DhcpClientInfo struct {
 	Subnet         string    `json:"subnet"`
 	SubnetName     string    `json:"subnetName"`
 	ClusterName    string    `json:"clusterName,omitempty"`
+	EnableBindIpForHoststatus *bool `json:"enableBindIpForHoststatus,omitempty"`
 }
 
 // DhcpServerConfig represents the configuration for the DHCP server

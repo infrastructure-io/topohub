@@ -25,7 +25,7 @@ spec:
     enableSyncHoststatus:
       enabled: true
       defaultClusterName: cluster1
-    enableBindDhcpIP: true
+      enableBindDhcpIP: true
     enablePxe: true
     enableZtp: false
 EOF
@@ -70,7 +70,7 @@ spec:
     enableSyncHoststatus:
       enabled: true
       defaultClusterName: cluster2
-    enableBindDhcpIP: true
+      enableBindDhcpIP: true
     enablePxe: true
     enableZtp: true
 EOF

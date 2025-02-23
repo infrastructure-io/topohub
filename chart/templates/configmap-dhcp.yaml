@@ -50,9 +50,7 @@ data:
     dhcp-option=vendor:Juniper,0,http://{{ "{{ .SelfIP }}" }}/ztp.conf
     {{- "{{ end }}" }}
 
-    {{- "{{ if .EnableBindDhcpIP }}" }}
     conf-file={{ "{{ .HostIpBindingsConfigPath }}" }}
-    {{- "{{ end }}" }}
 
     # Additional options
     # Disable DNS server functionality

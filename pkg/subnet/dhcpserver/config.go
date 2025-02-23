@@ -57,7 +57,6 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 		LogFile                  string
 		EnablePxe                bool
 		EnableZtp                bool
-		EnableBindDhcpIP         bool
 		Name                     string
 		SelfIP                   string
 		TftpServerDir            string
@@ -72,7 +71,6 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 		LogFile:                  s.logPath,
 		EnablePxe:                s.subnet.Spec.Feature.EnablePxe,
 		EnableZtp:                s.subnet.Spec.Feature.EnableZtp,
-		EnableBindDhcpIP:         s.subnet.Spec.Feature.EnableBindDhcpIP,
 		Name:                     s.subnet.Name,
 		SelfIP:                   strings.Split(s.subnet.Spec.Interface.IPv4, "/")[0],
 		TftpServerDir:            s.config.StoragePathTftp,
@@ -104,7 +102,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 
 	//-------------------- prepare the binding config -------------
 	// make sure the binding config file exists
-	if _, err := os.ReadFile(s.HostIpBindingsConfigPath); err != nil && os.IsNotExist(err) && s.subnet.Spec.Feature.EnableBindDhcpIP {
+	if _, err := os.ReadFile(s.HostIpBindingsConfigPath); err != nil && os.IsNotExist(err) {
 		// 如果文件不存在，创建文件
 		if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
 			s.log.Panicf("failed to create directory for bindings file: %v", err)
@@ -118,13 +116,10 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 	if _, err := s.processDhcpLease(true); err != nil {
 		return fmt.Errorf("failed to process lease file: %v", err)
 	}
+
 	// finally update the binding config
 	finalNewClient := map[string]*DhcpClientInfo{}
 	for k, v := range s.currentManualBindingClients {
-		finalNewClient[k] = v
-	}
-	// lease clients prioritize over the manual ones if they have the same ip
-	for k, v := range s.currentLeaseClients {
 		finalNewClient[k] = v
 	}
 	if err := s.UpdateDhcpBindings(finalNewClient, nil); err != nil {
@@ -144,9 +139,10 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 }
 
 // processLeaseFile reads and processes the lease file
-func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdateBindings bool, finalErr error) {
+// 1. 获取新的 client， 通知 HostStatus 模块
+func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientChangedFlag bool, finalErr error) {
 	leaseFile := s.leasePath
-	needUpdateBindings = false
+	clientChangedFlag = false
 
 	// 读取租约文件
 	content, err := os.ReadFile(leaseFile)
@@ -190,6 +186,11 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 			clusterName = *s.subnet.Spec.Feature.EnableSyncHoststatus.DefaultClusterName
 		}
 
+		enableBindIP:=false
+		if s.subnet.Spec.Feature.EnableSyncHoststatus.Enabled && s.subnet.Spec.Feature.EnableSyncHoststatus.EnableBindDhcpIP {
+			enableBindIP=true
+		}
+
 		clientInfo := &DhcpClientInfo{
 			MAC:            fields[1],
 			IP:             fields[2],
@@ -199,6 +200,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 			Subnet:         s.subnet.Spec.IPv4Subnet.Subnet,
 			SubnetName:     s.subnet.Name,
 			ClusterName:    clusterName,
+			EnableBindIpForHoststatus: &enableBindIP,
 		}
 		currentLeaseClients[clientInfo.IP] = clientInfo
 
@@ -210,10 +212,8 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 				s.addedDhcpClientForHostStatus <- *clientInfo
 				s.log.Infof("send event to add dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
 			}
-			if s.subnet.Spec.Feature.EnableBindDhcpIP {
-				// 进行 ip 绑定
-				needUpdateBindings = true
-			}
+			clientChangedFlag = true
+
 		} else {
 			if data.MAC != clientInfo.MAC || data.Hostname != clientInfo.Hostname {
 				if  s.subnet.Spec.Feature.EnableSyncHoststatus.Enabled {
@@ -221,10 +221,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 					s.addedDhcpClientForHostStatus <- *clientInfo
 					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, old hostname=%s, new hostname=%s, ip=%s", data.MAC, clientInfo.MAC, data.Hostname, clientInfo.Hostname, clientInfo.IP)
 				}
-				if s.subnet.Spec.Feature.EnableBindDhcpIP {
-					// bind new client to conf
-					needUpdateBindings = true
-				}
+				clientChangedFlag = true
 			} else if !clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
 				if  s.subnet.Spec.Feature.EnableSyncHoststatus.Enabled {
 					s.addedDhcpClientForHostStatus <- *clientInfo
@@ -232,7 +229,6 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 				}
 			}
 		}
-
 	}
 
 	// 检查删除的客户端
@@ -250,7 +246,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (needUpdat
 	// 更新客户端缓存和统计信息
 	s.currentLeaseClients = currentLeaseClients
 
-	return needUpdateBindings, nil
+	return clientChangedFlag, nil
 }
 
 // UpdateDhcpBindings updates the dhcp-host configuration file by:
@@ -268,20 +264,14 @@ func (s *dhcpServer) UpdateDhcpBindings(added, deleted map[string]*DhcpClientInf
 	content, err := os.ReadFile(s.HostIpBindingsConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// make sure the bindings file exists
-			if s.subnet.Spec.Feature.EnableBindDhcpIP {
-				// 如果文件不存在，创建文件
-				if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
-					s.log.Panicf("failed to create directory for bindings file: %v", err)
-				}
-				if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
-					s.log.Panicf("failed to create bindings file: %v", err)
-				}
-				s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
-			} else {
-				s.log.Debugf("bindings file does not exist: %s, skip to process dhcp bindings", s.HostIpBindingsConfigPath)
-				return nil
+			// 如果文件不存在，创建文件
+			if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
+				s.log.Panicf("failed to create directory for bindings file: %v", err)
 			}
+			if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
+				s.log.Panicf("failed to create bindings file: %v", err)
+			}
+			s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
 		} else {
 			return fmt.Errorf("failed to read bindings file, err: %v", err)
 

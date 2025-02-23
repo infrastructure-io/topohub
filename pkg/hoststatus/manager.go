@@ -37,12 +37,11 @@ type hostStatusController struct {
 	recorder             record.EventRecorder
 	addChan              chan dhcpserver.DhcpClientInfo
 	deleteChan           chan dhcpserver.DhcpClientInfo
-	deleteHostStatusChan chan dhcpserver.DhcpClientInfo
 
 	log *zap.SugaredLogger
 }
 
-func NewHostStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager, addChan, deleteChan chan dhcpserver.DhcpClientInfo, deleteHostStatusChan chan dhcpserver.DhcpClientInfo) HostStatusController {
+func NewHostStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager, addChan, deleteChan chan dhcpserver.DhcpClientInfo) HostStatusController {
 	log.Logger.Debugf("Creating new HostStatus controller")
 
 	// Create event recorder
@@ -56,7 +55,6 @@ func NewHostStatusController(kubeClient kubernetes.Interface, config *config.Age
 		config:               config,
 		addChan:              addChan,
 		deleteChan:           deleteChan,
-		deleteHostStatusChan: deleteHostStatusChan,
 		stopCh:               make(chan struct{}),
 		recorder:             recorder,
 		log:                  log.Logger.Named("hoststatus"),

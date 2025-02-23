@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"fmt"
 
 	hoststatusdata "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
@@ -59,6 +60,71 @@ func (c *hostStatusController) processDHCPEvents() {
 	}
 }
 
+func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.DhcpClientInfo) ( retry bool ) {
+	name := formatHostStatusName(client.IP)
+
+	// creat bindingIp for the hoststatus
+	if client.EnableBindIpForHoststatus == nil || !*client.EnableBindIpForHoststatus {
+		c.log.Infof("do not need to bind ip for hoststatus %s", name)
+		return false
+	}
+
+	c.log.Debugf("checking to create bindip %s for hoststatus %s", name , name)
+
+	bindingIP:=topohubv1beta1.BindingIp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				topohubv1beta1.LabelHostStatus: name,
+			},
+		},
+		Spec: topohubv1beta1.BindingIpSpec{
+			IpAddr: client.IP,
+			MacAddr: client.MAC,
+			Subnet: client.SubnetName,
+		},
+	}
+
+	ctx:= context.Background()
+	bindingIPList := &topohubv1beta1.BindingIpList{}
+	if err := c.client.List(ctx, bindingIPList); err != nil {
+		c.log.Errorf("Failed to list BindingIPs: %v", err)
+		return true
+	}
+	for _, existingBindingIP := range bindingIPList.Items {
+
+		if existingBindingIP.Name == bindingIP.Name && existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr  && existingBindingIP.Spec.MacAddr == bindingIP.Spec.MacAddr {
+			c.log.Debugf("bindingIP already exists for host %s: %+v", bindingIP.Name, existingBindingIP)
+			return false
+		}
+
+		if existingBindingIP.Name == bindingIP.Name {
+			c.log.Errorf("A conflicted bindgIp already exists for host %s: %+v", bindingIP.Name, existingBindingIP)
+			// ignore binding ip
+			return false
+		}
+
+		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr {
+			c.log.Errorf("IP address %s is already used by BindingIP %s", 
+				bindingIP.Spec.IpAddr, 
+				existingBindingIP.Name)
+			return false
+		}
+	}
+
+	// create the bindingip
+	if err := c.client.Create(context.Background(), &bindingIP); err != nil {
+		c.log.Errorf("Failed to create BindingIP: %v", err)
+		return true
+	}
+
+	c.log.Infof("created bindingip %s for hoststatus %s: %+v", bindingIP.Name, name, bindingIP)
+
+	return false
+}
+		
+	
+
 // create the hoststatus for the dhcp client
 func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) error {
 
@@ -103,6 +169,12 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 			}
 			c.log.Infof("Successfully updated HostStatus %s", name)
 		}
+
+		// make sure the binding ip
+		if c.createBindingIpForHoststatus(client) {
+			return fmt.Errorf("failed to create binding ip for hoststatus %s: %+v", name, client)
+		}
+
 		return nil
 	}
 
@@ -218,6 +290,12 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 
 	c.log.Infof("Successfully created HostStatus %s", name)
 	c.log.Debugf("DHCP client details - %+v", client)
+
+
+	if c.createBindingIpForHoststatus(client) {
+		return fmt.Errorf("failed to create binding ip for hoststatus %s: %+v", name, client)
+	}
+
 	return nil
 }
 

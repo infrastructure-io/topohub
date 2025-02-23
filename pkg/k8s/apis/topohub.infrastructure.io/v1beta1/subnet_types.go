@@ -12,9 +12,7 @@ import (
 // +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
 // +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
 // +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpBindAmount"
-// +kubebuilder:printcolumn:name="SYNC_ENDPOINT",type="boolean",JSONPath=".spec.feature.enableSyncHoststatus.enabled"
-// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.feature.enableSyncHoststatus.defaultClusterName"
-// +kubebuilder:printcolumn:name="BIND_DHCP_IP",type="boolean",JSONPath=".spec.feature.enableBindDhcpIP"
+// +kubebuilder:printcolumn:name="SYNC_HOSTSTATUS",type="boolean",JSONPath=".spec.feature.enableSyncHoststatus.enabled"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
 // +kubebuilder:printcolumn:name="ZTP",type="boolean",JSONPath=".spec.feature.enableZtp"
 // +kubebuilder:subresource:status
@@ -74,11 +72,6 @@ type FeatureSpec struct {
 	// EnableSyncHoststatus configuration
 	EnableSyncHoststatus EnableSyncHoststatusSpec `json:"enableSyncHoststatus"`
 
-	// Enable Automatically bind DHCP Client IP in the dhcp server config
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	EnableBindDhcpIP bool `json:"enableBindDhcpIP"`
-
 	// Enable PXE boot support
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
@@ -96,10 +89,10 @@ type EnableSyncHoststatusSpec struct {
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 
-	// // Enable subnet scan-based endpoint sync
-	// // +kubebuilder:validation:Required
-	// // +kubebuilder:default=false
-	// ScanEndpoint bool `json:"scanEndpoint"`
+	// Enable bind dhcp ip
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=true
+	EnableBindDhcpIP bool `json:"enableBindDhcpIP"`
 
 	// Default cluster name
 	// +optional

@@ -28,13 +28,7 @@ spec:
       name: IP_RESERVED
       type: integer
     - jsonPath: .spec.feature.enableSyncHoststatus.enabled
-      name: SYNC_ENDPOINT
-      type: boolean
-    - jsonPath: .spec.feature.enableSyncHoststatus.defaultClusterName
-      name: CLUSTER
-      type: string
-    - jsonPath: .spec.feature.enableBindDhcpIP
-      name: BIND_DHCP_IP
+      name: SYNC_HOSTSTATUS
       type: boolean
     - jsonPath: .spec.feature.enablePxe
       name: PXE
@@ -70,11 +64,6 @@ spec:
               feature:
                 description: Feature configuration
                 properties:
-                  enableBindDhcpIP:
-                    default: false
-                    description: Enable Automatically bind DHCP Client IP in the dhcp
-                      server config
-                    type: boolean
                   enablePxe:
                     default: false
                     description: Enable PXE boot support
@@ -85,12 +74,17 @@ spec:
                       defaultClusterName:
                         description: Default cluster name
                         type: string
+                      enableBindDhcpIP:
+                        default: true
+                        description: Enable bind dhcp ip
+                        type: boolean
                       enabled:
                         default: false
                         description: Enable automatically create the hoststatus object
                           for the dhcp client. Notice, it will not be deleted automatically
                         type: boolean
                     required:
+                    - enableBindDhcpIP
                     - enabled
                     type: object
                   enableZtp:
@@ -98,7 +92,6 @@ spec:
                     description: Enable ZTP configuration for switch
                     type: boolean
                 required:
-                - enableBindDhcpIP
                 - enablePxe
                 - enableSyncHoststatus
                 - enableZtp

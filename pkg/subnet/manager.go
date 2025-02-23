@@ -26,7 +26,6 @@ type SubnetManager interface {
 	SetupWithManager(mgr ctrl.Manager) error
 	Stop()
 	GetDhcpClientEventsForHostStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
-	GetHostStatusEvents() chan dhcpserver.DhcpClientInfo
 	GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo)
 }
 
@@ -42,8 +41,6 @@ type subnetManager struct {
 	addedDhcpClientForHostStatus   chan dhcpserver.DhcpClientInfo
 	deletedDhcpClientForHostStatus chan dhcpserver.DhcpClientInfo
 
-	// hoststatus 往其中添加数据，关于 hoststatus 被删除信息。由本模块来消费使用
-	deletedHostStatus chan dhcpserver.DhcpClientInfo
 
 	// bindingip 模块 往其中添加数据，关于 bindingip 。由本模块来消费使用
 	addedBindingIp   chan bindingipdata.BindingIPInfo
@@ -63,7 +60,6 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 		lockLeader:                     lock.RWMutex{},
 		addedDhcpClientForHostStatus:   make(chan dhcpserver.DhcpClientInfo, 1000),
 		deletedDhcpClientForHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
-		deletedHostStatus:              make(chan dhcpserver.DhcpClientInfo, 1000),
 		addedBindingIp:                 make(chan bindingipdata.BindingIPInfo, 1000),
 		deletedBindingIp:               make(chan bindingipdata.BindingIPInfo, 1000),
 		leader:                         false,
@@ -219,8 +215,6 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 		// after all server is started , start to process binding ip event
 		time.Sleep(2 * time.Second)
 		go s.processBindingIpEvents()
-		// Start subnet manager
-		go s.processHostStatusEvents()
 
 	}()
 
@@ -241,28 +235,6 @@ func (s *subnetManager) Stop() {
 // this module send event to the channel, and hoststatus module consume it
 func (s *subnetManager) GetDhcpClientEventsForHostStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
 	return s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus
-}
-
-// hoststatus module send event to this channel and this module consume it
-func (s *subnetManager) GetHostStatusEvents() chan dhcpserver.DhcpClientInfo {
-	return s.deletedDhcpClientForHostStatus
-}
-
-// DHCP manager 把 dhcp client 事件告知后，进行 hoststatus 更新
-func (s *subnetManager) processHostStatusEvents() {
-	s.log.Infof("begin to process host status events for deleting binding setting")
-
-	for event := range s.deletedDhcpClientForHostStatus {
-		s.log.Debugf("process host status deleted events: %+v", event)
-		if c, exists := s.dhcpServerList[event.SubnetName]; !exists {
-			s.log.Errorf("subnet %s is not running, skip to process host status events: %+v", event.SubnetName, event)
-		} else {
-			if err := c.DeleteDhcpBinding(event.IP, event.MAC); err != nil {
-				s.log.Errorf("failed to delete dhcp binding: %v", err)
-			}
-		}
-	}
-	s.log.Panic("deletedDhcpClient channel closed")
 }
 
 func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo) {

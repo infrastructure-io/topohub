@@ -10,7 +10,6 @@ import (
 
 	hoststatusdata "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 
 	//"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
@@ -312,15 +311,6 @@ func (c *hostStatusController) Reconcile(ctx context.Context, req ctrl.Request) 
 			logger.Debugf("HostStatus not found")
 			data := hoststatusdata.HostCacheDatabase.Get(req.Name)
 			if data != nil {
-				if data.DhcpHost {
-					logger.Infof("delete hostStatus %s for the binding setting of dhcp client, %+v", req.Name, *data)
-					// inform the dhcp module to delete the binding setting in the config
-					c.deleteHostStatusChan <- dhcpserver.DhcpClientInfo{
-						MAC:        data.Info.Mac,
-						IP:         data.Info.IpAddr,
-						SubnetName: *data.Info.SubnetName,
-					}
-				}
 				// try to delete the binding setting in dhcp server config
 				logger.Infof("delete hostStatus %s in cache, %+v", req.Name, *data)
 				hoststatusdata.HostCacheDatabase.Delete(req.Name)

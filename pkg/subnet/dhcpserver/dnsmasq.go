@@ -87,15 +87,11 @@ func (s *dhcpServer) monitor() {
 		return
 	}
 	defer leaseWatcher.Close()
-	if s.subnet.Spec.Feature.EnableBindDhcpIP {
-		s.log.Infof(" bind dhcp ip is enabled, and watch lease file")
-		if err := leaseWatcher.Add(filepath.Dir(s.leasePath)); err != nil {
-			s.log.Errorf("Failed to watch lease file: %v", err)
-			return
-		}
-	} else {
-		s.log.Infof("bind dhcp ip is disabled, and do not watch lease file")
+	if err := leaseWatcher.Add(filepath.Dir(s.leasePath)); err != nil {
+		s.log.Errorf("Failed to watch lease file: %v", err)
+		return
 	}
+
 
 	// watch the process at an interval
 	tickerProcess := time.NewTicker(3 * time.Second)
@@ -128,47 +124,13 @@ func (s *dhcpServer) monitor() {
 
 			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
 				s.log.Infof("watcher lease file event: %+v", event)
-
-				if reloadConfig, err := s.processDhcpLease(true); err != nil {
+				// inform new client to the hoststatus 
+				if _, err := s.processDhcpLease(true); err != nil {
 					s.log.Errorf("failed to processDhcpLease: %v", err)
-				} else {
-					if reloadConfig {
-						newClients := make(map[string]*DhcpClientInfo)
-						for _, client := range s.currentLeaseClients {
-							newClients[client.IP] = client
-						}
-						if err := s.UpdateDhcpBindings(newClients, nil); err != nil {
-							s.log.Errorf("failed to add dhcp bindings: %v", err)
-							continue
-						}
-
-						needRenewConfig = false
-						needReload = true
-						s.log.Infof("client ip or mac changed, so dhcp server reload after binding new ip")
-					} else {
-						s.log.Infof("client expiration is updated, so dhcp server does not need to reload")
-					}
 				}
 			} else {
 				s.log.Debugf("watcher invalid file event: %+v", event)
 			}
-
-		// 	HostStatus 模块通知来的 HostStatus 删除事件，进行 ip 解绑处理
-		case event, ok := <-s.deletedHostStatus:
-			if !ok {
-				s.log.Panic("deletedHostStatus channel closed")
-			}
-			s.log.Infof("process hostStatus deleting events, delete dhcp binding, ip %s, mac %s", event.IP, event.MAC)
-			deleted := map[string]*DhcpClientInfo{
-				event.IP: {MAC: event.MAC},
-			}
-			if err := s.UpdateDhcpBindings(nil, deleted); err != nil {
-				s.log.Errorf("failed to delete dhcp binding for ip %s, err: %v", event.IP, err)
-				continue
-			}
-			// it has been renew the config
-			needRenewConfig = false
-			needReload = true
 
 		case info := <-s.addedBindingIp:
 			s.log.Debugf("process binding ip adding events for subnet %s: %+v", info.Subnet, info)

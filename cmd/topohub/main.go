@@ -143,10 +143,9 @@ func main() {
 		os.Exit(1)
 	}
 	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEventsForHostStatus()
-	deleteHostStatusChan := subnetMgr.GetHostStatusEvents()
 	addBindingIpChan, deleteBindingIpChan := subnetMgr.GetBindingIpEvents()
 	// Initialize hoststatus controller
-	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan, deleteHostStatusChan)
+	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan)
 	if err = hostStatusCtrl.SetupWithManager(mgr); err != nil {
 		log.Logger.Errorf("Unable to create hoststatus controller: %v", err)
 		os.Exit(1)
