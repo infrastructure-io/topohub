@@ -66,7 +66,7 @@ func (c *bindingIPController) processBindingIP(bindingIP *topohubv1beta1.Binding
 		c.addedBindingIp <- info
 
 	} else {
-		if oldData.IPAddr != bindingIP.Spec.IpAddr || strings.ToLower(oldData.MacAddr) != strings.ToLower(bindingIP.Spec.MacAddr) || oldData.Subnet != bindingIP.Spec.Subnet {
+		if oldData.IPAddr != bindingIP.Spec.IpAddr || !strings.EqualFold(oldData.MacAddr, bindingIP.Spec.MacAddr) || oldData.Subnet != bindingIP.Spec.Subnet {
 			logger.Infof("bindingIP Spec changed, notify the dhcp server")
 			bindingipdata.BindingIPCacheDatabase.Add(name, info)
 			c.addedBindingIp <- info

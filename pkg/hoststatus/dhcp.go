@@ -102,7 +102,7 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 	}
 	for _, existingBindingIP := range bindingIPList.Items {
 
-		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr && strings.ToLower(existingBindingIP.Spec.MacAddr) == strings.ToLower(bindingIP.Spec.MacAddr) {
+		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr && strings.EqualFold(existingBindingIP.Spec.MacAddr, bindingIP.Spec.MacAddr) {
 			c.log.Debugf("bindingip %s already exists for host %s: %+v", existingBindingIP.Name, name, existingBindingIP.Spec )
 			return false
 		}

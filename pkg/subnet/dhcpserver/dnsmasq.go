@@ -170,7 +170,7 @@ func (s *dhcpServer) monitor() {
 		case info := <-s.deletedBindingIp:
 			s.log.Debugf("process binding ip deleting events for subnet %s: %+v", info.Subnet, info)
 			//note: currently, it does not consider whether the ip is belonged to the ip range or not, which make it simple to handle the subnet changes
-			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok && strings.ToLower(item.MAC) == strings.ToLower(info.MacAddr) {
+			if item, ok := s.currentManualBindingClients[info.IPAddr]; ok && strings.EqualFold(item.MAC, info.MacAddr) {
 				delete(s.currentManualBindingClients, info.IPAddr)
 				s.log.Infof("delete binding ip %s: %+v", info.IPAddr, info)
 			} else {
