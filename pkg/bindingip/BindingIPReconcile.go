@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 	"time"
+	"strings"
 	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/tools"
@@ -65,7 +66,7 @@ func (c *bindingIPController) processBindingIP(bindingIP *topohubv1beta1.Binding
 		c.addedBindingIp <- info
 
 	} else {
-		if oldData.IPAddr != bindingIP.Spec.IpAddr || oldData.MacAddr != bindingIP.Spec.MacAddr || oldData.Subnet != bindingIP.Spec.Subnet {
+		if oldData.IPAddr != bindingIP.Spec.IpAddr || strings.ToLower(oldData.MacAddr) != strings.ToLower(bindingIP.Spec.MacAddr) || oldData.Subnet != bindingIP.Spec.Subnet {
 			logger.Infof("bindingIP Spec changed, notify the dhcp server")
 			bindingipdata.BindingIPCacheDatabase.Add(name, info)
 			c.addedBindingIp <- info
