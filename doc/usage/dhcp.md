@@ -13,34 +13,6 @@ topohub 可以创建 subnet 对象，实现在不同子网上启动 DHCP server 
 
 ## 功能说明
 
-### 同步维护 dhcp client 的 hoststatus 
-
-```
-apiVersion: topohub.infrastructure.io/v1beta1
-kind: Subnet
-spec:
-  feature:
-    enableSyncHoststatus:
-      enabled: true
-      defaultClusterName: cluster1
-```
-
-spec.enableBindDhcpIP 开启时，每当 DHCP server 分配一个 IP 地址后，同时会把该 client 的 IP 和 mac 地址的绑定关系写入到 dhcp server 的配置文件中，实现 IP 地址的固定。只有删除相应的 hoststatus 对象后，才会删除 dhcp server 的配置中的绑定关系。
-
-### 自动固定 dhcp client 的 IP 
-
-```
-apiVersion: topohub.infrastructure.io/v1beta1
-kind: Subnet
-spec:
-  feature:
-    enableBindDhcpIP: true
-```
-
-spec.enableBindDhcpIP 开启时，每当 DHCP server 分配一个 IP 地址后，同时会把该 client 的 IP 和 mac 地址的绑定关系写入到 dhcp server 的配置文件中，实现 IP 地址的固定。
-
-只有删除相应的 hoststatus 对象后，才会删除 dhcp server 的配置中的绑定关系。不过请注意的是，对于 dhcp client 的 hoststatus，如果它还活跃在网络中，那么 spec.feature.enableSyncHoststatus.dhcpClient 的开启也会重新创建出 hoststatus 对象。因此，当某个主机活跃于网络中时，删除 IP 地址的绑定关系才有意义。
-
 ### 手动固定 dhcp client 的 IP 
 
 在主机未接入 DHCP 前，可以创建配置，基于主机的 MAC 地址来预先未绑定即将分配的 IP 地址
@@ -89,6 +61,22 @@ status:
     # dpch server 的 总 IP 数量
     dhcpIpTotalAmount: 101
 ```
+
+### 同步维护 dhcp client 的 hoststatus 和 绑定 IP 地址
+
+```
+apiVersion: topohub.infrastructure.io/v1beta1
+kind: Subnet
+spec:
+  feature:
+    syncHoststatus:
+      enabled: true  # 基于 dhcp server 分配的 ip， 如果能成功访问其 bmc ，就会创建出 hoststatus 对象
+      defaultClusterName: cluster1
+      enableBindDhcpIP: true  # 如果能够成功创建出 hoststatus 对象，就会自动创建出 bindingIp 对象。当 hoststatus 被删除时，其对应的 bindingIp 对象也会被删除。
+
+```
+
+如果希望删除某个 Hoststatus 和其 bindingIp （自动级联删除）对象。确保该 Hoststatus 对象在网络中真实不工作了，否则，请手动删除 /var/lib/topohub/dhcp/lease 中的 IP 分配记录，再删除 Hoststatus 对象。如果不这么做，syncHoststatus.enabled 会使得 topohub 基于 dhcp 分配 ip 的记录，在确认其能够正常登录 bmc ， 会再次创建出 Hoststatus 和 bindingIp
 
 ### 故障排查
 

@@ -12,7 +12,7 @@ import (
 // +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
 // +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
 // +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpBindAmount"
-// +kubebuilder:printcolumn:name="SYNC_HOSTSTATUS",type="boolean",JSONPath=".spec.feature.enableSyncHoststatus.enabled"
+// +kubebuilder:printcolumn:name="SYNC_HOSTSTATUS",type="boolean",JSONPath=".spec.feature.syncHoststatus.enabled"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
 // +kubebuilder:printcolumn:name="ZTP",type="boolean",JSONPath=".spec.feature.enableZtp"
 // +kubebuilder:subresource:status
@@ -69,8 +69,8 @@ type InterfaceSpec struct {
 
 // FeatureSpec defines the feature configuration
 type FeatureSpec struct {
-	// EnableSyncHoststatus configuration
-	EnableSyncHoststatus EnableSyncHoststatusSpec `json:"enableSyncHoststatus"`
+	// SyncHoststatus configuration
+	SyncHoststatus SyncHoststatusSpec `json:"syncHoststatus"`
 
 	// Enable PXE boot support
 	// +kubebuilder:validation:Required
@@ -83,8 +83,8 @@ type FeatureSpec struct {
 	EnableZtp bool `json:"enableZtp"`
 }
 
-// EnableSyncHoststatusSpec defines the sync endpoint configuration
-type EnableSyncHoststatusSpec struct {
+// SyncHoststatusSpec defines the sync endpoint configuration
+type SyncHoststatusSpec struct {
 	// Enable automatically create the hoststatus object for the dhcp client. Notice, it will not be deleted automatically
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`

@@ -91,15 +91,16 @@ func (c *bindingIPController) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// 对象已被删除，从缓存中移除
-			if bindingipdata.BindingIPCacheDatabase.Get(req.Name) != nil {
-				c.log.Infof("bindingIP deleted, notify the dhcp server")
+			if data := bindingipdata.BindingIPCacheDatabase.Get(req.Name); data != nil {
 				bindingipdata.BindingIPCacheDatabase.Delete(req.Name)
-				c.deletedBindingIp <- bindingipdata.BindingIPInfo{
-					IPAddr:  bindingIP.Spec.IpAddr,
-					MacAddr: bindingIP.Spec.MacAddr,
-					Subnet:  bindingIP.Spec.Subnet,
-					Hostname: bindingIP.Name,
+				t := bindingipdata.BindingIPInfo{
+					IPAddr:  data.IPAddr,
+					MacAddr: data.MacAddr,
+					Subnet:  data.Subnet,
+					Hostname: data.Hostname,
 				}
+				c.deletedBindingIp <- t
+				c.log.Infof("bindingIP deleted, notify the dhcp server: %+v", t)
 			}
 			return ctrl.Result{}, nil
 		}

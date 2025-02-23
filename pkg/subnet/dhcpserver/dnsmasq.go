@@ -158,7 +158,7 @@ func (s *dhcpServer) monitor() {
 				s.lockData.Unlock()
 				s.log.Infof("add new binding ip %s: %+v", info.IPAddr, info)
 			}
-			if err := s.UpdateDhcpBindings(s.currentManualBindingClients, nil); err != nil {
+			if err := s.UpdateDhcpBindings(); err != nil {
 				s.log.Errorf("failed to add dhcp bindings: %v", err)
 				continue
 			}
@@ -175,7 +175,7 @@ func (s *dhcpServer) monitor() {
 			} else {
 				continue
 			}
-			if err := s.UpdateDhcpBindings(s.currentManualBindingClients, nil); err != nil {
+			if err := s.UpdateDhcpBindings(); err != nil {
 				s.log.Errorf("failed to delete dhcp bindings: %v", err)
 				continue
 			}

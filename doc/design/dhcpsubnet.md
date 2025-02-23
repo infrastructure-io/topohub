@@ -27,13 +27,13 @@ spec:
         # Self IP for DHCP server (必选字段，格式校验)，本 IP 地址会配置在 interface 或者 其上的 vlan 子接口中
         ipv4: "192.168.0.2/24"
     feature:
-      enableSyncHoststatus:
+      syncHoststatus:
         # 是否基于 DHCP client ip 分配情况，自动创建或者删除对应的 Endpoint 对象 
         enabled: true
         # 是否周期主动扫描子网内的所有 ip，自动创建或者删除对应的 Endpoint 对象 
         scanEndpoint: true
         # 设置到同步创建的 Endpoint 对象的 ClusterName 字段
-        DefaultClusterName: ""
+        defaultClusterName: ""
 
       # 把 DHCP 分配的 ip 在 dhcp server 配置中进行 IP 绑定，避免 IP 发生变化
       enableBindDhcpIP: true

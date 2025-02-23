@@ -248,6 +248,10 @@ func (s *subnetManager) processBindingIpEvents() {
 	for {
 		select {
 		case event := <-s.addedBindingIp:
+			if len(event.Subnet) == 0 {
+				s.log.Errorf("subnet is empty, skip to process binding ip events: %+v", event)
+				continue
+			}
 			s.log.Debugf("receive adding binding ip event: %+v", event)
 			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
@@ -263,6 +267,10 @@ func (s *subnetManager) processBindingIpEvents() {
 			}
 
 		case event := <-s.deletedBindingIp:
+			if len(event.Subnet) == 0 {
+				s.log.Errorf("subnet is empty, skip to process binding ip events: %+v", event)
+				continue
+			}
 			s.log.Debugf("receive deleting binding ip event: %+v", event)
 			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)

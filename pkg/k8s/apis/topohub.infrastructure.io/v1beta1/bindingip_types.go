@@ -18,6 +18,7 @@ const (
 // +kubebuilder:printcolumn:name="MACADDR",type="string",JSONPath=".spec.macAddr"
 // +kubebuilder:printcolumn:name="VALID",type="string",JSONPath=".status.valid"
 
+
 type BindingIp struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -60,7 +60,7 @@ func (c *hostStatusController) processDHCPEvents() {
 	}
 }
 
-func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.DhcpClientInfo) ( retry bool ) {
+func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.DhcpClientInfo , ownerUid types.UID) ( retry bool ) {
 	name := formatHostStatusName(client.IP)
 
 	// creat bindingIp for the hoststatus
@@ -70,12 +70,21 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 	}
 
 	c.log.Debugf("checking to create bindip %s for hoststatus %s", name , name)
-
+	setTrue:=true
 	bindingIP:=topohubv1beta1.BindingIp{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				topohubv1beta1.LabelHostStatus: name,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: topohubv1beta1.APIVersion,
+					Kind:       topohubv1beta1.KindHostStatus,
+					Name:       name,		
+					UID:        ownerUid,	
+					BlockOwnerDeletion: &setTrue,
+				},
 			},
 		},
 		Spec: topohubv1beta1.BindingIpSpec{
@@ -171,7 +180,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 		}
 
 		// make sure the binding ip
-		if c.createBindingIpForHoststatus(client) {
+		if c.createBindingIpForHoststatus(client , existing.GetUID()) {
 			return fmt.Errorf("failed to create binding ip for hoststatus %s: %+v", name, client)
 		}
 
@@ -292,7 +301,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 	c.log.Debugf("DHCP client details - %+v", client)
 
 
-	if c.createBindingIpForHoststatus(client) {
+	if c.createBindingIpForHoststatus(client, hostStatus.GetUID()) {
 		return fmt.Errorf("failed to create binding ip for hoststatus %s: %+v", name, client)
 	}
 

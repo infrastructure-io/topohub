@@ -27,7 +27,7 @@ spec:
     - jsonPath: .status.dhcpStatus.dhcpIpBindAmount
       name: IP_RESERVED
       type: integer
-    - jsonPath: .spec.feature.enableSyncHoststatus.enabled
+    - jsonPath: .spec.feature.syncHoststatus.enabled
       name: SYNC_HOSTSTATUS
       type: boolean
     - jsonPath: .spec.feature.enablePxe
@@ -68,8 +68,12 @@ spec:
                     default: false
                     description: Enable PXE boot support
                     type: boolean
-                  enableSyncHoststatus:
-                    description: EnableSyncHoststatus configuration
+                  enableZtp:
+                    default: false
+                    description: Enable ZTP configuration for switch
+                    type: boolean
+                  syncHoststatus:
+                    description: SyncHoststatus configuration
                     properties:
                       defaultClusterName:
                         description: Default cluster name
@@ -87,14 +91,10 @@ spec:
                     - enableBindDhcpIP
                     - enabled
                     type: object
-                  enableZtp:
-                    default: false
-                    description: Enable ZTP configuration for switch
-                    type: boolean
                 required:
                 - enablePxe
-                - enableSyncHoststatus
                 - enableZtp
+                - syncHoststatus
                 type: object
               interface:
                 description: Interface configuration
