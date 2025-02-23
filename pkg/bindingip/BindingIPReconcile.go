@@ -71,8 +71,8 @@ func (c *bindingIPController) processBindingIP(bindingIP *topohubv1beta1.Binding
 			bindingipdata.BindingIPCacheDatabase.Add(name, info)
 			c.addedBindingIp <- info
 
-		} else if !reflect.DeepEqual(oldData, info) {
-			logger.Infof("bindingIP status change to %+v", bindingIP.Status)
+		} else if !reflect.DeepEqual(*oldData, info) {
+			logger.Infof("Valid status of bindingIP changes, from %+v to %+v", oldData, info)
 			bindingipdata.BindingIPCacheDatabase.Add(name, info)
 
 		} else {
