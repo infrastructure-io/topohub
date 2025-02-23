@@ -47,8 +47,7 @@ type subnetManager struct {
 	deletedBindingIp chan bindingipdata.BindingIPInfo
 
 	// lock
-	lockLeader     lock.RWMutex
-	leader         bool
+	dataLock     lock.RWMutex
 	dhcpServerList map[string]dhcpserver.DhcpServer
 }
 
@@ -57,12 +56,11 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 		config:                         &config,
 		kubeClient:                     kubeClient,
 		cache:                          NewSubnetCache(),
-		lockLeader:                     lock.RWMutex{},
+		dataLock:                     lock.RWMutex{},
 		addedDhcpClientForHostStatus:   make(chan dhcpserver.DhcpClientInfo, 1000),
 		deletedDhcpClientForHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
 		addedBindingIp:                 make(chan bindingipdata.BindingIPInfo, 1000),
 		deletedBindingIp:               make(chan bindingipdata.BindingIPInfo, 1000),
-		leader:                         false,
 		dhcpServerList:                 make(map[string]dhcpserver.DhcpServer),
 		log:                            log.Logger.Named("subnetManager"),
 	}
@@ -98,6 +96,10 @@ func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason
 func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := s.log.With(zap.String("subnet", req.Name))
 
+	s.dataLock.RLock()
+	server, exists := s.dhcpServerList[req.Name]
+	s.dataLock.RUnlock()
+
 	// Get the Subnet instance
 	subnet := &topohubv1beta1.Subnet{}
 	if err := s.client.Get(ctx, req.NamespacedName, subnet); err != nil {
@@ -105,12 +107,14 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			// Subnet was deleted
 			logger.Infof("Subnet %s was deleted, removing from cache", req.Name)
 			s.cache.Delete(req.Name)
-			if server, exists := s.dhcpServerList[req.Name]; exists {
+			if exists {
 				logger.Infof("Stopping DHCP server for subnet %s", req.Name)
 				if err := server.Stop(); err != nil {
 					logger.Errorf("Failed to stop DHCP server for subnet %s: %v", req.Name, err)
 				}
+				s.dataLock.Lock()
 				delete(s.dhcpServerList, req.Name)
+				s.dataLock.Unlock()
 			}
 			return reconcile.Result{}, nil
 		}
@@ -118,56 +122,54 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 		return reconcile.Result{}, err
 	}
 
-	// Check if this is a new subnet or if the spec has changed
-	s.lockLeader.Lock()
-	defer s.lockLeader.Unlock()
-	// if we are the leader, we should handle the subnet
-	if s.leader {
-		if s.cache.HasSpecChanged(subnet) {
-			logger.Infof("Subnet %s spec changed or new subnet detected (subnet: %s, ipRange: %s)",
-				subnet.Name,
-				subnet.Spec.IPv4Subnet.Subnet,
-				subnet.Spec.IPv4Subnet.IPRange)
+	if s.cache.HasSpecChanged(subnet) {
+		logger.Infof("Subnet %s spec changed or new subnet detected (subnet: %s, ipRange: %s)",
+			subnet.Name,
+			subnet.Spec.IPv4Subnet.Subnet,
+			subnet.Spec.IPv4Subnet.IPRange)
 
-			// todo: start the dhcp server on the subnet
-			if _, ok := s.dhcpServerList[subnet.Name]; !ok {
-				t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus)
-				err := t.Run()
-				if err != nil {
-					msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
-					logger.Errorf(msg)
-					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
-				} else {
-					logger.Infof("Started DHCP server for subnet %s", subnet.Name)
-					// Update the cache with the latest version
-					s.dhcpServerList[subnet.Name] = t
-					s.cache.Set(subnet)
-				}
-
-				// get all binding ip
-				bindingIPInfoList := bindingipdata.BindingIPCacheDatabase.GetInfoForSubnet(subnet.Name)
-				if len(bindingIPInfoList) > 0 {
-					logger.Infof("add binding ip events for subnet %s: %+v", subnet.Name, bindingIPInfoList)
-					if err := s.dhcpServerList[subnet.Name].UpdateBindingIpEvents(bindingIPInfoList, nil); err != nil {
-						msg := fmt.Sprintf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
-						logger.Errorf(msg)
-						return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
-					}
-				}
-
+		// todo: start the dhcp server on the subnet
+		if !exists {
+			t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus)
+			err := t.Run()
+			if err != nil {
+				msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
+				logger.Errorf(msg)
+				return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
 			} else {
-				logger.Infof("updated DHCP server for subnet %s", subnet.Name)
-				if err := s.dhcpServerList[subnet.Name].UpdateService(*subnet); err != nil {
-					msg := fmt.Sprintf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
-					logger.Errorf(msg)
-					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
-				}
+				logger.Infof("Started DHCP server for subnet %s", subnet.Name)
+				// Update the cache with the latest version
+				s.dataLock.Lock()
+				s.dhcpServerList[subnet.Name] = t
+				s.dataLock.Unlock()
+				//
 				s.cache.Set(subnet)
 			}
+
+			// get all binding ip
+			bindingIPInfoList := bindingipdata.BindingIPCacheDatabase.GetInfoForSubnet(subnet.Name)
+			if len(bindingIPInfoList) > 0 {
+				logger.Infof("add binding ip events for subnet %s: %+v", subnet.Name, bindingIPInfoList)
+				if err := server.UpdateBindingIpEvents(bindingIPInfoList, nil); err != nil {
+					msg := fmt.Sprintf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
+					logger.Errorf(msg)
+					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				}
+			}
+
 		} else {
-			logger.Debugf("Subnet %s spec has no change", subnet.Name)
+			logger.Infof("updated DHCP server for subnet %s", subnet.Name)
+			if err := server.UpdateService(*subnet); err != nil {
+				msg := fmt.Sprintf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
+				logger.Errorf(msg)
+				return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+			}
+			s.cache.Set(subnet)
 		}
+	} else {
+		logger.Debugf("Subnet %s spec has no change", subnet.Name)
 	}
+	
 
 	return reconcile.Result{}, nil
 }
@@ -180,10 +182,6 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 		<-mgr.Elected()
 		s.log.Info("Elected as leader, begin to start all controllers")
 
-		s.lockLeader.Lock()
-		defer s.lockLeader.Unlock()
-		s.leader = true
-
 		// 获取所有的 Subnet 实例并启动 DHCP 服务器
 		var subnetList topohubv1beta1.SubnetList
 		if err := mgr.GetClient().List(context.Background(), &subnetList); err != nil {
@@ -191,6 +189,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 			return
 		}
 
+		s.dataLock.Lock()
 		// 初始化并启动 DHCP 服务器
 		for _, subnet := range subnetList.Items {
 			if subnet.DeletionTimestamp != nil {
@@ -211,6 +210,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			}
 		}
+		s.dataLock.Unlock()
 
 		// after all server is started , start to process binding ip event
 		time.Sleep(2 * time.Second)
@@ -225,6 +225,9 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 
 func (s *subnetManager) Stop() {
 	s.log.Info("Stopping subnet manager")
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
+
 	for name, server := range s.dhcpServerList {
 		if err := server.Stop(); err != nil {
 			s.log.Errorf("Failed to stop DHCP server for subnet %s: %v", name, err)
@@ -253,7 +256,10 @@ func (s *subnetManager) processBindingIpEvents() {
 				continue
 			}
 			s.log.Debugf("receive adding binding ip event: %+v", event)
-			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
+			s.dataLock.RLock()
+			c, exists := s.dhcpServerList[event.Subnet]
+			s.dataLock.RUnlock()
+			if !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
 				go func() {
 					time.Sleep(30 * time.Second)
@@ -272,7 +278,10 @@ func (s *subnetManager) processBindingIpEvents() {
 				continue
 			}
 			s.log.Debugf("receive deleting binding ip event: %+v", event)
-			if c, exists := s.dhcpServerList[event.Subnet]; !exists {
+			s.dataLock.RLock()
+			c, exists := s.dhcpServerList[event.Subnet]
+			s.dataLock.RUnlock()
+			if !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
 				go func() {
 					time.Sleep(30 * time.Second)

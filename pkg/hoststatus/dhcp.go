@@ -102,21 +102,19 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 	}
 	for _, existingBindingIP := range bindingIPList.Items {
 
-		if existingBindingIP.Name == bindingIP.Name && existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr  && existingBindingIP.Spec.MacAddr == bindingIP.Spec.MacAddr {
-			c.log.Debugf("bindingIP already exists for host %s: %+v", bindingIP.Name, existingBindingIP)
+		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr && existingBindingIP.Spec.MacAddr == bindingIP.Spec.MacAddr {
+			c.log.Debugf("bindingip %s already exists for host %s: %+v", existingBindingIP.Name, name, existingBindingIP.Spec )
 			return false
 		}
 
 		if existingBindingIP.Name == bindingIP.Name {
-			c.log.Errorf("A conflicted bindgIp already exists for host %s: %+v", bindingIP.Name, existingBindingIP)
+			c.log.Errorf("A conflicted bindgIp already exists for host %s: existed=%+v, expected=%+v", bindingIP.Name, existingBindingIP.Spec, bindingIP.Spec)
 			// ignore binding ip
 			return false
 		}
 
 		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr {
-			c.log.Errorf("IP address %s is already used by BindingIP %s", 
-				bindingIP.Spec.IpAddr, 
-				existingBindingIP.Name)
+			c.log.Errorf("BindingIP %s already bind IP %s with mac %s, expected mac %s", bindingIP.Name, bindingIP.Spec.IpAddr, existingBindingIP.Spec.MacAddr, bindingIP.Spec.MacAddr)
 			return false
 		}
 	}
