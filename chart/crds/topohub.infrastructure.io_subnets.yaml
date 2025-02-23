@@ -218,9 +218,6 @@ spec:
                       the lease file
                     format: int64
                     type: integer
-                  dhcpIpAutoBindAmount:
-                    format: int64
-                    type: integer
                   dhcpIpAvailableAmount:
                     description: Number of available IP addresses
                     format: int64
@@ -230,19 +227,14 @@ spec:
                       MAC address
                     format: int64
                     type: integer
-                  dhcpIpManualBindAmount:
-                    format: int64
-                    type: integer
                   dhcpIpTotalAmount:
                     description: Total number of IP addresses in the subnet
                     format: int64
                     type: integer
                 required:
                 - dhcpIpActiveAmount
-                - dhcpIpAutoBindAmount
                 - dhcpIpAvailableAmount
                 - dhcpIpBindAmount
-                - dhcpIpManualBindAmount
                 - dhcpIpTotalAmount
                 type: object
               hostNode:

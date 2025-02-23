@@ -40,7 +40,6 @@ type dhcpServer struct {
 
 	currentLeaseClients         map[string]*DhcpClientInfo
 	currentManualBindingClients map[string]*DhcpClientInfo
-	currentAutoBindingClients   map[string]*DhcpClientInfo
 
 	lockConfigUpdate *lock.RWMutex
 
@@ -92,7 +91,6 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 		log:                            log.Logger.Named("dhcpServer/" + subnet.Name),
 		currentLeaseClients:            make(map[string]*DhcpClientInfo),
 		currentManualBindingClients:    make(map[string]*DhcpClientInfo),
-		currentAutoBindingClients:      make(map[string]*DhcpClientInfo),
 		configTemplatePath:             filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
 		configPath:                     filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
 		HostIpBindingsConfigPath:       filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s-bindIp.conf", subnet.Name)),
@@ -148,9 +146,15 @@ func (s *dhcpServer) Stop() error {
 }
 
 func (s *dhcpServer) UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, deleted []bindingipdata.BindingIPInfo) error {
-	for _, info := range added {
-		s.addedBindingIp <- info
-		s.deletedBindingIp <- info
+	if added != nil {
+		for _, ainfo := range added {
+			s.addedBindingIp <- ainfo
+		}
+	}
+	if deleted != nil {
+		for _, dinfo := range deleted {
+			s.deletedBindingIp <- dinfo
+		}
 	}
 	return nil
 }
