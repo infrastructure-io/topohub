@@ -94,7 +94,7 @@ func (s *dhcpServer) monitor() {
 
 
 	// watch the process at an interval
-	tickerProcess := time.NewTicker(3 * time.Second)
+	tickerProcess := time.NewTicker(5 * time.Second)
 	defer tickerProcess.Stop()
 
 	s.lockData.RLock()
