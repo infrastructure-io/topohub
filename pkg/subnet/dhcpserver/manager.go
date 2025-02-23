@@ -146,15 +146,13 @@ func (s *dhcpServer) Stop() error {
 }
 
 func (s *dhcpServer) UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, deleted []bindingipdata.BindingIPInfo) error {
-	if added != nil {
-		for _, ainfo := range added {
-			s.addedBindingIp <- ainfo
-		}
+	for _, ainfo := range added {
+		s.addedBindingIp <- ainfo
 	}
-	if deleted != nil {
-		for _, dinfo := range deleted {
-			s.deletedBindingIp <- dinfo
-		}
+
+	for _, dinfo := range deleted {
+		s.deletedBindingIp <- dinfo
 	}
+	
 	return nil
 }
