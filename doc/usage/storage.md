@@ -27,3 +27,18 @@ topohub pod 可使用 pvc 或者 hostPath 来持久化存储数据，默认挂�
 filebrowser 服务默认的 IP 地址是 “ topohub pod 所在主机的 IP + 8080 端口”，它的默认登录账户是 admin，密码是 admin，在登录  filebrowser 后，请在管理页面中及时修改密码
 
 filebrowser 默认可参考 [官方文档](https://github.com/filebrowser/filebrowser)
+
+## http server 服务
+
+topohub 中内置了一个 http server 服务，监听在所有端口，它是为了方便 PXE 装机中获取 IOS 文件。
+
+该 http server 工作的根目录是 topohub POD 的 `/var/lib/topohub/http` ，该目录下有如下子目录：
+
+* ztp : 该子目录中默认为空，主要用于放置 交换机的 ZTP 配置
+
+* iso : 该子目录中默认为空，主要用于放置 PXE 装机过程中获取的 ISO 镜像文件
+
+* tools : 该子目录中不为空，放置了一些常用的工具和脚本，请不要在该持久化目录下放置新的文件，因为每次 topohub 升级后，会更新该目录下的文件
+
+    例如，可通过命令 `wget http://${TopohubIp}/tools/system/set-netplan.sh` 获取工具
+

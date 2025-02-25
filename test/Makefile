@@ -67,6 +67,14 @@ show:
 		kubectl get hoststatuses -o wide
 	@echo "" ; echo "kubectl get bindingips -o wide" ; \
 		kubectl get bindingips -o wide
+	@ DEFAULT_INT=`ip r | grep default | head -1 | awk '{print $5}' ` ; \
+		INT_IPV4_ADDR=` ip a show $DEFAULT_INT grep -oP '(?<=inet\s)[0-9]+(\.[0-9]+){3}' ` ; \
+		echo "visit the filebrowser: " ; \
+		echo "     http://$INT_IPV4_ADDR:30080" ;\
+		echo "     http://$INT_IPV4_ADDR:30081" ;\
+		echo "     username: admin" ;\
+		echo "     password: password"
+
 
 # Clean up kind cluster
 clean:
