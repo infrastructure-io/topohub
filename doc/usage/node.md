@@ -34,9 +34,10 @@ spec:
     # 请分配一个可用 IP 地址，作为被 DHCP server 的工作 IP 地址
     ipv4: "${INT_IPV4}"
   feature:
-    enableSyncHoststatus:
+    syncHoststatus:
       enabled: true
       defaultClusterName: cluster1
+      enableBindDhcpIP: true
     enableBindDhcpIP: true
 EOF
 
@@ -110,11 +111,11 @@ metadata:
   name: net0
 spec:
   feature:
-    enableBindDhcpIP: true
     enablePxe: true
-    enableSyncHoststatus:
-      defaultClusterName: cluster1
+    syncHoststatus:
       enabled: true
+      defaultClusterName: cluster1
+      enableBindDhcpIP: true
     enableZtp: false
   interface:
     interface: eth1

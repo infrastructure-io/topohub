@@ -18,6 +18,9 @@ spec:
     - jsonPath: .spec.ipv4Subnet.subnet
       name: SUBNET
       type: string
+    - jsonPath: .spec.interface.ipv4
+      name: SERVER_IP
+      type: string
     - jsonPath: .status.dhcpStatus.dhcpIpTotalAmount
       name: IP_TOTAL
       type: integer
