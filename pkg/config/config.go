@@ -9,6 +9,7 @@ import (
 
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
+	"os/exec"
 )
 
 // AgentConfig represents the agent configuration
@@ -31,6 +32,7 @@ type AgentConfig struct {
 	StoragePathHttp                     string
 	StoragePathHttpZtp                  string
 	StoragePathHttpIso                  string
+	StoragePathHttpTools                string
 	StoragePathTftp                     string
 	StoragePathTftpRelativeDirForPxeEfi string
 	StoragePathTftpAbsoluteDirForPxeEfi string
@@ -155,6 +157,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 	c.StoragePathHttp = filepath.Join(c.StoragePath, "http")
 	c.StoragePathHttpZtp = filepath.Join(c.StoragePathHttp, "ztp")
 	c.StoragePathHttpIso = filepath.Join(c.StoragePathHttp, "iso")
+	c.StoragePathHttpTools = filepath.Join(c.StoragePathHttp, "tools")
 
 	// List of required subdirectories
 	subdirs := []string{
@@ -202,6 +205,20 @@ func (c *AgentConfig) initStorageDirectory() error {
 		}else{
 			return fmt.Errorf("source core.efi not found")
 		}
+	}
+
+	// Delete and recreate tools directory
+	if err := os.RemoveAll(c.StoragePathHttpTools); err != nil {
+		return fmt.Errorf("failed to delete tools directory %s: %v", c.StoragePathHttpTools, err)
+	}
+	if err := os.MkdirAll(c.StoragePathHttpTools, 0755); err != nil {
+		return fmt.Errorf("failed to create tools directory %s: %v", c.StoragePathHttpTools, err)
+	}
+
+	// Copy all files from /tools to c.StoragePathHttpTools
+	cmd := exec.Command("cp", "-r", "/tools/.", c.StoragePathHttpTools)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to copy tools: %v, output: %s", err, string(output))
 	}
 
 	return nil
