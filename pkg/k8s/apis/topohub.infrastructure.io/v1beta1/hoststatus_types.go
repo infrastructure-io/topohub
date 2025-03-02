@@ -24,6 +24,7 @@ const (
 // +kubebuilder:printcolumn:name="HEALTHY",type="boolean",JSONPath=".status.healthy"
 // +kubebuilder:printcolumn:name="IPADDR",type="string",JSONPath=".status.basic.ipAddr"
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".status.basic.type"
+// +kubebuilder:printcolumn:name="WARNING",type="string",JSONPath=".status.log.warningLogAccount"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 type HostStatus struct {

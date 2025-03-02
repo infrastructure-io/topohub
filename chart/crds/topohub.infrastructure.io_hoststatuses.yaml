@@ -27,6 +27,9 @@ spec:
     - jsonPath: .status.basic.type
       name: TYPE
       type: string
+    - jsonPath: .status.log.warningLogAccount
+      name: WARNING
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date

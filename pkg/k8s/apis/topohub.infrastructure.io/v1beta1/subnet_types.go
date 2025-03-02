@@ -9,6 +9,7 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="SUBNET",type="string",JSONPath=".spec.ipv4Subnet.subnet"
+// +kubebuilder:printcolumn:name="SERVER_IP",type="string",JSONPath=".spec.interface.ipv4"
 // +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
 // +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
 // +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpBindAmount"
@@ -146,7 +147,7 @@ type DhcpStatusSpec struct {
 	DhcpIpActiveAmount uint64 `json:"dhcpIpActiveAmount"`
 
 	// Number of reserved IP addresses which is bond to MAC address
-	DhcpIpBindAmount       uint64 `json:"dhcpIpBindAmount"`
+	DhcpIpBindAmount uint64 `json:"dhcpIpBindAmount"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
