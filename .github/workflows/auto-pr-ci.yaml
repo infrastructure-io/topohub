@@ -1,0 +1,138 @@
+name: Auto PR CI
+
+permissions: write-all
+
+on:
+  workflow_call:
+    inputs:
+      kindNodeImage:
+        required: false
+        type: string
+      justE2E:
+        required: false
+        type: string
+        default: 'false'
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches:
+      - main
+      - release-*
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'SHA, tag, or branch'
+        required: true
+        default: main
+      e2e_labels:
+        description: 'E2E labels (comma-separated for multiple labels)'
+        required: false
+        type: string
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ env.RUN_REF }}
+      e2e_labels: ${{ env.RUN_E2E_LABEL }}
+      unitest_enabled: ${{ env.RUN_UNITEST_ENABLED }}
+      e2e_enabled: ${{ env.RUN_E2E_ENABLED }}
+      kindNodeImage: ${{ env.RUN_kindNodeImage }}
+      JustE2E: ${{ env.RUN_JustE2E }}
+
+    steps:
+      - name: Check Code Changes
+        uses: dorny/paths-filter@v2.11.1
+        if: ${{ github.event_name == 'pull_request_target' }}
+        id: filter_pr
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          filters: |
+            run_e2e:
+              - '**/*.sh'
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'charts/**'
+              - 'Makefile*'
+              - '**/Makefile*'
+              - '**/Dockerfile'
+            all_e2e:
+              - 'tests/e2e/**/*.go'
+              - 'vendor/github.com/elf-io/**/*.go'
+
+      - name: Get Ref
+        id: get_ref
+        run: |
+          echo "event ${{ github.event_name }}"
+          echo "RUN_kindNodeImage=" >> $GITHUB_ENV
+          echo "RUN_JustE2E=false" >> $GITHUB_ENV
+          if ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref != '' }}; then
+              echo "RUN_TAG=${{ github.event.inputs.ref }}" >> $GITHUB_ENV
+              echo "RUN_E2E_LABEL=${{ github.event.inputs.e2e_labels }}" >> $GITHUB_ENV
+              echo "RUN_E2E_ENABLED=true" >> $GITHUB_ENV
+              echo "RUN_UNITEST_ENABLED=true" >> $GITHUB_ENV
+              if ${{ github.event.inputs.kindNodeImage != '' }}; then
+                  echo "RUN_kindNodeImage=${{ github.event.inputs.kindNodeImage }}" >> $GITHUB_ENV
+              fi
+          elif ${{ github.event_name == 'push' }}; then
+              echo "RUN_TAG=${{ github.sha }}" >> $GITHUB_ENV
+              echo "RUN_E2E_LABEL=smoke" >> $GITHUB_ENV
+              echo "RUN_E2E_ENABLED=true" >> $GITHUB_ENV
+              echo "RUN_UNITEST_ENABLED=false" >> $GITHUB_ENV
+          elif ${{ github.event_name == 'pull_request_target' }}; then
+              echo "RUN_TAG=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+              if ${{ steps.filter_pr.outputs.all_e2e == 'true' }}; then
+                  echo "RUN_E2E_LABEL=" >> $GITHUB_ENV
+              else
+                  echo "RUN_E2E_LABEL=smoke" >> $GITHUB_ENV
+              fi
+              echo "RUN_E2E_ENABLED=${{ steps.filter_pr.outputs.run_e2e }}" >> $GITHUB_ENV
+              echo "RUN_UNITEST_ENABLED=false" >> $GITHUB_ENV
+          else
+              echo "RUN_TAG=main" >> $GITHUB_ENV
+              echo "RUN_E2E_LABEL=" >> $GITHUB_ENV
+              echo "RUN_E2E_ENABLED=true" >> $GITHUB_ENV
+              echo "RUN_UNITEST_ENABLED=true" >> $GITHUB_ENV
+              if ${{ inputs.kindNodeImage != '' }}; then
+                echo "RUN_kindNodeImage=${{ inputs.kindNodeImage }}" >> $GITHUB_ENV
+              fi
+              if ${{ inputs.justE2E == 'true' }}; then
+                echo "RUN_JustE2E=true" >> $GITHUB_ENV
+              fi
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          ref: ${{ env.RUN_TAG }}
+
+      - name: Result Ref
+        id: result
+        run: |
+          ref=$(git show -s --format='format:%H')
+          echo "RUN_REF=${ref}" >> $GITHUB_ENV
+
+  # Define additional jobs as needed
+  call_unitest:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.unitest_enabled == 'true' && needs.prepare.outputs.JustE2E == 'false' }}
+    uses: ./.github/workflows/lint-golang.yaml
+    with:
+      ref: ${{ needs.prepare.outputs.ref }}
+    secrets: inherit
+
+  call_build_ci_image:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.e2e_enabled == 'true' && needs.prepare.outputs.JustE2E == 'false' }}
+    uses: ./.github/workflows/build-image-ci.yaml
+    with:
+      ref: ${{ needs.prepare.outputs.ref }}
+    secrets: inherit
+
+  # Add other jobs as needed...

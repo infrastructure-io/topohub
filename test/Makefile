@@ -10,7 +10,7 @@ KIND_CONFIG = kind-config.yaml
 # Initialize kind cluster with 2 nodes
 init:
 	@echo "Creating kind cluster with name: $(KIND_CLUSTER_NAME)"
-	kind create cluster --name $(KIND_CLUSTER_NAME) --config $(KIND_CONFIG)
+	kind create cluster --name $(KIND_CLUSTER_NAME) --config $(KIND_CONFIG) --image=kindest/node:$(KIND_NODE_VERSION)
 	@echo "Kind cluster created successfully"
 	@echo "storageclass local-path does not allow pods with a specified NodeName, so it makes all pods to run on the worker node"
 	kubectl taint node $(KIND_CLUSTER_NAME)-control-plane local-path=nopod:NoSchedule
