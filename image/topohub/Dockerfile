@@ -1,5 +1,5 @@
 # Build stage
-FROM docker.io/library/golang:1.24.2 as builder
+FROM docker.io/library/golang:1.24.3 as builder
 
 # Copy the entire project
 WORKDIR /workspace
