@@ -56,6 +56,9 @@ func main() {
 	metricsPort := flag.String("metrics-port", "8083", "The address the metric endpoint binds to.")
 	pyroscopeAddress := flag.String("pyroscope-address", "", "The address the pyroscope endpoint binds to.")
 	pyroscopeTag := flag.String("pyroscope-tag", "", "The tag used for pyroscope.")
+	pprofAddress := flag.String("pprof-address", "", "The address the pprof endpoint binds to.")
+	pprofPort := flag.String("pprof-port", "", "The port used for pprof")
+
 	flag.Parse()
 
 	// Initialize logger
@@ -64,6 +67,9 @@ func main() {
 
 	// start pyroscope server
 	debug.RunPyroscope(*pyroscopeAddress, *pyroscopeTag)
+
+	// start pprof server
+	debug.RunPProf(*pprofAddress, *pprofPort)
 
 	// Set controller-runtime logger
 	ctrl.SetLogger(zap.New())

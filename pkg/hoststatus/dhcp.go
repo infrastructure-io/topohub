@@ -2,10 +2,10 @@ package hoststatus
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
-	"fmt"
 
 	hoststatusdata "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
@@ -60,7 +60,7 @@ func (c *hostStatusController) processDHCPEvents() {
 	}
 }
 
-func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.DhcpClientInfo , ownerUid types.UID) ( retry bool ) {
+func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.DhcpClientInfo, ownerUid types.UID) (retry bool) {
 	name := formatHostStatusName(client.IP)
 
 	// creat bindingIp for the hoststatus
@@ -69,9 +69,9 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 		return false
 	}
 
-	c.log.Debugf("checking to create bindip %s for hoststatus %s", name , name)
-	setTrue:=true
-	bindingIP:=topohubv1beta1.BindingIp{
+	c.log.Debugf("checking to create bindip %s for hoststatus %s", name, name)
+	setTrue := true
+	bindingIP := topohubv1beta1.BindingIp{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -79,22 +79,22 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: topohubv1beta1.APIVersion,
-					Kind:       topohubv1beta1.KindHostStatus,
-					Name:       name,		
-					UID:        ownerUid,	
+					APIVersion:         topohubv1beta1.APIVersion,
+					Kind:               topohubv1beta1.KindHostStatus,
+					Name:               name,
+					UID:                ownerUid,
 					BlockOwnerDeletion: &setTrue,
 				},
 			},
 		},
 		Spec: topohubv1beta1.BindingIpSpec{
-			IpAddr: client.IP,
+			IpAddr:  client.IP,
 			MacAddr: client.MAC,
-			Subnet: client.SubnetName,
+			Subnet:  client.SubnetName,
 		},
 	}
 
-	ctx:= context.Background()
+	ctx := context.Background()
 	bindingIPList := &topohubv1beta1.BindingIpList{}
 	if err := c.client.List(ctx, bindingIPList); err != nil {
 		c.log.Errorf("Failed to list BindingIPs: %v", err)
@@ -103,7 +103,7 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 	for _, existingBindingIP := range bindingIPList.Items {
 
 		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr && strings.EqualFold(existingBindingIP.Spec.MacAddr, bindingIP.Spec.MacAddr) {
-			c.log.Debugf("bindingip %s already exists for host %s: %+v", existingBindingIP.Name, name, existingBindingIP.Spec )
+			c.log.Debugf("bindingip %s already exists for host %s: %+v", existingBindingIP.Name, name, existingBindingIP.Spec)
 			return false
 		}
 
@@ -129,8 +129,6 @@ func (c *hostStatusController) createBindingIpForHoststatus(client dhcpserver.Dh
 
 	return false
 }
-		
-	
 
 // create the hoststatus for the dhcp client
 func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) error {
@@ -178,7 +176,7 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 		}
 
 		// make sure the binding ip
-		if c.createBindingIpForHoststatus(client , existing.GetUID()) {
+		if c.createBindingIpForHoststatus(client, existing.GetUID()) {
 			return fmt.Errorf("failed to create binding ip for hoststatus %s: %+v", name, client)
 		}
 
@@ -218,7 +216,10 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 		Password: password,
 		DhcpHost: true,
 	}
-	if _, err := redfish.NewClient(d, c.log); err != nil {
+	if redfishClient, err := redfish.NewClient(d, c.log); err != nil {
+		if redfishClient != nil {
+			redfishClient.Close()
+		}
 		c.log.Warnf("ignore creating hoststatus for dhcp client %s, failed to connect: %v", client.IP, err)
 		return nil
 	}
@@ -297,7 +298,6 @@ func (c *hostStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) e
 
 	c.log.Infof("Successfully created HostStatus %s", name)
 	c.log.Debugf("DHCP client details - %+v", client)
-
 
 	if c.createBindingIpForHoststatus(client, hostStatus.GetUID()) {
 		return fmt.Errorf("failed to create binding ip for hoststatus %s: %+v", name, client)

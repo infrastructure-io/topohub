@@ -86,6 +86,9 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusFailed
 			hostOp.Status.Message = err.Error()
 		} else {
+			if c != nil {
+				defer c.Close()
+			}
 			switch hostOp.Spec.Action {
 			case topohubv1beta1.BootCmdOn:
 				err = c.Power(hostOp.Spec.Action)

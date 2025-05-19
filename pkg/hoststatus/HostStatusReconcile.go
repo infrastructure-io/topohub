@@ -11,12 +11,10 @@ import (
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 
 	"github.com/infrastructure-io/topohub/pkg/lock"
-	"github.com/infrastructure-io/topohub/pkg/redfish"
 
 	gofishredfish "github.com/stmcginnis/gofish/redfish"
 
 	"go.uber.org/zap"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,7 +37,7 @@ func (c *hostStatusController) GenerateEvents(logEntrys []*gofishredfish.LogEntr
 	}
 
 	totalMsgCount = len(logEntrys)
-	for m, entry := range logEntrys {
+	for _, entry := range logEntrys {
 		//log.Logger.Debugf("log service entries[%d] timestamp: %+v", m, entry.Created)
 		//log.Logger.Debugf("log service entries[%d] severity: %+v", m, entry.Severity)
 		//log.Logger.Debugf("log service entries[%d] oemSensorType: %+v", m, entry.OemSensorType)
@@ -47,9 +45,9 @@ func (c *hostStatusController) GenerateEvents(logEntrys []*gofishredfish.LogEntr
 
 		msg := fmt.Sprintf("[%s][%s]: %s %s", entry.Created, entry.Severity, entry.OemSensorType, entry.Message)
 
-		ty := corev1.EventTypeNormal
+		// ty := corev1.EventTypeNormal
 		if entry.Severity != gofishredfish.OKEventSeverity && entry.Severity != "" {
-			ty = corev1.EventTypeWarning
+			// ty = corev1.EventTypeWarning
 			if newLastestWarningMsg == "" {
 				newLastestWarningTime = entry.Created
 				newLastestWarningMsg = msg
@@ -58,26 +56,26 @@ func (c *hostStatusController) GenerateEvents(logEntrys []*gofishredfish.LogEntr
 		}
 
 		// 所有的新日志，生成 event
-		if entry.Created != lastLogTime {
-			newLogAccount++
-			c.log.Infof("find new log for hostStatus %s: %s", hostStatusName, msg)
+		// if entry.Created != lastLogTime {
+		// 	newLogAccount++
+		// 	c.log.Infof("find new log for hostStatus %s: %s", hostStatusName, msg)
 
-			// 确认是否有新日志了
-			if m == 0 {
-				newLastestTime = entry.Created
-				newLastestMsg = msg
-			}
+		// 	// 确认是否有新日志了
+		// 	if m == 0 {
+		// 		newLastestTime = entry.Created
+		// 		newLastestMsg = msg
+		// 	}
 
-			// Create event
-			t := &corev1.ObjectReference{
-				Kind:       topohubv1beta1.KindHostStatus,
-				Name:       hostStatusName,
-				Namespace:  c.config.PodNamespace,
-				APIVersion: topohubv1beta1.APIVersion,
-			}
-			c.recorder.Event(t, ty, "BMCLogEntry", msg)
+		// 	// Create event
+		// 	t := &corev1.ObjectReference{
+		// 		Kind:       topohubv1beta1.KindHostStatus,
+		// 		Name:       hostStatusName,
+		// 		Namespace:  c.config.PodNamespace,
+		// 		APIVersion: topohubv1beta1.APIVersion,
+		// 	}
+		// 	c.recorder.Event(t, ty, "BMCLogEntry", msg)
 
-		}
+		// }
 	}
 	return
 }
@@ -92,13 +90,17 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 
 	// 创建 redfish 客户端
 	var healthy bool
-	client, err1 := redfish.NewClient(*d, c.log)
-	if err1 != nil {
-		c.log.Warnf("Failed to create redfish client for HostStatus %s: %v", name, err1)
-		healthy = false
-	} else {
-		healthy = true
-	}
+	// client, err1 := redfish.NewClient(*d, c.log)
+	// if err1 != nil {
+	// 	c.log.Warnf("Failed to create redfish client for HostStatus %s: %v", name, err1)
+	// 	healthy = false
+	// } else {
+	// 	healthy = true
+	// 	if client != nil {
+	// 		defer client.Close()
+	// 	}
+
+	// }
 
 	protocol := "http"
 	if d.Info.Https {
@@ -121,15 +123,15 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 
 	// 检查健康状态
 	updated.Status.Healthy = healthy
-	if healthy {
-		infoData, err := client.GetInfo()
-		if err != nil {
-			c.log.Errorf("Failed to get info of HostStatus %s: %v", name, err)
-			healthy = false
-		} else {
-			updated.Status.Info = infoData
-		}
-	}
+	// if healthy {
+	// 	infoData, err := client.GetInfo()
+	// 	if err != nil {
+	// 		c.log.Errorf("Failed to get info of HostStatus %s: %v", name, err)
+	// 		healthy = false
+	// 	} else {
+	// 		updated.Status.Info = infoData
+	// 	}
+	// }
 	if !healthy {
 		c.log.Debugf("HostStatus %s is not healthy, set info to empty", name)
 		updated.Status.Info = map[string]string{}
@@ -139,42 +141,48 @@ func (c *hostStatusController) UpdateHostStatusInfo(name string, d *hoststatusda
 	}
 
 	// 获取日志
-	if healthy {
-		logEntrys, err := client.GetLog()
-		if err != nil {
-			c.log.Warnf("Failed to get logs of HostStatus %s: %v", name, err)
-		} else {
-			lastLogTime := ""
-			if updated.Status.Log.LastestLog != nil {
-				lastLogTime = updated.Status.Log.LastestLog.Time
-			}
-			newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg, totalMsgCount, warningMsgCount, newLogAccount := c.GenerateEvents(logEntrys, name, lastLogTime)
-			if newLastestTime != "" {
-				updated.Status.Log.TotalLogAccount = int32(totalMsgCount)
-				updated.Status.Log.WarningLogAccount = int32(warningMsgCount)
-				updated.Status.Log.LastestLog = &topohubv1beta1.LogEntry{
-					Time:    newLastestTime,
-					Message: newLastestMsg,
-				}
-				updated.Status.Log.LastestWarningLog = &topohubv1beta1.LogEntry{
-					Time:    newLastestWarningTime,
-					Message: newLastestWarningMsg,
-				}
-				c.log.Infof("find %d new logs for hostStatus %s", newLogAccount, name)
-			}
-		}
-	}
+	// if healthy {
+	// 	logEntrys, err := client.GetLog()
+	// 	if err != nil {
+	// 		c.log.Warnf("Failed to get logs of HostStatus %s: %v", name, err)
+	// 	} else {
+	// 		lastLogTime := ""
+	// 		if updated.Status.Log.LastestLog != nil {
+	// 			lastLogTime = updated.Status.Log.LastestLog.Time
+	// 		}
+	// 		newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg, totalMsgCount, warningMsgCount, newLogAccount := c.GenerateEvents(logEntrys, name, lastLogTime)
+
+	// 		if newLastestTime != "" {
+	// 			updated.Status.Log.TotalLogAccount = int32(totalMsgCount)
+	// 			updated.Status.Log.WarningLogAccount = int32(warningMsgCount)
+	// 			updated.Status.Log.LastestLog = &topohubv1beta1.LogEntry{
+	// 				Time:    newLastestTime,
+	// 				Message: newLastestMsg,
+	// 			}
+	// 			updated.Status.Log.LastestWarningLog = &topohubv1beta1.LogEntry{
+	// 				Time:    newLastestWarningTime,
+	// 				Message: newLastestWarningMsg,
+	// 			}
+	// 			c.log.Infof("find %d new logs for hostStatus %s", newLogAccount, name)
+	// 		}
+	// 	}
+	// 	// 一次性置空日志条目，帮助GC回收内存
+	// 	logEntrys = nil
+	// }
 
 	// 更新 HostStatus
 	if !compareHostStatus(updated.Status, existing.Status, c.log) {
 		c.log.Debugf("status changed, existing: %v, updated: %v", existing.Status, updated.Status)
 		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			return true, err
-		}
+		// if err := c.client.Status().Update(context.Background(), updated); err != nil {
+		// 	return true, err
+		// }
 		c.log.Infof("Successfully updated HostStatus %s status", name)
 		return true, nil
 	}
+
+	updated = nil
+
 	return false, nil
 }
 
@@ -223,23 +231,27 @@ func (c *hostStatusController) UpdateHostStatusInfoWrapper(name string) error {
 
 // ------------------------------  hoststatus spec.info 的	周期更新
 func (c *hostStatusController) UpdateHostStatusAtInterval() {
-	interval := time.Duration(c.config.RedfishHostStatusUpdateInterval) * time.Second
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	c.log.Infof("begin to update all hostStatus at interval of %v seconds", c.config.RedfishHostStatusUpdateInterval)
+	// interval := time.Duration(c.config.RedfishHostStatusUpdateInterval) * time.Second
+	// ticker := time.NewTicker(interval)
+	// defer ticker.Stop()
+	// c.log.Infof("begin to update all hostStatus at interval of %v seconds", c.config.RedfishHostStatusUpdateInterval)
 
-	for {
-		select {
-		case <-c.stopCh:
-			c.log.Info("Stopping UpdateHostStatusAtInterval")
-			return
-		case <-ticker.C:
-			c.log.Debugf("update all hostStatus at interval ")
-			if err := c.UpdateHostStatusInfoWrapper(""); err != nil {
-				c.log.Errorf("Failed to update host status: %v", err)
-			}
-		}
-	}
+	// for {
+	// 	select {
+	// 	case <-c.stopCh:
+	// 		c.log.Info("Stopping UpdateHostStatusAtInterval")
+	// 		return
+	// 	case <-ticker.C:
+	// 		if os.Getenv("ENABLE_HOSTSTATUS_UPDATE_INTERVAL") != "true" {
+	// 			c.log.Info("update hostStatus at interval close")
+	// 			return
+	// 		}
+	// 		c.log.Debugf("update all hostStatus at interval ")
+	// 		if err := c.UpdateHostStatusInfoWrapper(""); err != nil {
+	// 			c.log.Errorf("Failed to update host status: %v", err)
+	// 		}
+	// 	}
+	// }
 }
 
 // ------------------------------  hoststatus 的 reconcile , 触发更新

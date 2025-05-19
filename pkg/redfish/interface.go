@@ -2,8 +2,8 @@ package redfish
 
 import (
 	"fmt"
+
 	"github.com/stmcginnis/gofish/redfish"
-	"reflect"
 
 	hoststatusData "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 	"github.com/stmcginnis/gofish"
@@ -15,6 +15,7 @@ type RefishClient interface {
 	Power(string) error
 	GetInfo() (map[string]string, error)
 	GetLog() ([]*redfish.LogEntry, error)
+	Close() // 关闭客户端，释放资源
 }
 
 // redfishClient 实现了 Client 接口
@@ -24,6 +25,14 @@ type redfishClient struct {
 	client *gofish.APIClient
 }
 
+// Close 关闭客户端，释放资源
+func (c *redfishClient) Close() {
+	if c.client != nil {
+		c.logger.Infof("close redfish client: %s", c.config.Endpoint)
+		c.client.Logout()
+	}
+}
+
 var _ RefishClient = (*redfishClient)(nil)
 
 var CacheClient = make(map[string]*redfishClient)
@@ -31,43 +40,59 @@ var CacheClient = make(map[string]*redfishClient)
 // NewClient 创建一个新的 Redfish 客户端
 func NewClient(hostCon hoststatusData.HostConnectCon, log *zap.SugaredLogger) (RefishClient, error) {
 
-	url := buildEndpoint(hostCon)
-	config := gofish.ClientConfig{
-		Endpoint:         url,
-		Username:         hostCon.Username,
-		Password:         hostCon.Password,
-		Insecure:         true,
-		ReuseConnections: true,
-	}
+	return nil, fmt.Errorf("not implemented")
+	// 在创建 gofish 客户端前配置 HTTP 客户端
+	// transport := &http.Transport{
+	// 	MaxIdleConns:        30,
+	// 	MaxIdleConnsPerHost: 20,
+	// 	IdleConnTimeout:     90 * time.Second,
+	// 	TLSHandshakeTimeout: 10 * time.Second,
+	// 	TLSClientConfig: &tls.Config{
+	// 		InsecureSkipVerify: true,
+	// 	},
+	// }
 
-	if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
-		if reflect.DeepEqual(config, c.config) {
-			_, err := c.client.Service.Systems()
-			if err == nil {
-				log.Debugf("use cached redfish client for %s", hostCon.Info.IpAddr)
-				return c, nil
-			}
-		}
-		log.Debugf("logout invalid cached redfish client for %s", hostCon.Info.IpAddr)
-		c.client.Logout()
-		delete(CacheClient, hostCon.Info.IpAddr)
-	}
+	// httpClient := &http.Client{Transport: transport}
 
-	log.Debugf("create new redfish client for %s", hostCon.Info.IpAddr)
-	client, err := gofish.Connect(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %+v", err)
-	}
-	c := &redfishClient{
-		config: config,
-		logger: log.Named("redfish").With(
-			zap.String("endpoint", url),
-		),
-		client: client,
-	}
+	// url := buildEndpoint(hostCon)
+	// config := gofish.ClientConfig{
+	// 	Endpoint:         url,
+	// 	Username:         hostCon.Username,
+	// 	Password:         hostCon.Password,
+	// 	Insecure:         true,
+	// 	ReuseConnections: true,
+	// 	HTTPClient:       httpClient,
+	// }
 
-	CacheClient[hostCon.Info.IpAddr] = c
-	return c, nil
+	// if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
+	// 	if reflect.DeepEqual(config, c.config) {
+	// 		_, err := c.client.Service.Systems()
+	// 		if err == nil {
+	// 			log.Debugf("use cached redfish client for %s", hostCon.Info.IpAddr)
+	// 			return c, nil
+	// 		}
+	// 	}
+	// 	log.Debugf("logout invalid cached redfish client for %s", hostCon.Info.IpAddr)
+	// 	c.client.Logout()
+	// 	delete(CacheClient, hostCon.Info.IpAddr)
+	// }
+
+	// log.Debugf("create new redfish client for %s", hostCon.Info.IpAddr)
+	// client, err := gofish.Connect(config)
+	// if err != nil {
+
+	// 	return nil, fmt.Errorf("failed to connect: %+v", err)
+	// }
+	// c := &redfishClient{
+	// 	config: config,
+	// 	logger: log.Named("redfish").With(
+	// 		zap.String("endpoint", url),
+	// 	),
+	// 	client: client,
+	// }
+
+	// CacheClient[hostCon.Info.IpAddr] = c
+	// return c, nil
 }
 
 // buildEndpoint 根据 HostConnectCon 构建 Redfish 服务的端点 URL
