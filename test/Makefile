@@ -66,8 +66,8 @@ show:
 		kubectl get hostoperations -o wide
 	@echo "" ; echo "kubectl get subnets -o wide" ; \
 		kubectl get subnets -o wide
-	@echo "" ; echo "kubectl get hoststatuses -o wide" ; \
-		kubectl get hoststatuses -o wide
+	@echo "" ; echo "kubectl get redfishstatuses -o wide" ; \
+		kubectl get redfishstatuses -o wide
 	@echo "" ; echo "kubectl get bindingips -o wide" ; \
 		kubectl get bindingips -o wide
 	@DEFAULT_INT=`ip r | grep default | head -1 | awk '{print $$5}' ` ; \

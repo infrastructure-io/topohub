@@ -54,7 +54,7 @@ type HostOperationSpec struct {
 	Action string `json:"action"`
 
 	// +kubebuilder:validation:Required
-	HostStatusName string `json:"hostStatusName"`
+	RedfishStatusName string `json:"redfishStatusName"`
 }
 
 type HostOperationStatus struct {

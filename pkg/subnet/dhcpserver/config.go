@@ -135,7 +135,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 }
 
 // processLeaseFile reads and processes the lease file
-// 1. 获取新的 client， 通知 HostStatus 模块
+// 1. 获取新的 client， 通知 RedfishStatus 模块
 func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientChangedFlag bool, finalErr error) {
 	leaseFile := s.leasePath
 	clientChangedFlag = false
@@ -178,49 +178,49 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 		expireTime := time.Unix(expireTimestamp, 0)
 
 		clusterName := ""
-		if  s.subnet.Spec.Feature.SyncHoststatus.DefaultClusterName != nil {
-			clusterName = *s.subnet.Spec.Feature.SyncHoststatus.DefaultClusterName
+		if s.subnet.Spec.Feature.SyncRedfishstatus.DefaultClusterName != nil {
+			clusterName = *s.subnet.Spec.Feature.SyncRedfishstatus.DefaultClusterName
 		}
 
-		enableBindIP:=false
-		if s.subnet.Spec.Feature.SyncHoststatus.Enabled && s.subnet.Spec.Feature.SyncHoststatus.EnableBindDhcpIP {
-			enableBindIP=true
+		enableBindIP := false
+		if s.subnet.Spec.Feature.SyncRedfishstatus.Enabled && s.subnet.Spec.Feature.SyncRedfishstatus.EnableBindDhcpIP {
+			enableBindIP = true
 		}
 
 		clientInfo := &DhcpClientInfo{
-			MAC:            fields[1],
-			IP:             fields[2],
-			Hostname:       fields[3],
-			Active:         true,
-			DhcpExpireTime: expireTime,
-			Subnet:         s.subnet.Spec.IPv4Subnet.Subnet,
-			SubnetName:     s.subnet.Name,
-			ClusterName:    clusterName,
-			EnableBindIpForHoststatus: &enableBindIP,
+			MAC:                          fields[1],
+			IP:                           fields[2],
+			Hostname:                     fields[3],
+			Active:                       true,
+			DhcpExpireTime:               expireTime,
+			Subnet:                       s.subnet.Spec.IPv4Subnet.Subnet,
+			SubnetName:                   s.subnet.Name,
+			ClusterName:                  clusterName,
+			EnableBindIpForRedfishstatus: &enableBindIP,
 		}
 		currentLeaseClients[clientInfo.IP] = clientInfo
 
-		// hoststatus 进行 crd 实例同步
+		// redfishstatus 进行 crd 实例同步
 
 		if data, exists := previousClients[clientInfo.IP]; !exists {
-			if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
-				// hoststatus 进行 crd 实例同步
-				s.addedDhcpClientForHostStatus <- *clientInfo
+			if s.subnet.Spec.Feature.SyncRedfishstatus.Enabled {
+				// redfishstatus 进行 crd 实例同步
+				s.addedDhcpClientForRedfishStatus <- *clientInfo
 				s.log.Infof("send event to add dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
 			}
 			clientChangedFlag = true
 
 		} else {
 			if data.MAC != clientInfo.MAC || data.Hostname != clientInfo.Hostname {
-				if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
-					// hoststatus 进行 crd 实例同步
-					s.addedDhcpClientForHostStatus <- *clientInfo
+				if s.subnet.Spec.Feature.SyncRedfishstatus.Enabled {
+					// redfishstatus 进行 crd 实例同步
+					s.addedDhcpClientForRedfishStatus <- *clientInfo
 					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, old hostname=%s, new hostname=%s, ip=%s", data.MAC, clientInfo.MAC, data.Hostname, clientInfo.Hostname, clientInfo.IP)
 				}
 				clientChangedFlag = true
 			} else if !clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
-				if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
-					s.addedDhcpClientForHostStatus <- *clientInfo
+				if s.subnet.Spec.Feature.SyncRedfishstatus.Enabled {
+					s.addedDhcpClientForRedfishStatus <- *clientInfo
 					s.log.Infof("send event to update dhcp client for its DhcpExpireTime: %s, %s, oldDhcpExpireTime=%s, newDhcpExpireTime=%s", clientInfo.MAC, clientInfo.IP, previousClients[clientInfo.IP].DhcpExpireTime, clientInfo.DhcpExpireTime)
 				}
 			}
@@ -231,8 +231,8 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 	for _, client := range previousClients {
 		if _, exists := currentLeaseClients[client.IP]; !exists {
 			client.Active = false
-			if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
-				s.deletedDhcpClientForHostStatus <- *client
+			if s.subnet.Spec.Feature.SyncRedfishstatus.Enabled {
+				s.deletedDhcpClientForRedfishStatus <- *client
 				s.log.Infof("send event to delete dhcp client: %s, %s", client.MAC, client.IP)
 				// 对于删除的 dhcp 客户端，不进行 ip 解绑，确保安全
 			}
@@ -248,7 +248,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 // UpdateDhcpBindings updates the dhcp-host configuration file by:
 // 1. For ipMacMapAdded: if IP exists, update its MAC; if IP doesn't exist, add new binding
 // 2. For ipMacMapDeleted: delete binding only if both IP and MAC match exactly
-func (s *dhcpServer) UpdateDhcpBindings( ) error {
+func (s *dhcpServer) UpdateDhcpBindings() error {
 
 	// 读取现有的配置文件
 	_, err := os.ReadFile(s.HostIpBindingsConfigPath)
@@ -272,15 +272,15 @@ func (s *dhcpServer) UpdateDhcpBindings( ) error {
 	defer s.lockConfigUpdate.Unlock()
 
 	s.log.Debugf("processing dhcp bindings: %+v ", s.currentManualBindingClients)
-	
+
 	var finalLines []string
 	for ip, item := range s.currentManualBindingClients {
-			s.log.Debugf("adding new dhcp-host binding for IP %s, MAC %s", ip, item.MAC)
-			if len(item.Hostname) > 0 {
-				finalLines = append(finalLines, "# hostname "+item.Hostname)
-			}
-			line := fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
-			finalLines = append(finalLines, line)
+		s.log.Debugf("adding new dhcp-host binding for IP %s, MAC %s", ip, item.MAC)
+		if len(item.Hostname) > 0 {
+			finalLines = append(finalLines, "# hostname "+item.Hostname)
+		}
+		line := fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
+		finalLines = append(finalLines, line)
 	}
 
 	// 写入更新后的配置

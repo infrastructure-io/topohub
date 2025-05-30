@@ -46,6 +46,12 @@ type HostEndpointSpec struct {
 	// +optional
 	// +kubebuilder:default=443
 	Port *int32 `json:"port,omitempty"`
+
+	// Type specifies the endpoint type, either redfish or ssh
+	// +optional
+	// +kubebuilder:default=redfish
+	// +kubebuilder:validation:Enum=redfish;ssh
+	Type *string `json:"type,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

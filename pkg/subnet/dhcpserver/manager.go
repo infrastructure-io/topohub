@@ -47,11 +47,10 @@ type dhcpServer struct {
 	cmd       *exec.Cmd
 	cmdCancel context.CancelFunc
 	stopCh    chan struct{}
-	// 本模块用来通知给 HostStatus 模块，有新的 dhcp ip 分配，让其创建出 hoststatus
-	addedDhcpClientForHostStatus chan DhcpClientInfo
-	// 本模块用来通知给 HostStatus 模块，有 dhcp ip 释放
-	deletedDhcpClientForHostStatus chan DhcpClientInfo
-
+	// 本模块用来通知给 Redfishstatus 模块，有新的 dhcp ip 分配，让其创建出 redfishstatus
+	addedDhcpClientForRedfishStatus chan DhcpClientInfo
+	// 本模块用来通知给 Redfishstatus 模块，有 dhcp ip 释放
+	deletedDhcpClientForRedfishStatus chan DhcpClientInfo
 
 	// bindingip 模块 往其中添加数据，关于 bindingip 。由本模块来消费使用
 	addedBindingIp   chan bindingipdata.BindingIPInfo
@@ -73,29 +72,29 @@ type dhcpServer struct {
 }
 
 // NewDhcpServer creates a new DHCP server instance
-func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClientForHostStatus chan DhcpClientInfo, deletedDhcpClientForHostStatus chan DhcpClientInfo) *dhcpServer {
+func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClientForRedfishStatus chan DhcpClientInfo, deletedDhcpClientForRedfishStatus chan DhcpClientInfo) *dhcpServer {
 
 	return &dhcpServer{
-		config:                         config,
-		lockData:                       &lock.RWMutex{},
-		lockConfigUpdate:               &lock.RWMutex{},
-		subnet:                         subnet,
-		client:                         client,
-		addedDhcpClientForHostStatus:   addedDhcpClientForHostStatus,
-		deletedDhcpClientForHostStatus: deletedDhcpClientForHostStatus,
-		addedBindingIp:                 make(chan bindingipdata.BindingIPInfo, 1000),
-		deletedBindingIp:               make(chan bindingipdata.BindingIPInfo, 1000),
-		stopCh:                         make(chan struct{}),
-		statusUpdateCh:                 make(chan struct{}),
-		restartCh:                      make(chan struct{}),
-		log:                            log.Logger.Named("dhcpServer/" + subnet.Name),
-		currentLeaseClients:            make(map[string]*DhcpClientInfo),
-		currentManualBindingClients:    make(map[string]*DhcpClientInfo),
-		configTemplatePath:             filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
-		configPath:                     filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
-		HostIpBindingsConfigPath:       filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s-bindIp.conf", subnet.Name)),
-		leasePath:                      filepath.Join(config.StoragePathDhcpLease, fmt.Sprintf("dnsmasq-%s.leases", subnet.Name)),
-		logPath:                        filepath.Join(config.StoragePathDhcpLog, fmt.Sprintf("dnsmasq-%s.log", subnet.Name)),
+		config:                            config,
+		lockData:                          &lock.RWMutex{},
+		lockConfigUpdate:                  &lock.RWMutex{},
+		subnet:                            subnet,
+		client:                            client,
+		addedDhcpClientForRedfishStatus:   addedDhcpClientForRedfishStatus,
+		deletedDhcpClientForRedfishStatus: deletedDhcpClientForRedfishStatus,
+		addedBindingIp:                    make(chan bindingipdata.BindingIPInfo, 1000),
+		deletedBindingIp:                  make(chan bindingipdata.BindingIPInfo, 1000),
+		stopCh:                            make(chan struct{}),
+		statusUpdateCh:                    make(chan struct{}),
+		restartCh:                         make(chan struct{}),
+		log:                               log.Logger.Named("dhcpServer/" + subnet.Name),
+		currentLeaseClients:               make(map[string]*DhcpClientInfo),
+		currentManualBindingClients:       make(map[string]*DhcpClientInfo),
+		configTemplatePath:                filepath.Join(config.DhcpConfigTemplatePath, "dnsmasq.conf.tmpl"),
+		configPath:                        filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s.conf", subnet.Name)),
+		HostIpBindingsConfigPath:          filepath.Join(config.StoragePathDhcpConfig, fmt.Sprintf("dnsmasq-%s-bindIp.conf", subnet.Name)),
+		leasePath:                         filepath.Join(config.StoragePathDhcpLease, fmt.Sprintf("dnsmasq-%s.leases", subnet.Name)),
+		logPath:                           filepath.Join(config.StoragePathDhcpLog, fmt.Sprintf("dnsmasq-%s.log", subnet.Name)),
 	}
 }
 
@@ -153,6 +152,6 @@ func (s *dhcpServer) UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, 
 	for _, dinfo := range deleted {
 		s.deletedBindingIp <- dinfo
 	}
-	
+
 	return nil
 }

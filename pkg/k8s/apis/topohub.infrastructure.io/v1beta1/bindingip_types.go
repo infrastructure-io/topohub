@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	LabelHostStatus       = GroupName + "/hoststatus"
+	LabelRedfishStatus       = GroupName + "/redfishstatus"
 )
 
 // +genclient

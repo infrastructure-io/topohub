@@ -124,7 +124,7 @@ func (s *dhcpServer) monitor() {
 
 			if event.Name == s.leasePath && (event.Op&fsnotify.Write == fsnotify.Write) {
 				s.log.Infof("watcher lease file event: %+v", event)
-				// inform new client to the hoststatus
+				// inform new client to the redfishStatu
 				if _, err := s.processDhcpLease(true); err != nil {
 					s.log.Errorf("failed to processDhcpLease: %v", err)
 					continue

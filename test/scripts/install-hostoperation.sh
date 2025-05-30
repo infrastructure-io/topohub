@@ -1,15 +1,15 @@
 #!/bin/bash
 
-hostStatusName=$1
+redfishStatusName=$1
 action=$2
 
-echo "hostStatusName: $hostStatusName"
+echo "redfishStatusName: $redfishStatusName"
 echo "action: $action"
 
-[ -n "${hostStatusName}" ] || {
-    echo "kubectl get hoststatus"
-    kubectl get hoststatus
-    echo "error: HostStatusName is required"
+[ -n "${redfishStatusName}" ] || {
+    echo "kubectl get redfishstatus"
+    kubectl get redfishstatus
+    echo "error: redfishStatusName is required"
     exit 1
 }
 
@@ -29,14 +29,14 @@ case "${action}" in
         ;;
 esac
 
-kubectl get hoststatus ${hostStatusName} &>/dev/null || {
-    echo "kubectl get hoststatus"
-    kubectl get hoststatus
-    echo "error: HostEndpoint ${hostStatusName} not found"
+kubectl get redfishstatus ${redfishStatusName} &>/dev/null || {
+    echo "kubectl get redfishstatus"
+    kubectl get redfishstatus
+    echo "error: HostEndpoint ${redfishStatusName} not found"
     exit 1
 }
 
-name=${hostStatusName}-${action}
+name=${redfishStatusName}-${action}
 
 # 创建测试用的 HostOperation 实例
 cat <<EOF | kubectl apply -f -
@@ -46,8 +46,8 @@ metadata:
   name: $( echo "${name}" | tr '[:upper:]' '[:lower:]')
 spec:
   action: "${action}"
-  hostStatusName: ${hostStatusName}
+  redfishStatusName: ${redfishStatusName}
 EOF
 
-echo "HostOperation for ${hostStatusName} created with action ${action}"
+echo "HostOperation for ${redfishStatusName} created with action ${action}"
 

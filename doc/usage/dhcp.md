@@ -62,21 +62,21 @@ status:
     dhcpIpTotalAmount: 101
 ```
 
-### 同步维护 dhcp client 的 hoststatus 和 绑定 IP 地址
+### 同步维护 dhcp client 的 redfishstatus 和 绑定 IP 地址
 
 ```
 apiVersion: topohub.infrastructure.io/v1beta1
 kind: Subnet
 spec:
   feature:
-    syncHoststatus:
-      enabled: true  # 基于 dhcp server 分配的 ip， 如果能成功访问其 bmc ，就会创建出 hoststatus 对象
+    syncRedfishstatus:
+      enabled: true  # 基于 dhcp server 分配的 ip， 如果能成功访问其 bmc ，就会创建出 redfishstatus 对象
       defaultClusterName: cluster1
-      enableBindDhcpIP: true  # 如果能够成功创建出 hoststatus 对象，就会自动创建出 bindingIp 对象。当 hoststatus 被删除时，其对应的 bindingIp 对象也会被删除。
+      enableBindDhcpIP: true  # 如果能够成功创建出 redfishstatus 对象，就会自动创建出 bindingIp 对象。当 redfishstatus 被删除时，其对应的 bindingIp 对象也会被删除。
 
 ```
 
-如果希望删除某个 Hoststatus 和其 bindingIp （自动级联删除）对象。确保该 Hoststatus 对象在网络中真实不工作了，否则，请手动删除 /var/lib/topohub/dhcp/lease 中的 IP 分配记录，再删除 Hoststatus 对象。如果不这么做，syncHoststatus.enabled 会使得 topohub 基于 dhcp 分配 ip 的记录，在确认其能够正常登录 bmc ， 会再次创建出 Hoststatus 和 bindingIp
+如果希望删除某个 Redfishstatus 和其 bindingIp （自动级联删除）对象。确保该 Redfishstatus 对象在网络中真实不工作了，否则，请手动删除 /var/lib/topohub/dhcp/lease 中的 IP 分配记录，再删除 Redfishstatus 对象。如果不这么做，syncRedfishstatus.enabled 会使得 topohub 基于 dhcp 分配 ip 的记录，在确认其能够正常登录 bmc ， 会再次创建出 Redfishstatus 和 bindingIp
 
 ### 故障排查
 

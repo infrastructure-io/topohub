@@ -62,23 +62,47 @@ func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Re
 	return reconcile.Result{}, nil
 }
 
-// 根据 HostEndpoint ，同步更新对应的 HostStatus
+// 根据 HostEndpoint ，同步更新对应的 RedfishStatus 或 SSHStatus
 func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint, logger *zap.SugaredLogger) error {
 	name := hostEndpoint.Name
 	logger.Debugf("Processing HostEndpoint %s (IP: %s)", name, hostEndpoint.Spec.IPAddr)
 
-	// Try to get existing HostStatus
-	existing := &topohubv1beta1.HostStatus{}
+	// 获取 HostEndpoint 的类型，默认为 redfish
+	endpointType := "redfish"
+	if hostEndpoint.Spec.Type != nil {
+		endpointType = *hostEndpoint.Spec.Type
+	}
+
+	// 根据类型选择不同的处理逻辑
+	switch endpointType {
+	case "ssh":
+		return r.handleSSHEndpoint(ctx, hostEndpoint, logger)
+	case "redfish":
+		return r.handleRedfishEndpoint(ctx, hostEndpoint, logger)
+	default:
+		logger.Warnf("Unknown endpoint type: %s, treating as redfish", endpointType)
+		return r.handleRedfishEndpoint(ctx, hostEndpoint, logger)
+	}
+}
+
+// 处理 Redfish 类型的 HostEndpoint
+// 根据 HostEndpoint ，同步更新对应的 RedfishStatus
+func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint, logger *zap.SugaredLogger) error {
+	name := hostEndpoint.Name
+	logger.Debugf("Processing HostEndpoint %s (IP: %s)", name, hostEndpoint.Spec.IPAddr)
+
+	// Try to get existing RedfishStatus
+	existing := &topohubv1beta1.RedfishStatus{}
 	err := r.client.Get(ctx, client.ObjectKey{Name: name}, existing)
 	if err == nil {
-		// HostStatus exists, check if spec changed
+		// RedfishStatus exists, check if spec changed
 		if specEqual(existing.Status.Basic, hostEndpoint.Spec) {
-			logger.Debugf("HostStatus %s exists with same spec, no update needed", name)
+			logger.Debugf("RedfishStatus %s exists with same spec, no update needed", name)
 			return nil
 		}
 
 		// Spec changed, update the object
-		logger.Infof("Updating HostStatus %s due to spec change", name)
+		logger.Infof("Updating RedfishStatus %s due to spec change", name)
 
 		// Create a copy of the existing object to avoid modifying the cache
 		updated := existing.DeepCopy()
@@ -104,14 +128,14 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 
 		if err := r.client.Update(ctx, updated); err != nil {
 			if errors.IsConflict(err) {
-				logger.Debugf("Conflict updating HostStatus %s, will retry", name)
+				logger.Debugf("Conflict updating RedfishStatus %s, will retry", name)
 				return err
 			}
-			logger.Errorf("Failed to update HostStatus %s: %v", name, err)
+			logger.Errorf("Failed to update RedfishStatus %s: %v", name, err)
 			return err
 		}
-		logger.Infof("Successfully updated HostStatus %s", name)
-		logger.Debugf("Updated HostStatus details - IP: %s, Secret: %s/%s, Port: %d",
+		logger.Infof("Successfully updated RedfishStatus %s", name)
+		logger.Debugf("Updated RedfishStatus details - IP: %s, Secret: %s/%s, Port: %d",
 			updated.Status.Basic.IpAddr,
 			updated.Status.Basic.SecretNamespace,
 			updated.Status.Basic.SecretName,
@@ -120,12 +144,12 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 	}
 
 	if !errors.IsNotFound(err) {
-		logger.Errorf("Failed to get HostStatus %s: %v", name, err)
+		logger.Errorf("Failed to get RedfishStatus %s: %v", name, err)
 		return err
 	}
 
-	// HostStatus doesn't exist, create new one
-	hostStatus := &topohubv1beta1.HostStatus{
+	// RedfishStatus doesn't exist, create new one
+	redfishStatus := &topohubv1beta1.RedfishStatus{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -145,22 +169,23 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 		},
 	}
 
-	// HostStatus doesn't exist, create new one
-	// IMPORTANT: When creating a new HostStatus, we must follow a two-step process:
+	// RedfishStatus doesn't exist, create new one
+	// IMPORTANT: When creating a new RedfishStatus, we must follow a two-step process:
 	// 1. First create the resource with only metadata (no status). This is because
 	//    the Kubernetes API server does not allow setting status during creation.
 	// 2. Then update the status separately using UpdateStatus. If we try to set
 	//    status during creation, the status will be silently ignored, leading to
-	//    a HostStatus without any status information until the next reconciliation.
-	logger.Debugf("Creating new HostStatus %s", name)
-	if err := r.client.Create(ctx, hostStatus); err != nil {
-		logger.Errorf("Failed to create HostStatus %s: %v", name, err)
+	//    a RedfishStatus without any status information until the next reconciliation.
+	logger.Debugf("Creating new RedfishStatus %s", name)
+	if err := r.client.Create(ctx, redfishStatus); err != nil {
+		logger.Errorf("Failed to create RedfishStatus %s: %v", name, err)
 		return err
 	}
 
 	// Get the latest version of the resource after creation
-	// if err := r.client.Get(ctx, client.ObjectKey{Name: name}, hostStatus); err != nil {
-	// 	logger.Errorf("Failed to get latest version of HostStatus %s: %v", name, err)
+	// updated := &topohubv1beta1.RedfishStatus{}
+	// if err := r.client.Get(ctx, client.ObjectKey{Name: name}, updated); err != nil {
+	// 	logger.Errorf("Failed to verify RedfishStatus %s: %v", name, err)
 	// 	return err
 	// }
 
@@ -170,7 +195,7 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 		clusterName = *hostEndpoint.Spec.ClusterName
 	}
 
-	hostStatus.Status = topohubv1beta1.HostStatusStatus{
+	redfishStatus.Status = topohubv1beta1.RedfishStatusStatus{
 		Healthy:        false,
 		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
 		Basic: topohubv1beta1.BasicInfo{
@@ -189,33 +214,39 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 		},
 	}
 	if hostEndpoint.Spec.SecretName != nil {
-		hostStatus.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
+		redfishStatus.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
 	}
 	if hostEndpoint.Spec.SecretNamespace != nil {
-		hostStatus.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
+		redfishStatus.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
 	}
 	if hostEndpoint.Spec.HTTPS != nil {
-		hostStatus.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
+		redfishStatus.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
 	}
 	if hostEndpoint.Spec.Port != nil {
-		hostStatus.Status.Basic.Port = *hostEndpoint.Spec.Port
+		redfishStatus.Status.Basic.Port = *hostEndpoint.Spec.Port
 	}
 
-	if err := r.client.Status().Update(ctx, hostStatus); err != nil {
-		logger.Errorf("Failed to update status of HostStatus %s: %v", name, err)
+	logger.Debugf("Before RedfishStatus details - IP: %s, Secret: %s/%s, Port: %d",
+		redfishStatus.Status.Basic.IpAddr,
+		redfishStatus.Status.Basic.SecretNamespace,
+		redfishStatus.Status.Basic.SecretName,
+		redfishStatus.Status.Basic.Port)
+
+	if err := r.client.Status().Update(ctx, redfishStatus); err != nil {
+		logger.Errorf("Failed to update status of redfishStatus %s: %v", name, err)
 		return err
 	}
 
-	logger.Infof("Successfully created HostStatus %s", name)
-	logger.Debugf("HostStatus details - IP: %s, Secret: %s/%s, Port: %d",
-		hostStatus.Status.Basic.IpAddr,
-		hostStatus.Status.Basic.SecretNamespace,
-		hostStatus.Status.Basic.SecretName,
-		hostStatus.Status.Basic.Port)
+	logger.Infof("Successfully created RedfishStatus %s", name)
+	logger.Debugf("RedfishStatus details - IP: %s, Secret: %s/%s, Port: %d",
+		redfishStatus.Status.Basic.IpAddr,
+		redfishStatus.Status.Basic.SecretNamespace,
+		redfishStatus.Status.Basic.SecretName,
+		redfishStatus.Status.Basic.Port)
 	return nil
 }
 
-// specEqual checks if the HostStatus basic info matches the HostEndpoint spec
+// specEqual checks if the RedfishStatus basic info matches the HostEndpoint spec
 func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
 	clusterName := ""
 	if spec.ClusterName != nil {
@@ -237,13 +268,213 @@ func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointS
 	if spec.Port != nil && basic.Port == *spec.Port {
 		t4 = true
 	}
+	t5 := false
+	if spec.Type != nil && basic.Type == *spec.Type {
+		t5 = true
+	} else if spec.Type == nil && basic.Type == "redfish" {
+		t5 = true
+	}
 
 	return basic.IpAddr == spec.IPAddr &&
 		t1 &&
 		t2 &&
 		t3 &&
 		t4 &&
+		t5 &&
 		clusterName == basic.ClusterName
+}
+
+// Handle SSH type HostEndpoint
+func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint, logger *zap.SugaredLogger) error {
+	name := hostEndpoint.Name
+	logger.Debugf("Processing SSH HostEndpoint %s (IP: %s)", name, hostEndpoint.Spec.IPAddr)
+
+	// Try to get existing SSHStatus
+	existing := &topohubv1beta1.SSHStatus{}
+	err := r.client.Get(ctx, client.ObjectKey{Name: name}, existing)
+	if err == nil {
+		// SSHStatus exists, check if spec changed
+		if specEqualSSH(existing.Status.Basic, hostEndpoint.Spec) {
+			logger.Debugf("SSHStatus %s exists with same spec, no update needed", name)
+			return nil
+		}
+
+		// Spec changed, update the object
+		logger.Infof("Updating SSHStatus %s due to spec change", name)
+
+		// Create a copy of the existing object to avoid modifying the cache
+		updated := existing.DeepCopy()
+		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
+		updated.Status.Basic = topohubv1beta1.SSHBasicInfo{
+			Type:   topohubv1beta1.HostTypeSSH,
+			IpAddr: hostEndpoint.Spec.IPAddr,
+			Port:   *hostEndpoint.Spec.Port,
+		}
+
+		// Ensure Info field is initialized
+		if updated.Status.Info == nil {
+			updated.Status.Info = map[string]string{}
+		}
+
+		if hostEndpoint.Spec.SecretName != nil {
+			updated.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
+		}
+		if hostEndpoint.Spec.SecretNamespace != nil {
+			updated.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
+		}
+		if hostEndpoint.Spec.Port != nil {
+			updated.Status.Basic.Port = *hostEndpoint.Spec.Port
+		}
+		if hostEndpoint.Spec.ClusterName != nil {
+			updated.Status.Basic.ClusterName = *hostEndpoint.Spec.ClusterName
+		}
+
+		// Output detailed information before update
+		logger.Debugf("Updating SSHStatus with details - IP: %s, Secret: %s/%s, Port: %d, ClusterName: %s",
+			updated.Status.Basic.IpAddr,
+			updated.Status.Basic.SecretNamespace,
+			updated.Status.Basic.SecretName,
+			updated.Status.Basic.Port,
+			updated.Status.Basic.ClusterName)
+
+		if err := r.client.Status().Update(ctx, updated); err != nil {
+			if errors.IsConflict(err) {
+				logger.Debugf("Conflict updating SSHStatus %s, will retry", name)
+				return err
+			}
+			logger.Errorf("Failed to update SSHStatus %s: %v", name, err)
+			return err
+		}
+		logger.Infof("Successfully updated SSHStatus %s", name)
+		logger.Debugf("Updated SSHStatus details - IP: %s, Secret: %s/%s, Port: %d",
+			updated.Status.Basic.IpAddr,
+			updated.Status.Basic.SecretNamespace,
+			updated.Status.Basic.SecretName,
+			updated.Status.Basic.Port)
+		return nil
+	}
+
+	if !errors.IsNotFound(err) {
+		logger.Errorf("Failed to get SSHStatus %s: %v", name, err)
+		return err
+	}
+
+	// SSHStatus doesn't exist, create a new one
+	sshStatus := &topohubv1beta1.SSHStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				topohubv1beta1.LabelIPAddr:     hostEndpoint.Spec.IPAddr,
+				topohubv1beta1.LabelClientMode: topohubv1beta1.HostTypeSSH,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         topohubv1beta1.APIVersion,
+					Kind:               topohubv1beta1.KindHostEndpoint,
+					Name:               hostEndpoint.Name,
+					UID:                hostEndpoint.UID,
+					Controller:         &[]bool{true}[0],
+					BlockOwnerDeletion: &[]bool{true}[0],
+				},
+			},
+		},
+	}
+
+	// IMPORTANT: When creating a new SSHStatus, we must follow a two-step process:
+	// 1. First create the resource with only metadata (no status). This is because
+	//    the Kubernetes API server does not allow setting status during creation.
+	// 2. Then update the status separately using UpdateStatus. If we try to set
+	//    status during creation, the status will be silently ignored, leading to
+	//    a SSHStatus without any status information until the next reconciliation.
+	logger.Debugf("Creating new SSHStatus %s", name)
+	if err := r.client.Create(ctx, sshStatus); err != nil {
+		logger.Errorf("Failed to create SSHStatus %s: %v", name, err)
+		return err
+	}
+
+	// Get the latest version of the resource after creation
+	if err := r.client.Get(ctx, client.ObjectKey{Name: name}, sshStatus); err != nil {
+		logger.Errorf("Failed to get latest version of SSHStatus %s: %v", name, err)
+		return err
+	}
+
+	// Now update the status using the latest version
+	clusterName := ""
+	if hostEndpoint.Spec.ClusterName != nil {
+		clusterName = *hostEndpoint.Spec.ClusterName
+	}
+
+	sshStatus.Status = topohubv1beta1.SSHStatusStatus{
+		Healthy:        false,
+		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
+		Basic: topohubv1beta1.SSHBasicInfo{
+			Type:        topohubv1beta1.HostTypeSSH,
+			IpAddr:      hostEndpoint.Spec.IPAddr,
+			Port:        *hostEndpoint.Spec.Port,
+			ClusterName: clusterName,
+		},
+		Info: map[string]string{},
+	}
+
+	if hostEndpoint.Spec.SecretName != nil {
+		sshStatus.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
+	}
+	if hostEndpoint.Spec.SecretNamespace != nil {
+		sshStatus.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
+	}
+	if hostEndpoint.Spec.Port != nil {
+		sshStatus.Status.Basic.Port = *hostEndpoint.Spec.Port
+	}
+
+	// Output detailed information before creation
+	logger.Debugf("Creating SSHStatus with details - IP: %s, Secret: %s/%s, Port: %d, ClusterName: %s",
+		sshStatus.Status.Basic.IpAddr,
+		sshStatus.Status.Basic.SecretNamespace,
+		sshStatus.Status.Basic.SecretName,
+		sshStatus.Status.Basic.Port,
+		sshStatus.Status.Basic.ClusterName)
+
+	if err := r.client.Status().Update(ctx, sshStatus); err != nil {
+		logger.Errorf("Failed to update status of SSHStatus %s: %v", name, err)
+		return err
+	}
+
+	logger.Infof("Successfully created SSHStatus %s", name)
+	logger.Debugf("SSHStatus details - IP: %s, Secret: %s/%s, Port: %d",
+		sshStatus.Status.Basic.IpAddr,
+		sshStatus.Status.Basic.SecretNamespace,
+		sshStatus.Status.Basic.SecretName,
+		sshStatus.Status.Basic.Port)
+	return nil
+}
+
+// Check if the SSH status basic info matches the host endpoint spec
+func specEqualSSH(basic topohubv1beta1.SSHBasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
+	if basic.IpAddr != spec.IPAddr {
+		return false
+	}
+
+	// Check port
+	if spec.Port != nil && basic.Port != *spec.Port {
+		return false
+	}
+
+	// Check Secret
+	if spec.SecretName != nil && basic.SecretName != *spec.SecretName {
+		return false
+	}
+
+	// Check Secret namespace
+	if spec.SecretNamespace != nil && basic.SecretNamespace != *spec.SecretNamespace {
+		return false
+	}
+
+	// Check cluster name
+	clusterName := ""
+	if spec.ClusterName != nil {
+		clusterName = *spec.ClusterName
+	}
+	return basic.ClusterName == clusterName
 }
 
 // SetupWithManager sets up the controller with the Manager

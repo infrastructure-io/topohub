@@ -22,7 +22,7 @@ spec:
     vlanId: ${INT_VLAN_ID}
     ipv4: "${INT_IPV4}"
   feature:
-    syncHoststatus:
+    syncRedfishstatus:
       enabled: true
       defaultClusterName: cluster1
       enableBindDhcpIP: true
@@ -67,7 +67,7 @@ spec:
     vlanId: ${INT_VLAN_ID}
     ipv4: "${INT_IPV4}"
   feature:
-    syncHoststatus:
+    syncRedfishstatus:
       enabled: true
       defaultClusterName: cluster2
       enableBindDhcpIP: true

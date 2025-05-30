@@ -3,6 +3,7 @@ package hostoperation
 import (
 	"context"
 	"fmt"
+
 	"go.uber.org/zap"
 
 	//"time"
@@ -60,16 +61,16 @@ func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.O
 
 	h.log.Debugf("Processing ValidateCreate webhook for HostOperation %s", hostOp.Name)
 
-	// 验证 hostStatusName 对应的 HostStatus 是否存在且健康
-	var hostStatus topohubv1beta1.HostStatus
-	if err := h.Client.Get(ctx, client.ObjectKey{Name: hostOp.Spec.HostStatusName}, &hostStatus); err != nil {
-		err = fmt.Errorf("hostStatus %s not found: %v", hostOp.Spec.HostStatusName, err)
+	// 验证 RedfishStatusName 对应的 RedfishStatus 是否存在且健康
+	var redfishStatus topohubv1beta1.RedfishStatus
+	if err := h.Client.Get(ctx, client.ObjectKey{Name: hostOp.Spec.RedfishStatusName}, &redfishStatus); err != nil {
+		err = fmt.Errorf("RedfishStatus %s not found: %v", hostOp.Spec.RedfishStatusName, err)
 		h.log.Error(err.Error())
 		return nil, err
 	}
 
-	if !hostStatus.Status.Healthy {
-		err := fmt.Errorf("hostStatus %s is not healthy, so it is not allowed to create hostOperation %s", hostOp.Spec.HostStatusName, hostOp.Name)
+	if !redfishStatus.Status.Healthy {
+		err := fmt.Errorf("RedfishStatus %s is not healthy, so it is not allowed to create hostOperation %s", hostOp.Spec.RedfishStatusName, hostOp.Name)
 		h.log.Error(err.Error())
 		return nil, err
 	}

@@ -11,10 +11,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/infrastructure-io/topohub/pkg/config"
-	hoststatusData "github.com/infrastructure-io/topohub/pkg/hoststatus/data"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
+	redfishstatusData "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	"go.uber.org/zap"
 )
 
@@ -51,10 +51,10 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// 获取关联的 HostStatus
-	hostStatus := &topohubv1beta1.HostStatus{}
-	if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.HostStatusName}, hostStatus); err != nil {
-		logger.Errorf("Failed to get HostStatus %s: %v", hostOp.Spec.HostStatusName, err)
+	// 获取关联的 RedfishStatus
+	redfishStatus := &topohubv1beta1.RedfishStatus{}
+	if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.RedfishStatusName}, redfishStatus); err != nil {
+		logger.Errorf("Failed to get RedfishStatus %s: %v", hostOp.Spec.RedfishStatusName, err)
 		return ctrl.Result{}, err
 	}
 
@@ -65,24 +65,24 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		// 更新状态
 		hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
 		hostOp.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		hostOp.Status.ClusterName = hostStatus.Status.Basic.ClusterName
-		hostOp.Status.IpAddr = hostStatus.Status.Basic.IpAddr
+		hostOp.Status.ClusterName = redfishStatus.Status.Basic.ClusterName
+		hostOp.Status.IpAddr = redfishStatus.Status.Basic.IpAddr
 
 		// 调用 redfish 接口 完成操作
 		// get connect config from cache
-		d := hoststatusData.HostCacheDatabase.Get(hostOp.Spec.HostStatusName)
+		d := redfishstatusData.RedfishCacheDatabase.Get(hostOp.Spec.RedfishStatusName)
 		if d == nil {
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
-			logger.Warnf("Failed to get connect config %s from cache, retry later", hostOp.Spec.HostStatusName)
+			logger.Warnf("Failed to get connect config %s from cache, retry later", hostOp.Spec.RedfishStatusName)
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
-		logger.Debugf("get connect config %s from cache: %+v", hostOp.Spec.HostStatusName, d)
+		logger.Debugf("get connect config %s from cache: %+v", hostOp.Spec.RedfishStatusName, d)
 
 		var err error
 		c, terr := redfish.NewClient(*d, logger)
 		if terr != nil {
 			err = terr
-			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.HostStatusName, err)
+			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.RedfishStatusName, err)
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusFailed
 			hostOp.Status.Message = err.Error()
 		} else {
@@ -108,11 +108,11 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 
 		hostOp.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		if err != nil {
-			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.HostStatusName, err)
+			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.RedfishStatusName, err)
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusFailed
 			hostOp.Status.Message = err.Error()
 		} else {
-			logger.Infof("Succeeded to operate %s", hostOp.Spec.HostStatusName)
+			logger.Infof("Succeeded to operate %s", hostOp.Spec.RedfishStatusName)
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusSuccess
 		}
 

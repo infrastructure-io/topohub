@@ -25,7 +25,7 @@ import (
 type SubnetManager interface {
 	SetupWithManager(mgr ctrl.Manager) error
 	Stop()
-	GetDhcpClientEventsForHostStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
+	GetDhcpClientEventsForRedfishStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo)
 	GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo)
 }
 
@@ -37,32 +37,31 @@ type subnetManager struct {
 
 	log *zap.SugaredLogger
 
-	// 本模块往其中添加数据，关于 dhcp client 变化信息。由 hoststatus 模块来消费使用
-	addedDhcpClientForHostStatus   chan dhcpserver.DhcpClientInfo
-	deletedDhcpClientForHostStatus chan dhcpserver.DhcpClientInfo
-
+	// 本模块往其中添加数据，关于 dhcp client 变化信息。由 redfishstatus 模块来消费使用
+	addedDhcpClientForRedfishStatus   chan dhcpserver.DhcpClientInfo
+	deletedDhcpClientForRedfishStatus chan dhcpserver.DhcpClientInfo
 
 	// bindingip 模块 往其中添加数据，关于 bindingip 。由本模块来消费使用
 	addedBindingIp   chan bindingipdata.BindingIPInfo
 	deletedBindingIp chan bindingipdata.BindingIPInfo
 
 	// lock
-	dataLock     lock.RWMutex
+	dataLock       lock.RWMutex
 	dhcpServerList map[string]dhcpserver.DhcpServer
 }
 
 func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interface) SubnetManager {
 	return &subnetManager{
-		config:                         &config,
-		kubeClient:                     kubeClient,
-		cache:                          NewSubnetCache(),
-		dataLock:                     lock.RWMutex{},
-		addedDhcpClientForHostStatus:   make(chan dhcpserver.DhcpClientInfo, 1000),
-		deletedDhcpClientForHostStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
-		addedBindingIp:                 make(chan bindingipdata.BindingIPInfo, 1000),
-		deletedBindingIp:               make(chan bindingipdata.BindingIPInfo, 1000),
-		dhcpServerList:                 make(map[string]dhcpserver.DhcpServer),
-		log:                            log.Logger.Named("subnetManager"),
+		config:                            &config,
+		kubeClient:                        kubeClient,
+		cache:                             NewSubnetCache(),
+		dataLock:                          lock.RWMutex{},
+		addedDhcpClientForRedfishStatus:   make(chan dhcpserver.DhcpClientInfo, 1000),
+		deletedDhcpClientForRedfishStatus: make(chan dhcpserver.DhcpClientInfo, 1000),
+		addedBindingIp:                    make(chan bindingipdata.BindingIPInfo, 1000),
+		deletedBindingIp:                  make(chan bindingipdata.BindingIPInfo, 1000),
+		dhcpServerList:                    make(map[string]dhcpserver.DhcpServer),
+		log:                               log.Logger.Named("subnetManager"),
 	}
 }
 
@@ -130,7 +129,7 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 
 		// todo: start the dhcp server on the subnet
 		if !exists {
-			t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus)
+			t := dhcpserver.NewDhcpServer(s.config, subnet, s.client, s.addedDhcpClientForRedfishStatus, s.deletedDhcpClientForRedfishStatus)
 			err := t.Run()
 			if err != nil {
 				msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
@@ -169,7 +168,6 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 	} else {
 		logger.Debugf("Subnet %s spec has no change", subnet.Name)
 	}
-	
 
 	return reconcile.Result{}, nil
 }
@@ -199,7 +197,7 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 			// 检查是否已经存在对应的 DHCP 服务器
 			if _, exists := s.dhcpServerList[subnet.Name]; !exists {
 				// 创建新的 DHCP 服务器实例
-				dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus)
+				dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClientForRedfishStatus, s.deletedDhcpClientForRedfishStatus)
 
 				// 启动 DHCP 服务器
 				if err := dhcpServer.Run(); err != nil {
@@ -235,9 +233,9 @@ func (s *subnetManager) Stop() {
 	}
 }
 
-// this module send event to the channel, and hoststatus module consume it
-func (s *subnetManager) GetDhcpClientEventsForHostStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
-	return s.addedDhcpClientForHostStatus, s.deletedDhcpClientForHostStatus
+// this module send event to the channel, and redfishstatus module consume it
+func (s *subnetManager) GetDhcpClientEventsForRedfishStatus() (chan dhcpserver.DhcpClientInfo, chan dhcpserver.DhcpClientInfo) {
+	return s.addedDhcpClientForRedfishStatus, s.deletedDhcpClientForRedfishStatus
 }
 
 func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, chan bindingipdata.BindingIPInfo) {

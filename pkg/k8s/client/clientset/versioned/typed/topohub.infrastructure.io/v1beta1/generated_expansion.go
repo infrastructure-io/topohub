@@ -9,6 +9,8 @@ type HostEndpointExpansion interface{}
 
 type HostOperationExpansion interface{}
 
-type HostStatusExpansion interface{}
+type RedfishStatusExpansion interface{}
+
+type SSHStatusExpansion interface{}
 
 type SubnetExpansion interface{}

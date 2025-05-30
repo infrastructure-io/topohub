@@ -44,8 +44,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostEndpoints().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("hostoperations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostOperations().Informer()}, nil
-	case v1beta1.SchemeGroupVersion.WithResource("hoststatuses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().HostStatuses().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("redfishstatuses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().RedfishStatuses().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("sshstatuses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().SSHStatuses().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("subnets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Topohub().V1beta1().Subnets().Informer()}, nil
 

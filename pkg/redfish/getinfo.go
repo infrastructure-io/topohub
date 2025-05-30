@@ -112,7 +112,7 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 		return nil, err
 	}
 	setData(result, "MemoryChipsAccount", fmt.Sprintf("%d", len(mms)))
-	//在内存条不变时，有时数组的顺序的变换，导致 后续 hoststatus 会做无意义的更新，暂时 取消这些信息
+	//在内存条不变时，有时数组的顺序的变换，导致 后续 redfishstatus 会做无意义的更新，暂时 取消这些信息
 	for n, mm := range mms {
 		//c.logger.Debugf("Memory[%d]: %+v", n, mm)
 		setData(result, fmt.Sprintf("Memory[%d].Manufacturer", n), string(mm.Manufacturer))

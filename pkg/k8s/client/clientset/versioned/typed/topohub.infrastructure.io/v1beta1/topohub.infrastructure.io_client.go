@@ -17,7 +17,8 @@ type TopohubV1beta1Interface interface {
 	RESTClient() rest.Interface
 	HostEndpointsGetter
 	HostOperationsGetter
-	HostStatusesGetter
+	RedfishStatusesGetter
+	SSHStatusesGetter
 	SubnetsGetter
 }
 
@@ -34,8 +35,12 @@ func (c *TopohubV1beta1Client) HostOperations() HostOperationInterface {
 	return newHostOperations(c)
 }
 
-func (c *TopohubV1beta1Client) HostStatuses() HostStatusInterface {
-	return newHostStatuses(c)
+func (c *TopohubV1beta1Client) RedfishStatuses() RedfishStatusInterface {
+	return newRedfishStatuses(c)
+}
+
+func (c *TopohubV1beta1Client) SSHStatuses() SSHStatusInterface {
+	return newSSHStatuses(c)
 }
 
 func (c *TopohubV1beta1Client) Subnets() SubnetInterface {

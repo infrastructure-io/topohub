@@ -44,7 +44,7 @@ BMC (Baseboard Management Controller) 管理系统是一个基于 Kubernetes 的
    - 包含 Agent 的配置信息
    - 管理 Agent 的运行状态
 
-2. **HostStatus**
+2. **redfishStatus**
    - 记录物理机的状态信息
    - 包含 Redfish 获取的详细信息
    - 展示物理机的健康状态

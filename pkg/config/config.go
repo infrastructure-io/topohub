@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"os/exec"
+
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
-	"os/exec"
 )
 
 // AgentConfig represents the agent configuration
@@ -43,11 +44,12 @@ type AgentConfig struct {
 	// FeatureConfigPath is the path to the feature configuration file
 	FeatureConfigPath string
 	// Redfish configuration
-	RedfishPort                     int
-	RedfishHttps                    bool
-	RedfishSecretName               string
-	RedfishSecretNamespace          string
-	RedfishHostStatusUpdateInterval int
+	RedfishPort                 int
+	RedfishHttps                bool
+	RedfishSecretName           string
+	RedfishSecretNamespace      string
+	RedfishStatusUpdateInterval int
+	SSHStatusUpdateInterval     int
 	// DHCP server configuration
 	DhcpServerInterface string
 
@@ -89,16 +91,27 @@ func (c *AgentConfig) loadFeatureConfig() error {
 	}
 	c.RedfishSecretNamespace = string(secretNsBytes)
 
-	// Read redfishHostStatusUpdateInterval
-	intervalBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "redfishHostStatusUpdateInterval"))
+	// Read redfishStatusUpdateInterval
+	intervalBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "redfishStatusUpdateInterval"))
 	if err != nil {
-		return fmt.Errorf("failed to read redfishHostStatusUpdateInterval: %v", err)
+		return fmt.Errorf("failed to read redfishStatusUpdateInterval: %v", err)
 	}
 	interval, err := strconv.Atoi(string(intervalBytes))
 	if err != nil {
-		return fmt.Errorf("invalid redfishHostStatusUpdateInterval value: %v", err)
+		return fmt.Errorf("invalid redfishStatusUpdateInterval value: %v", err)
 	}
-	c.RedfishHostStatusUpdateInterval = interval
+	c.RedfishStatusUpdateInterval = interval
+
+	// Read sshStatusUpdateInterval
+	sshIntervalBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "sshStatusUpdateInterval"))
+	if err != nil {
+		return fmt.Errorf("failed to read sshStatusUpdateInterval: %v", err)
+	}
+	sshInterval, err := strconv.Atoi(string(sshIntervalBytes))
+	if err != nil {
+		return fmt.Errorf("invalid sshStatusUpdateInterval value: %v", err)
+	}
+	c.SSHStatusUpdateInterval = sshInterval
 
 	// Read dhcpServerInterface
 	interfaceBytes, err := os.ReadFile(filepath.Join(c.FeatureConfigPath, "dhcpServerInterface"))
@@ -191,7 +204,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 	// Copy core.efi file if it exists
 	sourceFile := "/files/core.efi"
 	targetFile := filepath.Join(c.StoragePathTftpAbsoluteDirForPxeEfi, "core.efi")
-	if _, err := os.Stat(targetFile); err!=nil && os.IsNotExist(err) {
+	if _, err := os.Stat(targetFile); err != nil && os.IsNotExist(err) {
 		if _, err := os.Stat(sourceFile); err == nil {
 			log.Logger.Infof("%s exists, copying to %s", sourceFile, targetFile)
 			input, err := os.ReadFile(sourceFile)
@@ -202,7 +215,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 				return fmt.Errorf("failed to copy core.efi to %s: %v", targetFile, err)
 			}
 			log.Logger.Infof("Successfully copied core.efi to %s", targetFile)
-		}else{
+		} else {
 			return fmt.Errorf("source core.efi not found")
 		}
 	}

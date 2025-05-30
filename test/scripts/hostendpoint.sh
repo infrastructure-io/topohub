@@ -27,7 +27,9 @@ spec:
   secretNamespace: "topohub"
   # Communication settings (optional)
   https: true  # Defaults to true if not specified
-  port: 443     
+  port: 443
+  # Endpoint type
+  type: redfish     
 EOF
 
 
@@ -61,6 +63,7 @@ spec:
   secretNamespace: "topohub"
   # Communication settings (optional)
   https: true  # Defaults to true if not specified
-  port: 443     
+  port: 443
+  # Endpoint type
+  type: redfish     
 EOF
-

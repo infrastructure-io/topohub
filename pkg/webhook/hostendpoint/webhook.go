@@ -3,8 +3,9 @@ package hostendpoint
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"net"
+
+	"go.uber.org/zap"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -137,15 +138,15 @@ func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndp
 		}
 	}
 
-	// Check IP address conflict with existing HostStatus
-	hostStatusList := &topohubv1beta1.HostStatusList{}
-	if err := w.Client.List(ctx, hostStatusList); err != nil {
-		return fmt.Errorf("failed to list HostStatus: %v", err)
+	// Check IP address conflict with existing RedfishStatus
+	redfishStatusList := &topohubv1beta1.RedfishStatusList{}
+	if err := w.Client.List(ctx, redfishStatusList); err != nil {
+		return fmt.Errorf("failed to list RedfishStatus: %v", err)
 	}
 
-	for _, hostStatus := range hostStatusList.Items {
-		if hostStatus.Status.Basic.IpAddr == hostEndpoint.Spec.IPAddr {
-			return fmt.Errorf("IP address %s is already used by HostStatus %s", hostEndpoint.Spec.IPAddr, hostStatus.Name)
+	for _, redfishStatus := range redfishStatusList.Items {
+		if redfishStatus.Status.Basic.IpAddr == hostEndpoint.Spec.IPAddr {
+			return fmt.Errorf("IP address %s is already used by RedfishStatus %s", hostEndpoint.Spec.IPAddr, redfishStatus.Name)
 		}
 	}
 

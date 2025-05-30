@@ -23,17 +23,19 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/debug"
 	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
 	"github.com/infrastructure-io/topohub/pkg/hostoperation"
-	"github.com/infrastructure-io/topohub/pkg/hoststatus"
 	"github.com/infrastructure-io/topohub/pkg/httpserver"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
 	"github.com/infrastructure-io/topohub/pkg/secret"
+	"github.com/infrastructure-io/topohub/pkg/sshstatus"
 	"github.com/infrastructure-io/topohub/pkg/subnet"
 	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
 	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
 	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
-	hoststatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/hoststatus"
+	redfishstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/redfishstatus"
+	sshstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/sshstatus"
 	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -136,9 +138,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup HostStatus webhook
-	if err = (&hoststatuswebhook.HostStatusWebhook{}).SetupWebhookWithManager(mgr); err != nil {
-		log.Logger.Errorf("unable to create webhook %s: %v", "HostStatus", err)
+	// Setup RedfishStatus webhook
+	if err := redfishstatuswebhook.SetupWebhookWithManager(mgr); err != nil {
+		log.Logger.Errorf("Unable to setup redfishstatus webhook: %v", err)
+		os.Exit(1)
+	}
+
+	// Setup SSHStatus webhook
+	if err = (&sshstatuswebhook.SSHStatusWebhook{}).SetupWebhookWithManager(mgr); err != nil {
+		log.Logger.Errorf("unable to create webhook %s: %v", "SSHStatus", err)
 		os.Exit(1)
 	}
 
@@ -148,17 +156,19 @@ func main() {
 		log.Logger.Errorf("Failed to setup subnet manager: %v", err)
 		os.Exit(1)
 	}
-	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEventsForHostStatus()
+
+	// dhcp client events for redfishstatus
+	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEventsForRedfishStatus()
 	addBindingIpChan, deleteBindingIpChan := subnetMgr.GetBindingIpEvents()
-	// Initialize hoststatus controller
-	hostStatusCtrl := hoststatus.NewHostStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan)
-	if err = hostStatusCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create hoststatus controller: %v", err)
+	// Initialize redfishstatus controller
+	redfishStatusCtrl := redfishstatus.NewRedfishStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan)
+	if err = redfishStatusCtrl.SetupWithManager(mgr); err != nil {
+		log.Logger.Errorf("Unable to create redfishstatus controller: %v", err)
 		os.Exit(1)
 	}
 
-	// initialize secret controller
-	secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, hostStatusCtrl)
+	// Initialize secret controller
+	secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
 	if err != nil {
 		log.Logger.Errorf("Failed to create secret controller: %v", err)
 		os.Exit(1)
@@ -168,7 +178,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize hostendpoint controller, it will watch the hostendpoint and update the hoststatus
+	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus
 	hostEndpointCtrl, err := hostendpoint.NewHostEndpointReconciler(mgr, k8sClient, agentConfig)
 	if err != nil {
 		log.Logger.Errorf("Failed to create hostendpoint controller: %v", err)
@@ -188,6 +198,13 @@ func main() {
 
 	if err = hostOperationCtrl.SetupWithManager(mgr); err != nil {
 		log.Logger.Errorf("Unable to create hostoperation controller: %v", err)
+		os.Exit(1)
+	}
+
+	// Initialize sshstatus controller
+	sshStatusCtrl := sshstatus.NewSSHStatusController(k8sClient, agentConfig, mgr)
+	if err = sshStatusCtrl.SetupWithManager(mgr); err != nil {
+		log.Logger.Errorf("Unable to create sshstatus controller: %v", err)
 		os.Exit(1)
 	}
 
@@ -264,8 +281,8 @@ func main() {
 
 			// Stop DHCP server to remove ip if it was started
 
-			// Stop hoststatus controller
-			hostStatusCtrl.Stop()
+			// Stop redfishstatus controller
+			redfishStatusCtrl.Stop()
 
 			// Cancel context to stop manager
 			cancel()

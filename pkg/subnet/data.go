@@ -1,8 +1,9 @@
 package subnet
 
 import (
-	"github.com/infrastructure-io/topohub/pkg/lock"
 	"reflect"
+
+	"github.com/infrastructure-io/topohub/pkg/lock"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )

@@ -13,7 +13,7 @@ import (
 // +kubebuilder:printcolumn:name="IP_TOTAL",type="integer",JSONPath=".status.dhcpStatus.dhcpIpTotalAmount"
 // +kubebuilder:printcolumn:name="IP_AVAILABLE",type="integer",JSONPath=".status.dhcpStatus.dhcpIpAvailableAmount"
 // +kubebuilder:printcolumn:name="IP_RESERVED",type="integer",JSONPath=".status.dhcpStatus.dhcpIpBindAmount"
-// +kubebuilder:printcolumn:name="SYNC_HOSTSTATUS",type="boolean",JSONPath=".spec.feature.syncHoststatus.enabled"
+// +kubebuilder:printcolumn:name="SYNC_redfishStatus",type="boolean",JSONPath=".spec.feature.syncRedfishstatus.enabled"
 // +kubebuilder:printcolumn:name="PXE",type="boolean",JSONPath=".spec.feature.enablePxe"
 // +kubebuilder:printcolumn:name="ZTP",type="boolean",JSONPath=".spec.feature.enableZtp"
 // +kubebuilder:subresource:status
@@ -70,8 +70,8 @@ type InterfaceSpec struct {
 
 // FeatureSpec defines the feature configuration
 type FeatureSpec struct {
-	// SyncHoststatus configuration
-	SyncHoststatus SyncHoststatusSpec `json:"syncHoststatus"`
+	// SyncRedfishstatus configuration
+	SyncRedfishstatus SyncRedfishstatusSpec `json:"syncRedfishstatus"`
 
 	// Enable PXE boot support
 	// +kubebuilder:validation:Required
@@ -84,9 +84,9 @@ type FeatureSpec struct {
 	EnableZtp bool `json:"enableZtp"`
 }
 
-// SyncHoststatusSpec defines the sync endpoint configuration
-type SyncHoststatusSpec struct {
-	// Enable automatically create the hoststatus object for the dhcp client. Notice, it will not be deleted automatically
+// SyncRedfishstatusSpec defines the sync endpoint configuration
+type SyncRedfishstatusSpec struct {
+	// Enable automatically create the redfishstatus object for the dhcp client. Notice, it will not be deleted automatically
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 

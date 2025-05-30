@@ -92,13 +92,13 @@ root@bmc-e2e-worker:/# cat /var/lib/dhcp/bmc-clusteragent-dhcpd.leases
             client-hostname "redfish-redfish-mockup-ff6b7749c-7njhv";
           }
 
-## hoststatus 管理模块
+## redfishstatus 管理模块
 
-新建定义一个 cluster 级别的 crd hoststatus
+新建定义一个 cluster 级别的 crd redfishstatus
 
 ```
 apiVersion: topohub.infrastructure.io/v1beta1
-kind: hostStatus
+kind: redfishStatus
 metadata:
   name: agentname-ipaddress
   ownerReferences:
@@ -132,9 +132,9 @@ status:
 
 请在 @pkg/k8s/apis/topohub.infrastructure.io/v1beta1 中创建 crd 定义后， 可使用 make update_crd_sdk  来生成 配套的 client sdk，位于 @pkg/k8s/client 下 ， 相关的 deep copy 函数，也会生成在 @pkg/k8s/apis ， 相关的 crd 定义 生成在 @chart/crds 下
 
-请在 @templates/agent-templates.yaml 中的 agent role 中赋予 hoststatus 的权限
+请在 @templates/agent-templates.yaml 中的 agent role 中赋予 redfishstatus 的权限
 
-@pkg/agent/hoststatus 目录下 创建一个 hoststatus 维护模块，它 通过 interface{} 对外暴露使用，它应该有如下接口
+@pkg/agent/redfishstatus 目录下 创建一个 redfishstatus 维护模块，它 通过 interface{} 对外暴露使用，它应该有如下接口
 
 （1）创建  维护模块 实例
       传入 agent的 agentConfig 对象 作为 工作参数
@@ -142,50 +142,50 @@ status:
 
 （2）运行接口
       * 它 启动一个携程， list watch 所有的 hostEndpoint 实例，当有 新的 hostEndpoint 对象时
-          确认 hostEndpoint 对象 的 对应的 hostStatus 对象存在， 如果不存在，就创建一个
-             hostStatus 对象的创建，遵循
-                  hostStatus metadata.name = hostEndpoint spec.clusterAgent +  hostEndpoint spec.ipAddr(把 . 替换成 -)
-                  hostStatus metadata.ownerReferences 关联到 该  hostEndpoint 。 从而可实现 级联删除
-                  hostStatus status.healthReady = false
-                  hostStatus status.clusterAgent = hostEndpoint spec.clusterAgent
-                  hostStatus status.basic.type = "hostEndpoint"
-                  hostStatus status.basic.ipAddr = hostEndpoint spec.ipAddr
-                  hostStatus status.basic.secretName = hostEndpoint spec.secretName
-                  hostStatus status.basic.secretNamespace = hostEndpoint spec.secretNamespace
-                  hostStatus status.basic.https = hostEndpoint spec.https
-                  hostStatus status.basic.port = hostEndpoint spec.port
-                  hostStatus status.basic.mac = ""
-                  刷新 hostStatus status.lastUpdateTime
+          确认 hostEndpoint 对象 的 对应的 redfishStatus 对象存在， 如果不存在，就创建一个
+             redfishStatus 对象的创建，遵循
+                  redfishStatus metadata.name = hostEndpoint spec.clusterAgent +  hostEndpoint spec.ipAddr(把 . 替换成 -)
+                  redfishStatus metadata.ownerReferences 关联到 该  hostEndpoint 。 从而可实现 级联删除
+                  redfishStatus status.healthReady = false
+                  redfishStatus status.clusterAgent = hostEndpoint spec.clusterAgent
+                  redfishStatus status.basic.type = "hostEndpoint"
+                  redfishStatus status.basic.ipAddr = hostEndpoint spec.ipAddr
+                  redfishStatus status.basic.secretName = hostEndpoint spec.secretName
+                  redfishStatus status.basic.secretNamespace = hostEndpoint spec.secretNamespace
+                  redfishStatus status.basic.https = hostEndpoint spec.https
+                  redfishStatus status.basic.port = hostEndpoint spec.port
+                  redfishStatus status.basic.mac = ""
+                  刷新 redfishStatus status.lastUpdateTime
 
       * 它 启动一个携程，通过 暴露两个 channel 变量，  让 @pkg/dhcpserver/server.go 中的  func (s *dhcpServer) updateStats() error 中 发生事件 时主动通知， 获取 新增 和 删除 的 client 信息
-            当有新的 dhcp client 分配了 ip ， 把么 创建对应的 hostStatus 对象
-                  hostStatus metadata.name = agentConfig 中的 clusterAgentName + 新 client 的 ip (把 . 替换成 -)
-                  hostStatus metadata.ownerReferences 关联到 空
-                  hostStatus status.healthReady = false
-                  hostStatus status.clusterAgent = agentConfig 中的 clusterAgentName
-                  hostStatus status.basic.type = "dhcp"
-                  hostStatus status.basic.ipAddr = 新 client 的 ip
-                  hostStatus status.basic.secretName = agentConfig 中 AgentObjSpec.Endpoint.secretName
-                  hostStatus status.basic.secretNamespace = agentConfig 中 AgentObjSpec.Endpoint.secretNamespace
-                  hostStatus status.basic.https =  agentConfig 中 AgentObjSpec.Endpoint.https
-                  hostStatus status.basic.port = agentConfig 中 AgentObjSpec.Endpoint.port
-                  hostStatus status.basic.mac = 新 client 的 mac
-                  刷新 hostStatus status.lastUpdateTime
+            当有新的 dhcp client 分配了 ip ， 把么 创建对应的 redfishStatus 对象
+                  redfishStatus metadata.name = agentConfig 中的 clusterAgentName + 新 client 的 ip (把 . 替换成 -)
+                  redfishStatus metadata.ownerReferences 关联到 空
+                  redfishStatus status.healthReady = false
+                  redfishStatus status.clusterAgent = agentConfig 中的 clusterAgentName
+                  redfishStatus status.basic.type = "dhcp"
+                  redfishStatus status.basic.ipAddr = 新 client 的 ip
+                  redfishStatus status.basic.secretName = agentConfig 中 AgentObjSpec.Endpoint.secretName
+                  redfishStatus status.basic.secretNamespace = agentConfig 中 AgentObjSpec.Endpoint.secretNamespace
+                  redfishStatus status.basic.https =  agentConfig 中 AgentObjSpec.Endpoint.https
+                  redfishStatus status.basic.port = agentConfig 中 AgentObjSpec.Endpoint.port
+                  redfishStatus status.basic.mac = 新 client 的 mac
+                  刷新 redfishStatus status.lastUpdateTime
 
-            当有 dhcp client 被释放 ip ， 把么 删除 对应  hostStatus 对象
+            当有 dhcp client 被释放 ip ， 把么 删除 对应  redfishStatus 对象
 
-    * 它 启动一个携程， 监听所有的  hostStatus 对象 ，实现对  hostStatus status.info  的信息维护 （更新函数中的代码。暂时为空，只打印 监听到 hostStatus 对象 变化的日志 ）
+    * 它 启动一个携程， 监听所有的  redfishStatus 对象 ，实现对  redfishStatus status.info  的信息维护 （更新函数中的代码。暂时为空，只打印 监听到 redfishStatus 对象 变化的日志 ）
 
 
 （3）停止接口
 
-在 @cmd/agent 集成以上 hoststatus 维护模块， 实现它的 启动 和 停止
+在 @cmd/agent 集成以上 redfishstatus 维护模块， 实现它的 启动 和 停止
 
 请不要修改和本问题无关的其他代码
 
 //---------------
 
-在 pkg/agent/hoststatus/data 中实现一个 数据缓存的模块 ，定义如下
+在 pkg/agent/redfishstatus/data 中实现一个 数据缓存的模块 ，定义如下
 
 type hostData struct {
   Info *BasicInfo
@@ -212,7 +212,7 @@ type hostCache struct {
 ## dhcp 的 僵死 ip
 
 dhcp 不支持 主动探活 client ip  
-对于 hoststatus 中的 HEALTHREADY = false， 因此 需要手动 确认 
+对于 redfishstatus 中的 HEALTHREADY = false， 因此 需要手动 确认 
 然后 进入 agent pod 中， 删除  /var/lib/dhcp/bmc-clusteragent-dhcpd.leases 文件中的 无效 ip 即可 
 
 ## redfish 接口
@@ -247,12 +247,12 @@ metadata:
   name: power-off
 spec:
   action: "powerOff"|"powerOn"|"reboot"|"pxeReboot"  // 必填
-  hostStatusName: "test"  // 必填， controller 组件确认，该名字 对应的 hostStatus crd 实例要存在，且其 status.healthy 要求为 true
+  redfishStatusName: "test"  // 必填， controller 组件确认，该名字 对应的 redfishStatus crd 实例要存在，且其 status.healthy 要求为 true
 status:
   status: "pending"|"success"|"failure"  // 对象创建后，默认初始是 pending 状态
   message: "xxxx"
   lastUpdateTime: "2024-12-19T07:14:33Z"
-  clusterAgent: default-agent  //对象创建后，controller 组件的 mutating webhook ， 根据 spec.hostStatusName ，寻找对应的 hostStatus crd 实例 ， 把其中的 status.clusterAgent 赋值给 它
+  clusterAgent: default-agent  //对象创建后，controller 组件的 mutating webhook ， 根据 spec.redfishStatusName ，寻找对应的 redfishStatus crd 实例 ， 把其中的 status.clusterAgent 赋值给 它
 ```
 
 请在 @pkg/k8s/apis/topohub.infrastructure.io/v1beta1 中创建 crd 定义后， 可使用 make update_crd_sdk  来生成 配套的 client sdk，位于 @pkg/k8s/client 下 ， 相关的 deep copy 函数，也会生成在 @pkg/k8s/apis ， 相关的 crd 定义 生成在 @chart/crds 下

@@ -49,11 +49,11 @@ func (w *SubnetWebhook) Default(ctx context.Context, obj runtime.Object) error {
 
 	w.log.Debugf("Setting initial values for nil fields in Subnet %s", subnet.Name)
 
-	if subnet.Spec.Feature.SyncHoststatus.DefaultClusterName != nil && *subnet.Spec.Feature.SyncHoststatus.DefaultClusterName != "" {
+	if subnet.Spec.Feature.SyncRedfishstatus.DefaultClusterName != nil && *subnet.Spec.Feature.SyncRedfishstatus.DefaultClusterName != "" {
 		if subnet.ObjectMeta.Labels == nil {
 			subnet.ObjectMeta.Labels = make(map[string]string)
 		}
-		subnet.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = *subnet.Spec.Feature.SyncHoststatus.DefaultClusterName
+		subnet.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = *subnet.Spec.Feature.SyncRedfishstatus.DefaultClusterName
 	} else {
 		if subnet.ObjectMeta.Labels == nil {
 			subnet.ObjectMeta.Labels = make(map[string]string)

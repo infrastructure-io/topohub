@@ -20,15 +20,15 @@ HostOperation CRD 支持以下操作类型：
 
 ### 前提条件
 
-1. 确保物理机已经被正确注册到系统中（存在对应的 HostStatus CR）
-2. 确保物理机状态健康（HostStatus 的 status.healthy 为 true）
+1. 确保物理机已经被正确注册到系统中（存在对应的 RedfishStatus CR）
+2. 确保物理机状态健康（RedfishStatus 的 status.healthy 为 true）
 3. 确保有足够的权限执行这些操作
 
 ### 操作步骤
 
 1. 查看当前可操作的物理机列表：
 ```bash
-~# kubectl get hoststatus
+~# kubectl get redfishstatus
 NAME                             CLUSTERAGENT       HEALTHY   IPADDR          TYPE           AGE
 bmc-clusteragent-host1           bmc-clusteragent   true      10.64.64.42     hostEndpoint   44s
 bmc-clusteragent-192-168-0-100   bmc-clusteragent   true      192.168.0.100   dhcp           64s
@@ -45,13 +45,13 @@ metadata:
   name: host1-restart
 spec:
   action: "GracefulRestart"
-  hostStatusName: "bmc-clusteragent-host1"
+  redfishStatusName: "bmc-clusteragent-host1"
 EOF
 ```
 
 > 注意：
 > 1. spec.action 的值，必须是小节 [支持的操作类型](#支持的操作类型) 中的一种
-> 2. spec.hostStatusName 的值，必须是步骤 1 中获取的已存在 hoststatus 实例的名字
+> 2. spec.redfishStatusName 的值，必须是步骤 1 中获取的已存在 redfishstatus 实例的名字
 
 3. 查看操作状态：
 ```bash
