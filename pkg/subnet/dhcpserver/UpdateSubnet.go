@@ -185,7 +185,7 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				})
 			}
 
-			if reflect.DeepEqual(current.Status.DhcpStatus, updated.Status.DhcpStatus) {
+			if reflect.DeepEqual(current.Status, updated.Status) {
 				return nil
 			}
 

@@ -10,7 +10,6 @@ import (
 
 // https://github.com/DMTF/Redfish-Tacklebox/blob/main/scripts/rf_power_reset.py
 // post request to systems
-
 func (c *redfishClient) Power(bootCmd string) error {
 
 	// Attached the client to service root
@@ -54,9 +53,9 @@ func (c *redfishClient) Power(bootCmd string) error {
 			err = system.Reset(redfish.ResetType(bootCmd))
 
 		case topohubv1beta1.BootCmdResetPxeOnce:
-			// check if the system supports GracefulRestart or ForceRestart
-			if !strings.Contains(resetTypes, string(redfish.GracefulRestartResetType)) && !strings.Contains(resetTypes, string(redfish.ForceRestartResetType)) {
-				return fmt.Errorf("neither GracefulRestart nor ForceRestart is supported by system %s, supported types: %v", system.Name, resetTypes)
+			// check if the system supports ForceRestart
+			if !strings.Contains(resetTypes, string(redfish.ForceRestartResetType)) {
+				return fmt.Errorf("ForceRestart is not supported by system %s, supported types: %v", system.Name, resetTypes)
 			}
 
 			// https://github.com/stmcginnis/gofish/blob/main/examples/reboot.md
@@ -68,20 +67,8 @@ func (c *redfishClient) Power(bootCmd string) error {
 				BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
 			}
 			c.logger.Infof("pxe reboot %s for System: %+v \n", c.config.Endpoint, system.Name)
-			err = system.SetBoot(bootOverride)
-			if err != nil {
-				return fmt.Errorf("failed to set boot option error:%+v", err)
-			}
 
-			// try to use GracefulRestart first
-			if strings.Contains(resetTypes, string(redfish.GracefulRestartResetType)) {
-				c.logger.Infof("using GracefulRestart for System: %s", system.Name)
-				err = system.Reset(redfish.GracefulRestartResetType)
-			} else {
-				// try to use ForceRestart
-				c.logger.Infof("using ForceRestart for System: %s", system.Name)
-				err = system.Reset(redfish.ForceRestartResetType)
-			}
+			err = c.setBootWithRetry(system, bootOverride, resetTypes)
 
 		default:
 			c.logger.Errorf("unknown boot cmd: %+v", bootCmd)
@@ -94,4 +81,64 @@ func (c *redfishClient) Power(bootCmd string) error {
 	}
 
 	return nil
+}
+
+// Lenovo machine Redifish requires an ETag,when the ETag does not match, it may report an error, so add a retry
+func (c *redfishClient) setBootWithRetry(system *redfish.ComputerSystem, bootOverride redfish.Boot, resetTypes string) error {
+	// Maximum retry attempts
+	maxRetries := 3
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			c.logger.Infof("Retry attempt %d for setting PXE boot...", i)
+			// Refresh system info to update ETag
+			systems, refreshErr := c.client.Service.Systems()
+			if refreshErr != nil {
+				return fmt.Errorf("failed to refresh system info: %+v", refreshErr)
+			}
+			if len(systems) == 0 {
+				return fmt.Errorf("no systems found during refresh")
+			}
+
+			// find the system with the same ID
+			originalID := system.ID
+			found := false
+			for _, s := range systems {
+				if s.ID == originalID {
+					system = s
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				return fmt.Errorf("system %s not found after refresh", originalID)
+			}
+		}
+
+		// set boot options
+		setBootErr := system.SetBoot(bootOverride)
+		if setBootErr == nil {
+			// reset system
+			c.logger.Infof("Successfully set boot options for system %s, now attempting reset", system.Name)
+			resetErr := system.Reset(redfish.ForceRestartResetType)
+
+			// reset successfully
+			if resetErr == nil {
+				c.logger.Infof("Successfully reset system %s", system.Name)
+				return nil
+			}
+
+			// reset failed, continue retry
+			c.logger.Errorf("Reset failed after setting boot options: %v, will retry", resetErr)
+			lastErr = resetErr
+			continue
+		}
+
+		lastErr = setBootErr
+		c.logger.Error("Failed to set boot options: %v, will retry", setBootErr)
+	}
+
+	return fmt.Errorf("failed to set boot options after %d retries: %+v", maxRetries, lastErr)
 }
