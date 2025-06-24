@@ -82,6 +82,10 @@ type FeatureSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
 	EnableZtp bool `json:"enableZtp"`
+
+	// Enable DHCP trusted only mode (dhcp-ignore=tag:!trusted)
+	// +kubebuilder:default=false
+	EnableDhcpTrustedOnly bool `json:"enableDhcpTrustedOnly"`
 }
 
 // SyncHoststatusSpec defines the sync endpoint configuration

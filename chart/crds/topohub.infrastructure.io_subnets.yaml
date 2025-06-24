@@ -67,6 +67,10 @@ spec:
               feature:
                 description: Feature configuration
                 properties:
+                  enableDhcpTrustedOnly:
+                    default: false
+                    description: Enable DHCP trusted only mode (dhcp-ignore=tag:!trusted)
+                    type: boolean
                   enablePxe:
                     default: false
                     description: Enable PXE boot support
@@ -95,6 +99,7 @@ spec:
                     - enabled
                     type: object
                 required:
+                - enableDhcpTrustedOnly
                 - enablePxe
                 - enableZtp
                 - syncHoststatus

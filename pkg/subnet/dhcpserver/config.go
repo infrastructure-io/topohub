@@ -48,6 +48,14 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 		ipRange[k] = strings.ReplaceAll(ipRange[k], "-", ",")
 	}
 
+	// 安全获取 Feature 配置值
+	var enablePxe, enableZtp, enableDhcpTrustedOnly bool
+	if s.subnet.Spec.Feature != nil {
+		enablePxe = s.subnet.Spec.Feature.EnablePxe
+		enableZtp = s.subnet.Spec.Feature.EnableZtp
+		enableDhcpTrustedOnly = s.subnet.Spec.Feature.EnableDhcpTrustedOnly
+	}
+
 	data := struct {
 		Interface                string
 		IPRanges                 []string
@@ -57,6 +65,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 		LogFile                  string
 		EnablePxe                bool
 		EnableZtp                bool
+		EnableDhcpTrustedOnly    bool
 		Name                     string
 		SelfIP                   string
 		TftpServerDir            string
@@ -69,8 +78,9 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 		DNS:                      s.subnet.Spec.IPv4Subnet.Dns,
 		LeaseFile:                s.leasePath,
 		LogFile:                  s.logPath,
-		EnablePxe:                s.subnet.Spec.Feature.EnablePxe,
-		EnableZtp:                s.subnet.Spec.Feature.EnableZtp,
+		EnablePxe:                enablePxe,
+		EnableZtp:                enableZtp,
+		EnableDhcpTrustedOnly:    enableDhcpTrustedOnly,
 		Name:                     s.subnet.Name,
 		SelfIP:                   strings.Split(s.subnet.Spec.Interface.IPv4, "/")[0],
 		TftpServerDir:            s.config.StoragePathTftp,
@@ -178,24 +188,24 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 		expireTime := time.Unix(expireTimestamp, 0)
 
 		clusterName := ""
-		if  s.subnet.Spec.Feature.SyncHoststatus.DefaultClusterName != nil {
+		if s.subnet.Spec.Feature.SyncHoststatus.DefaultClusterName != nil {
 			clusterName = *s.subnet.Spec.Feature.SyncHoststatus.DefaultClusterName
 		}
 
-		enableBindIP:=false
+		enableBindIP := false
 		if s.subnet.Spec.Feature.SyncHoststatus.Enabled && s.subnet.Spec.Feature.SyncHoststatus.EnableBindDhcpIP {
-			enableBindIP=true
+			enableBindIP = true
 		}
 
 		clientInfo := &DhcpClientInfo{
-			MAC:            fields[1],
-			IP:             fields[2],
-			Hostname:       fields[3],
-			Active:         true,
-			DhcpExpireTime: expireTime,
-			Subnet:         s.subnet.Spec.IPv4Subnet.Subnet,
-			SubnetName:     s.subnet.Name,
-			ClusterName:    clusterName,
+			MAC:                       fields[1],
+			IP:                        fields[2],
+			Hostname:                  fields[3],
+			Active:                    true,
+			DhcpExpireTime:            expireTime,
+			Subnet:                    s.subnet.Spec.IPv4Subnet.Subnet,
+			SubnetName:                s.subnet.Name,
+			ClusterName:               clusterName,
 			EnableBindIpForHoststatus: &enableBindIP,
 		}
 		currentLeaseClients[clientInfo.IP] = clientInfo
@@ -203,7 +213,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 		// hoststatus 进行 crd 实例同步
 
 		if data, exists := previousClients[clientInfo.IP]; !exists {
-			if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
+			if s.subnet.Spec.Feature.SyncHoststatus.Enabled {
 				// hoststatus 进行 crd 实例同步
 				s.addedDhcpClientForHostStatus <- *clientInfo
 				s.log.Infof("send event to add dhcp client: %s, %s", clientInfo.MAC, clientInfo.IP)
@@ -212,14 +222,14 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 
 		} else {
 			if data.MAC != clientInfo.MAC || data.Hostname != clientInfo.Hostname {
-				if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
+				if s.subnet.Spec.Feature.SyncHoststatus.Enabled {
 					// hoststatus 进行 crd 实例同步
 					s.addedDhcpClientForHostStatus <- *clientInfo
 					s.log.Infof("send event to update dhcp client, old mac=%s, new mac=%s, old hostname=%s, new hostname=%s, ip=%s", data.MAC, clientInfo.MAC, data.Hostname, clientInfo.Hostname, clientInfo.IP)
 				}
 				clientChangedFlag = true
 			} else if !clientInfo.DhcpExpireTime.Equal(previousClients[clientInfo.IP].DhcpExpireTime) {
-				if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
+				if s.subnet.Spec.Feature.SyncHoststatus.Enabled {
 					s.addedDhcpClientForHostStatus <- *clientInfo
 					s.log.Infof("send event to update dhcp client for its DhcpExpireTime: %s, %s, oldDhcpExpireTime=%s, newDhcpExpireTime=%s", clientInfo.MAC, clientInfo.IP, previousClients[clientInfo.IP].DhcpExpireTime, clientInfo.DhcpExpireTime)
 				}
@@ -231,7 +241,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 	for _, client := range previousClients {
 		if _, exists := currentLeaseClients[client.IP]; !exists {
 			client.Active = false
-			if  s.subnet.Spec.Feature.SyncHoststatus.Enabled {
+			if s.subnet.Spec.Feature.SyncHoststatus.Enabled {
 				s.deletedDhcpClientForHostStatus <- *client
 				s.log.Infof("send event to delete dhcp client: %s, %s", client.MAC, client.IP)
 				// 对于删除的 dhcp 客户端，不进行 ip 解绑，确保安全
@@ -248,7 +258,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 // UpdateDhcpBindings updates the dhcp-host configuration file by:
 // 1. For ipMacMapAdded: if IP exists, update its MAC; if IP doesn't exist, add new binding
 // 2. For ipMacMapDeleted: delete binding only if both IP and MAC match exactly
-func (s *dhcpServer) UpdateDhcpBindings( ) error {
+func (s *dhcpServer) UpdateDhcpBindings() error {
 
 	// 读取现有的配置文件
 	_, err := os.ReadFile(s.HostIpBindingsConfigPath)
@@ -272,15 +282,17 @@ func (s *dhcpServer) UpdateDhcpBindings( ) error {
 	defer s.lockConfigUpdate.Unlock()
 
 	s.log.Debugf("processing dhcp bindings: %+v ", s.currentManualBindingClients)
-	
+
 	var finalLines []string
 	for ip, item := range s.currentManualBindingClients {
-			s.log.Debugf("adding new dhcp-host binding for IP %s, MAC %s", ip, item.MAC)
-			if len(item.Hostname) > 0 {
-				finalLines = append(finalLines, "# hostname "+item.Hostname)
-			}
-			line := fmt.Sprintf("dhcp-host=%s,%s", item.MAC, ip)
-			finalLines = append(finalLines, line)
+		s.log.Debugf("adding new dhcp-host binding for IP %s, MAC %s", ip, item.MAC)
+		// Format: MAC,id:*,set:trusted,IP
+		var line string
+		if len(item.Hostname) > 0 {
+			finalLines = append(finalLines, "# hostname "+item.Hostname)
+		}
+		line = fmt.Sprintf("%s,id:*,set:trusted,%s", item.MAC, ip)
+		finalLines = append(finalLines, line)
 	}
 
 	// 写入更新后的配置
