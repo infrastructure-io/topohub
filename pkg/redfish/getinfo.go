@@ -132,21 +132,38 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	}
 
 	// storage info
-	stroages, err := system.SimpleStorages()
+	storages, err := system.Storage()
 	if err != nil {
-		c.logger.Errorf("failed to get simple storage: %+v", err)
+		c.logger.Errorf("failed to get storage: %+v", err)
 		return nil, err
 	}
-	c.logger.Debugf("simple storage amount: %d", len(stroages))
-	for n, st := range stroages {
-		for m, item := range st.Devices {
-			c.logger.Debugf("Storage[%d][%d]: %+v", n, m, item)
-			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Name", n, m), string(item.Name))
-			setData(result, fmt.Sprintf("Storage[%d].Device[%d].TotalGiB", n, m), fmt.Sprintf("%.2f", float64(item.CapacityBytes)/(1024*1024*1024)))
-			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Manufacturer", n, m), string(item.Manufacturer))
-			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Model", n, m), string(item.Model))
-			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Health", n, m), string(item.Status.Health))
-			setData(result, fmt.Sprintf("Storage[%d].Device[%d].State", n, m), string(item.Status.State))
+	c.logger.Debugf("storage amount: %d", len(storages))
+	for n, st := range storages {
+		c.logger.Debugf("Storage[%d]: %+v", n, st)
+		setData(result, fmt.Sprintf("Storage[%d].Name", n), st.Name)
+		setData(result, fmt.Sprintf("Storage[%d].Id", n), st.ID)
+		setData(result, fmt.Sprintf("Storage[%d].Health", n), string(st.Status.Health))
+		setData(result, fmt.Sprintf("Storage[%d].State", n), string(st.Status.State))
+
+		// 获取驱动器信息
+		drives, err := st.Drives()
+		if err != nil {
+			c.logger.Errorf("failed to get drives for storage[%d]: %+v", n, err)
+			continue
+		}
+
+		c.logger.Debugf("Storage[%d] drives amount: %d", n, len(drives))
+		for m, drive := range drives {
+			c.logger.Debugf("Storage[%d].Drive[%d]: %+v", n, m, drive)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Name", n, m), drive.Name)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Model", n, m), drive.Model)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Manufacturer", n, m), drive.Manufacturer)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].SerialNumber", n, m), drive.SerialNumber)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].MediaType", n, m), string(drive.MediaType))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Protocol", n, m), string(drive.Protocol))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].CapacityGiB", n, m), fmt.Sprintf("%.2f", float64(drive.CapacityBytes)/(1024*1024*1024)))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Health", n, m), string(drive.Status.Health))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].State", n, m), string(drive.Status.State))
 		}
 	}
 
