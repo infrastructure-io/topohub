@@ -169,74 +169,12 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 		},
 	}
 
-	// RedfishStatus doesn't exist, create new one
-	// IMPORTANT: When creating a new RedfishStatus, we must follow a two-step process:
-	// 1. First create the resource with only metadata (no status). This is because
-	//    the Kubernetes API server does not allow setting status during creation.
-	// 2. Then update the status separately using UpdateStatus. If we try to set
-	//    status during creation, the status will be silently ignored, leading to
-	//    a RedfishStatus without any status information until the next reconciliation.
 	logger.Debugf("Creating new RedfishStatus %s", name)
 	if err := r.client.Create(ctx, redfishStatus); err != nil {
 		logger.Errorf("Failed to create RedfishStatus %s: %v", name, err)
 		return err
 	}
-
-	// Get the latest version of the resource after creation
-	// updated := &topohubv1beta1.RedfishStatus{}
-	// if err := r.client.Get(ctx, client.ObjectKey{Name: name}, updated); err != nil {
-	// 	logger.Errorf("Failed to verify RedfishStatus %s: %v", name, err)
-	// 	return err
-	// }
-
-	// Now update the status using the latest version
-	clusterName := ""
-	if hostEndpoint.Spec.ClusterName != nil {
-		clusterName = *hostEndpoint.Spec.ClusterName
-	}
-
-	redfishStatus.Status = topohubv1beta1.RedfishStatusStatus{
-		Healthy:        false,
-		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
-		Basic: topohubv1beta1.BasicInfo{
-			Type:        topohubv1beta1.HostTypeEndpoint,
-			IpAddr:      hostEndpoint.Spec.IPAddr,
-			Https:       true,
-			Port:        443,
-			ClusterName: clusterName,
-		},
-		Info: map[string]string{},
-		Log: topohubv1beta1.LogStruct{
-			TotalLogAccount:   0,
-			WarningLogAccount: 0,
-			LastestLog:        nil,
-			LastestWarningLog: nil,
-		},
-	}
-	if hostEndpoint.Spec.SecretName != nil {
-		redfishStatus.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
-	}
-	if hostEndpoint.Spec.SecretNamespace != nil {
-		redfishStatus.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
-	}
-	if hostEndpoint.Spec.HTTPS != nil {
-		redfishStatus.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
-	}
-	if hostEndpoint.Spec.Port != nil {
-		redfishStatus.Status.Basic.Port = *hostEndpoint.Spec.Port
-	}
-
-	if err := r.client.Status().Update(ctx, redfishStatus); err != nil {
-		logger.Errorf("Failed to update status of redfishStatus %s: %v", name, err)
-		return err
-	}
-
 	logger.Infof("Successfully created RedfishStatus %s", name)
-	logger.Debugf("RedfishStatus details - IP: %s, Secret: %s/%s, Port: %d",
-		redfishStatus.Status.Basic.IpAddr,
-		redfishStatus.Status.Basic.SecretNamespace,
-		redfishStatus.Status.Basic.SecretName,
-		redfishStatus.Status.Basic.Port)
 	return nil
 }
 
