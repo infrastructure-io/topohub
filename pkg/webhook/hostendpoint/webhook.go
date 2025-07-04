@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 
 	"go.uber.org/zap"
 
@@ -102,15 +103,36 @@ func (w *HostEndpointWebhook) ValidateCreate(ctx context.Context, obj runtime.Ob
 
 // ValidateUpdate implements webhook.Validator
 func (w *HostEndpointWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	hostEndpoint, ok := newObj.(*topohubv1beta1.HostEndpoint)
+	newHostEndpoint, ok := newObj.(*topohubv1beta1.HostEndpoint)
 	if !ok {
 		err := fmt.Errorf("object is not a HostEndpoint")
 		w.log.Error(err.Error())
 		return nil, err
 	}
 
-	w.log.Infof("Rejecting update of HostEndpoint %s: updates are not allowed", hostEndpoint.Name)
-	return nil, fmt.Errorf("updates to HostEndpoint resources are not allowed")
+	oldHostEndpoint, ok := oldObj.(*topohubv1beta1.HostEndpoint)
+	if !ok {
+		err := fmt.Errorf("old object is not a HostEndpoint")
+		w.log.Error(err.Error())
+		return nil, err
+	}
+
+	w.log.Infof("Validating update of HostEndpoint %s", newHostEndpoint.Name)
+	// Validate that Type cannot be changed
+	if *oldHostEndpoint.Spec.Type != *newHostEndpoint.Spec.Type {
+		err := fmt.Errorf("hostEndpoint Type cannot be changed")
+		w.log.Error(err.Error())
+		return nil, err
+	}
+
+	// Validate that ClusterName cannot be changed
+	if !reflect.DeepEqual(oldHostEndpoint.Spec.ClusterName, newHostEndpoint.Spec.ClusterName) {
+		err := fmt.Errorf("hostEndpoint ClusterName cannot be changed")
+		w.log.Error(err.Error())
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator

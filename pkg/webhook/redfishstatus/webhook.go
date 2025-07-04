@@ -62,8 +62,6 @@ func (w *RedfishStatusWebhook) Default(ctx context.Context, obj runtime.Object) 
 
 	// ip
 	if redfishstatus.Status.Basic.IpAddr != "" {
-		w.log.Debugf("Processing IpAddr for RedfishStatus %s: %s",
-			redfishstatus.Name, redfishstatus.Status.Basic.IpAddr)
 		IpAddr := strings.Split(redfishstatus.Status.Basic.IpAddr, "/")[0]
 		w.log.Debugf("Setting IpAddr label for RedfishStatus %s: %s",
 			redfishstatus.Name, IpAddr)
