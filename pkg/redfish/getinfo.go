@@ -131,40 +131,9 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 		//setData(result, fmt.Sprintf("Memory[%d].OperatingSpeedMhz", n), fmt.Sprintf("%d", mm.OperatingSpeedMhz))
 	}
 
-	// storage info
-	storages, err := system.Storage()
-	if err != nil {
-		c.logger.Errorf("failed to get storage: %+v", err)
-		return nil, err
-	}
-	c.logger.Debugf("storage amount: %d", len(storages))
-	for n, st := range storages {
-		c.logger.Debugf("Storage[%d]: %+v", n, st)
-		setData(result, fmt.Sprintf("Storage[%d].Name", n), st.Name)
-		setData(result, fmt.Sprintf("Storage[%d].Id", n), st.ID)
-		setData(result, fmt.Sprintf("Storage[%d].Health", n), string(st.Status.Health))
-		setData(result, fmt.Sprintf("Storage[%d].State", n), string(st.Status.State))
-
-		// 获取驱动器信息
-		drives, err := st.Drives()
-		if err != nil {
-			c.logger.Errorf("failed to get drives for storage[%d]: %+v", n, err)
-			continue
-		}
-
-		c.logger.Debugf("Storage[%d] drives amount: %d", n, len(drives))
-		for m, drive := range drives {
-			c.logger.Debugf("Storage[%d].Drive[%d]: %+v", n, m, drive)
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].Name", n, m), drive.Name)
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].Model", n, m), drive.Model)
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].Manufacturer", n, m), drive.Manufacturer)
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].SerialNumber", n, m), drive.SerialNumber)
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].MediaType", n, m), string(drive.MediaType))
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].Protocol", n, m), string(drive.Protocol))
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].CapacityGiB", n, m), fmt.Sprintf("%.2f", float64(drive.CapacityBytes)/(1024*1024*1024)))
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].Health", n, m), string(drive.Status.Health))
-			setData(result, fmt.Sprintf("Storage[%d].Drive[%d].State", n, m), string(drive.Status.State))
-		}
+	// storage info - try SimpleStorage first, fallback to Storage
+	if err := c.getStorageInfoWithFallback(system, result); err != nil {
+		c.logger.Errorf("failed to get storage info: %+v", err)
 	}
 
 	// network info
@@ -353,4 +322,87 @@ func (c *redfishClient) GetSupportedResetTypes(system *redfish.ComputerSystem) s
 	}
 
 	return ""
+}
+
+// getStorageInfoWithFallback tries SimpleStorage first, falls back to Storage interface
+// Output format is compatible with SimpleStorage for consistency
+func (c *redfishClient) getStorageInfoWithFallback(system *redfish.ComputerSystem, result map[string]string) error {
+	// Try SimpleStorage first
+	var err error
+	if err = c.getSimpleStorageInfo(system, result); err != nil {
+		c.logger.Errorf("Failed to retrieve storage info using SimpleStorage interface: %v", err)
+	}
+	if len(result) > 0 {
+		c.logger.Debugf("Successfully retrieved storage info using SimpleStorage interface")
+		return nil
+	}
+	c.logger.Debugf("SimpleStorage interface not available or failed: %v, trying Storage interface", err)
+	// Fallback to Storage interface
+	if err = c.getStorageInfoAsSimpleStorage(system, result); err != nil {
+		c.logger.Errorf("Both SimpleStorage and Storage interfaces failed: %v", err)
+		return err
+	}
+	if len(result) == 0 {
+		c.logger.Debugf("Both SimpleStorage and Storage interfaces failed: %v", err)
+		return nil
+	}
+	c.logger.Debugf("Successfully retrieved storage info using Storage interface (fallback)")
+	return nil
+}
+
+// getSimpleStorageInfo retrieves storage information using SimpleStorage interface
+func (c *redfishClient) getSimpleStorageInfo(system *redfish.ComputerSystem, result map[string]string) error {
+	simpleStorages, err := system.SimpleStorages()
+	if err != nil {
+		return fmt.Errorf("failed to get SimpleStorage: %v", err)
+	}
+
+	c.logger.Debugf("SimpleStorage amount: %d", len(simpleStorages))
+	for n, ss := range simpleStorages {
+		// Get device information
+		c.logger.Debugf("SimpleStorage[%d] devices amount: %d", n, len(ss.Devices))
+		for m, device := range ss.Devices {
+			c.logger.Debugf("SimpleStorage[%d].Device[%d]: %+v", n, m, device)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Name", n, m), string(device.Name))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].TotalGiB", n, m), fmt.Sprintf("%.2f", float64(device.CapacityBytes)/(1024*1024*1024)))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Manufacturer", n, m), string(device.Manufacturer))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Model", n, m), string(device.Model))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Health", n, m), string(device.Status.Health))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].State", n, m), string(device.Status.State))
+		}
+	}
+
+	return nil
+}
+
+// getStorageInfoAsSimpleStorage retrieves storage information using Storage interface
+// but keeps the original Storage format as fallback
+func (c *redfishClient) getStorageInfoAsSimpleStorage(system *redfish.ComputerSystem, result map[string]string) error {
+	storages, err := system.Storage()
+	if err != nil {
+		return fmt.Errorf("failed to get Storage: %v", err)
+	}
+
+	c.logger.Debugf("Storage amount: %d (fallback from SimpleStorage)", len(storages))
+	for n, st := range storages {
+		// Get drives information
+		drives, err := st.Drives()
+		if err != nil {
+			c.logger.Errorf("failed to get drives for storage[%d]: %+v", n, err)
+			continue
+		}
+
+		c.logger.Debugf("Storage[%d] drives amount: %d", n, len(drives))
+		for m, drive := range drives {
+			c.logger.Debugf("Storage[%d].Device[%d]: %+v", n, m, drive)
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Name", n, m), string(drive.Name))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].TotalGiB", n, m), fmt.Sprintf("%.2f", float64(drive.CapacityBytes)/(1024*1024*1024)))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Manufacturer", n, m), string(drive.Manufacturer))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Model", n, m), string(drive.Model))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].Health", n, m), string(drive.Status.Health))
+			setData(result, fmt.Sprintf("Storage[%d].Device[%d].State", n, m), string(drive.Status.State))
+		}
+	}
+
+	return nil
 }
