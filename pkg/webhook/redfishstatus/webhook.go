@@ -54,24 +54,26 @@ func (w *RedfishStatusWebhook) Default(ctx context.Context, obj runtime.Object) 
 	}
 
 	// cluster name
-	w.log.Debugf("Setting ClusterName label for RedfishStatus %s: %s",
-		redfishstatus.Name, redfishstatus.Status.Basic.ClusterName)
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = redfishstatus.Status.Basic.ClusterName
+	if redfishstatus.Status.Basic.ClusterName != "" {
+		w.log.Debugf("Processing ClusterName for RedfishStatus %s: %s",
+			redfishstatus.Name, redfishstatus.Status.Basic.ClusterName)
+		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = redfishstatus.Status.Basic.ClusterName
+	}
 
 	// ip
-	w.log.Debugf("Processing IpAddr for RedfishStatus %s: %s",
-		redfishstatus.Name, redfishstatus.Status.Basic.IpAddr)
-	IpAddr := strings.Split(redfishstatus.Status.Basic.IpAddr, "/")[0]
-	w.log.Debugf("Setting IpAddr label for RedfishStatus %s: %s",
-		redfishstatus.Name, IpAddr)
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
+	if redfishstatus.Status.Basic.IpAddr != "" {
+		w.log.Debugf("Processing IpAddr for RedfishStatus %s: %s",
+			redfishstatus.Name, redfishstatus.Status.Basic.IpAddr)
+		IpAddr := strings.Split(redfishstatus.Status.Basic.IpAddr, "/")[0]
+		w.log.Debugf("Setting IpAddr label for RedfishStatus %s: %s",
+			redfishstatus.Name, IpAddr)
+		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
+	}
 
 	// mode
 	w.log.Debugf("Setting ClientMode label for RedfishStatus %s based on type: %s",
 		redfishstatus.Name, redfishstatus.Status.Basic.Type)
-	if redfishstatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP {
-		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
-	} else {
+	if redfishstatus.Status.Basic.Type != "" {
 		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeEndpoint
 	}
 

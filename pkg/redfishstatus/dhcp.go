@@ -2,13 +2,11 @@ package redfishstatus
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/infrastructure-io/topohub/pkg/redfish"
-	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
@@ -20,13 +18,16 @@ import (
 const (
 	// retryDelay is the delay before retrying a failed operation
 	retryDelay = time.Second
+
+	// BasicInfoAnnotation is the annotation key for storing basicInfo as JSON
+	BasicInfoAnnotation = "topohub.infrastructure.io/basic-info"
 )
 
 func shouldRetry(err error) bool {
 	return errors.IsConflict(err) || errors.IsServerTimeout(err) || errors.IsTooManyRequests(err)
 }
 
-// DHCP manager 把 dhcp client 事件告知后，进行 redfishstatus 更新
+// processDHCPEvents processes DHCP events from the DHCP manager
 func (c *redfishStatusController) processDHCPEvents() {
 
 	for {
@@ -101,7 +102,6 @@ func (c *redfishStatusController) createBindingIpForredfishstatus(client dhcpser
 		return true
 	}
 	for _, existingBindingIP := range bindingIPList.Items {
-
 		if existingBindingIP.Spec.IpAddr == bindingIP.Spec.IpAddr && strings.EqualFold(existingBindingIP.Spec.MacAddr, bindingIP.Spec.MacAddr) {
 			c.log.Debugf("bindingip %s already exists for host %s: %+v", existingBindingIP.Name, name, existingBindingIP.Spec)
 			return false
@@ -203,22 +203,9 @@ func (c *redfishStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo
 			expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
 			return &expireTimeStr
 		}(),
-		Hostname: &client.Hostname,
-	}
-	username, password, err := c.getSecretData(c.config.RedfishSecretName, c.config.RedfishSecretNamespace)
-	if err != nil {
-		c.log.Errorf("Failed to get secret data from secret %s/%s when creating redfishstatus for %s: %v", c.config.RedfishSecretNamespace, c.config.RedfishSecretName, client.IP, err)
-		return err
-	}
-	d := redfishstatusdata.RedfishConnectCon{
-		Info:     &basicInfo,
-		Username: username,
-		Password: password,
-		DhcpHost: true,
-	}
-	if _, err := redfish.NewClient(d, c.log); err != nil {
-		c.log.Warnf("ignore creating redfishstatus for dhcp client %s, failed to connect: %v", client.IP, err)
-		return nil
+		Hostname:        &client.Hostname,
+		SecretName:      c.config.RedfishSecretName,
+		SecretNamespace: c.config.RedfishSecretNamespace,
 	}
 
 	c.log.Debugf("succeed to checking the redfishstatus %s, and create redfishstatus for it", client.IP)
@@ -237,59 +224,35 @@ func (c *redfishStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo
 	c.log.Debugf("Creating new redfishstatus %s", name)
 
 	// redfishstatus doesn't exist, create new one
-	// IMPORTANT: When creating a new redfishstatus, we must follow a two-step process:
-	// 1. First create the resource with only metadata (no status). This is because
-	//    the Kubernetes API server does not allow setting status during creation.
-	// 2. Then update the status separately using UpdateStatus. If we try to set
-	//    status during creation, the status will be silently ignored, leading to
-	//    a redfishstatus without any status information until the next reconciliation.
-	if err := c.client.Create(context.Background(), redfishstatus); err != nil {
-		c.log.Errorf("Failed to create redfishstatus %s: %v", name, err)
+	// write basicInfo to annotation
+	if redfishstatus.ObjectMeta.Annotations == nil {
+		redfishstatus.ObjectMeta.Annotations = make(map[string]string)
+	}
+
+	basicInfoJSON, err := json.Marshal(basicInfo)
+	if err != nil {
+		c.log.Errorf("Failed to marshal basicInfo for redfishstatus %s: %v", name, err)
 		return err
 	}
-
-	// Get the latest version of the resource after creation
-	// if err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, redfishstatus); err != nil {
-	// 	log.Logger.Errorf("Failed to get latest version of redfishstatus %s: %v", name, err)
-	// 	return err
-	// }
-
-	// Now update the status using the latest version
-	redfishstatus.Status = topohubv1beta1.RedfishStatusStatus{
-		Healthy:        false,
-		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
-		Basic:          basicInfo,
-		Info:           map[string]string{},
-		Log: topohubv1beta1.LogStruct{
-			TotalLogAccount:   0,
-			WarningLogAccount: 0,
-			LastestLog:        nil,
-			LastestWarningLog: nil,
-		},
-	}
-	if c.config.RedfishSecretName != "" {
-		redfishstatus.Status.Basic.SecretName = c.config.RedfishSecretName
-	}
-	if c.config.RedfishSecretNamespace != "" {
-		redfishstatus.Status.Basic.SecretNamespace = c.config.RedfishSecretNamespace
-	}
+	redfishstatus.ObjectMeta.Annotations[BasicInfoAnnotation] = string(basicInfoJSON)
 
 	// update the labels
 	if redfishstatus.ObjectMeta.Labels == nil {
 		redfishstatus.ObjectMeta.Labels = make(map[string]string)
 	}
 	// cluster name
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = redfishstatus.Status.Basic.ClusterName
+	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = basicInfo.ClusterName
 	// ip
-	IpAddr := strings.Split(redfishstatus.Status.Basic.IpAddr, "/")[0]
+	IpAddr := strings.Split(basicInfo.IpAddr, "/")[0]
 	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
 	// mode
 	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
 	// dhcp
 	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
 
-	if err := c.client.Status().Update(context.Background(), redfishstatus); err != nil {
-		c.log.Errorf("Failed to update status of redfishstatus %s: %v", name, err)
+	// create resource
+	if err := c.client.Create(context.Background(), redfishstatus); err != nil {
+		c.log.Errorf("Failed to create redfishstatus %s: %v", name, err)
 		return err
 	}
 
@@ -307,7 +270,7 @@ func (c *redfishStatusController) handleDHCPDelete(client dhcpserver.DhcpClientI
 	name := formatRedfishStatusName(client.IP)
 	c.log.Debugf("Processing DHCP delete event - %+v", client)
 
-	// 获取现有的 redfishstatus
+	// get the redfishstatus
 	existing := &topohubv1beta1.RedfishStatus{}
 	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
 	if err != nil {
@@ -319,16 +282,16 @@ func (c *redfishStatusController) handleDHCPDelete(client dhcpserver.DhcpClientI
 		return err
 	}
 
-	// 创建更新对象的副本
+	// create update object
 	updated := existing.DeepCopy()
-	// 如果没有 labels map，则创建
+	// if no labels map, create
 	if updated.Labels == nil {
 		updated.Labels = make(map[string]string)
 	}
-	// 添加或更新标签
+	// update labels
 	updated.Labels[topohubv1beta1.LabelClientActive] = "false"
 	updated.Status.Basic.ActiveDhcpClient = false
-	// 更新对象
+	// update object
 	if err := c.client.Update(context.Background(), updated); err != nil {
 		c.log.Errorf("Failed to update labels of redfishstatus %s: %v", name, err)
 		return err
