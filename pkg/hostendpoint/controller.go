@@ -15,6 +15,8 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
+	sshstatusdata "github.com/infrastructure-io/topohub/pkg/sshstatus/data"
 )
 
 // HostEndpointReconciler reconciles a HostEndpoint object
@@ -110,8 +112,8 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 		updated.Status.Basic = topohubv1beta1.BasicInfo{
 			Type:   topohubv1beta1.HostTypeEndpoint,
 			IpAddr: hostEndpoint.Spec.IPAddr,
-			Https:  true,
-			Port:   443,
+			Https:  *hostEndpoint.Spec.HTTPS,
+			Port:   *hostEndpoint.Spec.Port,
 		}
 		if hostEndpoint.Spec.SecretName != nil {
 			updated.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
@@ -140,6 +142,10 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 			updated.Status.Basic.SecretNamespace,
 			updated.Status.Basic.SecretName,
 			updated.Status.Basic.Port)
+
+		// delete the cache of RedfishStatus
+		redfishstatusdata.RedfishCacheDatabase.Delete(name)
+		logger.Debugf("Deleted RedfishStatus %s from cache due to spec change", name)
 		return nil
 	}
 
@@ -179,40 +185,26 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 }
 
 // specEqual checks if the RedfishStatus basic info matches the HostEndpoint spec
+// Only compare mutable fields: IPAddr、SecretName、SecretNamespace、HTTPS、Port
+// Do not compare immutable fields: name、type、clusterName
 func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
-	// 检查 IP 地址是否匹配
 	if basic.IpAddr != spec.IPAddr {
 		return false
 	}
 
-	clusterName := ""
-	if spec.ClusterName != nil {
-		clusterName = *spec.ClusterName
-	}
-	if clusterName != basic.ClusterName {
+	if spec.SecretName != nil && basic.SecretName != *spec.SecretName {
 		return false
 	}
 
-	if !(spec.SecretName != nil && basic.SecretName == *spec.SecretName) {
+	if spec.SecretNamespace != nil && basic.SecretNamespace != *spec.SecretNamespace {
 		return false
 	}
 
-	if !(spec.SecretNamespace != nil && basic.SecretNamespace == *spec.SecretNamespace) {
+	if spec.HTTPS != nil && basic.Https != *spec.HTTPS {
 		return false
 	}
 
-	if !(spec.HTTPS != nil && basic.Https == *spec.HTTPS) {
-		return false
-	}
-	if !(spec.Port != nil && basic.Port == *spec.Port) {
-		return false
-	}
-
-	if spec.Type != nil {
-		if basic.Type != *spec.Type {
-			return false
-		}
-	} else if basic.Type != topohubv1beta1.EndpointTypeRedfish {
+	if spec.Port != nil && basic.Port != *spec.Port {
 		return false
 	}
 
@@ -286,6 +278,10 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 			updated.Status.Basic.SecretNamespace,
 			updated.Status.Basic.SecretName,
 			updated.Status.Basic.Port)
+
+		// delete the cache of SSHStatus
+		sshstatusdata.SSHCacheDatabase.Delete(name)
+		logger.Debugf("Deleted SSHStatus %s from cache due to spec change", name)
 		return nil
 	}
 
@@ -324,32 +320,26 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 }
 
 // Check if the SSH status basic info matches the host endpoint spec
+// Only compare mutable fields: IPAddr、SecretName、SecretNamespace、Port
+// Do not compare immutable fields: name、type、clusterName
 func specEqualSSH(basic topohubv1beta1.SSHBasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
 	if basic.IpAddr != spec.IPAddr {
 		return false
 	}
 
-	// Check port
 	if spec.Port != nil && basic.Port != *spec.Port {
 		return false
 	}
 
-	// Check Secret
 	if spec.SecretName != nil && basic.SecretName != *spec.SecretName {
 		return false
 	}
 
-	// Check Secret namespace
 	if spec.SecretNamespace != nil && basic.SecretNamespace != *spec.SecretNamespace {
 		return false
 	}
 
-	// Check cluster name
-	clusterName := ""
-	if spec.ClusterName != nil {
-		clusterName = *spec.ClusterName
-	}
-	return basic.ClusterName == clusterName
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager
