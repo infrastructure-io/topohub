@@ -110,9 +110,9 @@ func main() {
 			Port: webhookPortInt,
 			//CertDir: agentConfig.WebhookCertDir,
 		}),
-		LeaderElection:          true,
-		LeaderElectionID:        "topohub-lock",
-		LeaderElectionNamespace: agentConfig.PodNamespace,
+
+		// Leader Election disabled for single pod deployment
+		LeaderElection: false,
 	})
 	if err != nil {
 		log.Logger.Errorf("Unable to start manager: %v", err)
@@ -250,9 +250,6 @@ func main() {
 	// Start manager
 	go func() {
 		log.Logger.Info("Starting manager")
-		// If LeaderElection is used, the binary must be exited immediately after this returns,
-		// otherwise components that need leader election might continue to run after the leader
-		// lock was lost.
 		if err := mgr.Start(ctx); err != nil {
 			log.Logger.Errorf("Problem running manager: %v", err)
 
@@ -262,11 +259,7 @@ func main() {
 		}
 	}()
 
-	go func() {
-		log.Logger.Infof("waiting for leader elected")
-		<-mgr.Elected()
-		log.Logger.Infof("I am elected as the Leader")
-	}()
+	log.Logger.Info("Manager started successfully (single pod deployment)")
 
 	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
