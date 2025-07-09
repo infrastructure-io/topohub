@@ -127,8 +127,13 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 		if hostEndpoint.Spec.Port != nil {
 			updated.Status.Basic.Port = *hostEndpoint.Spec.Port
 		}
+		if hostEndpoint.Spec.ClusterName != nil {
+			updated.Status.Basic.ClusterName = *hostEndpoint.Spec.ClusterName
+		}
 
-		if err := r.client.Update(ctx, updated); err != nil {
+		logger.Debugf("Before update RedfishStatus %s, Basic: %+v", name, updated.Status.Basic)
+
+		if err := r.client.Status().Update(ctx, updated); err != nil {
 			if errors.IsConflict(err) {
 				logger.Debugf("Conflict updating RedfishStatus %s, will retry", name)
 				return err
@@ -136,12 +141,7 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 			logger.Errorf("Failed to update RedfishStatus %s: %v", name, err)
 			return err
 		}
-		logger.Infof("Successfully updated RedfishStatus %s", name)
-		logger.Debugf("Updated RedfishStatus details - IP: %s, Secret: %s/%s, Port: %d",
-			updated.Status.Basic.IpAddr,
-			updated.Status.Basic.SecretNamespace,
-			updated.Status.Basic.SecretName,
-			updated.Status.Basic.Port)
+		logger.Debugf("Successfully update RedfishStatus %s, Basic: %+v", name, updated.Status.Basic)
 
 		// delete the cache of RedfishStatus
 		redfishstatusdata.RedfishCacheDatabase.Delete(name)
