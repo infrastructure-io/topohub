@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -155,6 +156,54 @@ func (c *sshStatusController) UpdateSSHStatusAtInterval() {
 }
 
 // checks if the SSHStatus IP is in the Subnet's dhcpClientDetails and updates the subnetName
+func (c *sshStatusController) cacheSSHStatusData(sshStatus *topohubv1beta1.SSHStatus, logger *zap.SugaredLogger) error {
+	var (
+		username, password, sshKey string
+		sshKeyAuth                 bool
+		err                        error
+	)
+
+	// check if the sshStatus data is in cache
+	existingData := sshstatusdata.SSHCacheDatabase.Get(sshStatus.Name)
+	if len(sshStatus.Status.Basic.SecretName) > 0 && len(sshStatus.Status.Basic.SecretNamespace) > 0 {
+		username, password, sshKey, sshKeyAuth, err = c.getSecretData(
+			sshStatus.Status.Basic.SecretName,
+			sshStatus.Status.Basic.SecretNamespace,
+		)
+		if err != nil {
+			logger.Errorf("Failed to get secret data for SSHStatus %s: %v", sshStatus.Name, err)
+			return err
+		}
+		logger.Debugf("Preparing SSHStatus %s cache with username: %s, sshKeyAuth: %v",
+			sshStatus.Name, username, sshKeyAuth)
+	} else {
+		logger.Debugf("Preparing SSHStatus %s cache with empty authentication", sshStatus.Name)
+	}
+
+	// create new connection object
+	sshConnectCon := sshstatusdata.SSHConnectCon{
+		Info:       &sshStatus.Status.Basic,
+		Username:   username,
+		Password:   password,
+		SSHKey:     sshKey,
+		SSHKeyAuth: sshKeyAuth,
+	}
+
+	// if the sshStatus data is in cache, check if the data is changed
+	if existingData != nil {
+		if reflect.DeepEqual(*existingData, sshConnectCon) {
+			logger.Debugf("SSHStatus %s cache data unchanged, skipping update", sshStatus.Name)
+			return nil
+		}
+	}
+
+	// update cache
+	sshstatusdata.SSHCacheDatabase.Add(sshStatus.Name, sshConnectCon)
+	logger.Debugf("Successfully cached SSHStatus %s data (IP: %s)", sshStatus.Name, sshStatus.Status.Basic.IpAddr)
+	return nil
+}
+
+// checks if the SSHStatus IP is in the Subnet's dhcpClientDetails and updates the subnetName
 func (c *sshStatusController) updateSubnetNameFromDhcpClientDetails(sshStatus *topohubv1beta1.SSHStatus, logger *zap.SugaredLogger) error {
 	if sshStatus == nil || sshStatus.Status.Basic.IpAddr == "" {
 		return nil
@@ -253,43 +302,24 @@ func (c *sshStatusController) processSSHStatus(sshStatus *topohubv1beta1.SSHStat
 		sshStatus.Status.Basic.IpAddr,
 		sshStatus.Status.Healthy)
 
-	// Cache SSH status data locally
-	username := ""
-	password := ""
-	sshKey := ""
-	sshKeyAuth := false
-	var err error
-	if len(sshStatus.Status.Basic.SecretName) > 0 && len(sshStatus.Status.Basic.SecretNamespace) > 0 {
-		username, password, sshKey, sshKeyAuth, err = c.getSecretData(
-			sshStatus.Status.Basic.SecretName,
-			sshStatus.Status.Basic.SecretNamespace,
-		)
-		if err != nil {
-			logger.Errorf("Failed to get secret data for SSHStatus %s: %v", sshStatus.Name, err)
-			return err
-		}
-		logger.Debugf("Adding/Updating SSHStatus %s in cache with username: %s, sshKeyAuth: %v",
-			sshStatus.Name, username, sshKeyAuth)
-	} else {
-		logger.Debugf("Adding/Updating SSHStatus %s in cache with empty authentication", sshStatus.Name)
+	if err := c.cacheSSHStatusData(sshStatus, logger); err != nil {
+		logger.Errorf("Failed to cache SSHStatus data during processing: %v", err)
+		return err
+	}
+	data := sshstatusdata.SSHCacheDatabase.Get(sshStatus.Name)
+	if data == nil {
+		return fmt.Errorf("no cache data found for SSHStatus %s after caching", sshStatus.Name)
 	}
 
-	sshConnectCon := sshstatusdata.SSHConnectCon{
-		Info:       &sshStatus.Status.Basic,
-		Username:   username,
-		Password:   password,
-		SSHKey:     sshKey,
-		SSHKeyAuth: sshKeyAuth,
-	}
-
-	sshstatusdata.SSHCacheDatabase.Add(sshStatus.Name, sshConnectCon)
+	sshConnectCon := *data
 
 	// Check if IP is in Subnet's dhcpClientDetails and update subnetName
 	if err := c.updateSubnetNameFromDhcpClientDetails(sshStatus, logger); err != nil {
 		logger.Warnf("Failed to update subnet name from dhcp client details: %v", err)
 	}
 
-	_, err = c.UpdateSSHStatusInfo(sshStatus.Name, &sshConnectCon)
+	// update sshStatus info
+	_, err := c.UpdateSSHStatusInfo(sshStatus.Name, &sshConnectCon)
 	if err != nil {
 		logger.Errorf("Failed to update SSHStatus %s: %v", sshStatus.Name, err)
 		return err
@@ -323,6 +353,9 @@ func (c *sshStatusController) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if len(sshStatus.Status.Basic.IpAddr) != 0 {
+		if err := c.cacheSSHStatusData(sshStatus, logger); err != nil {
+			logger.Error(err, "Failed to cache SSHStatus data")
+		}
 		logger.Debugf("SSHStatus %s has IP address, skipping processing", sshStatus.Name)
 		return ctrl.Result{}, nil
 	}
