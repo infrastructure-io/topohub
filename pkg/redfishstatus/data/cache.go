@@ -100,7 +100,7 @@ func (c *RedfishCache) GetStaticClientInfo() map[string]RedfishConnectCon {
 	return result
 }
 
-func (c *RedfishCache) UpdateSecet(secretName, secretNamespace, username, password string) []string {
+func (c *RedfishCache) UpdateSecret(secretName, secretNamespace, username, password string) []string {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -123,6 +123,10 @@ func (c *RedfishCache) UpdateSecet(secretName, secretNamespace, username, passwo
 		if changed {
 			changedHosts = append(changedHosts, name)
 		}
+	}
+
+	if len(changedHosts) > 0 {
+		log.Logger.Infof("update redfish status username for host %v", changedHosts)
 	}
 	return changedHosts
 }

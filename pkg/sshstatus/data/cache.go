@@ -4,14 +4,15 @@ import (
 	"sync"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
 // SSHConnectCon stores the information required for SSH connection
 type SSHConnectCon struct {
-	Info     *topohubv1beta1.SSHBasicInfo
-	Username string
-	Password string
-	SSHKey   string
+	Info       *topohubv1beta1.SSHBasicInfo
+	Username   string
+	Password   string
+	SSHKey     string
 	SSHKeyAuth bool
 }
 
@@ -67,7 +68,7 @@ func (c *SSHHostCache) GetAll() map[string]SSHConnectCon {
 func (c *SSHHostCache) UpdateSecret(secretName, secretNamespace, username, password string) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	var changedHosts []string
 	for name, con := range c.hosts {
 		if con.Info.SecretName == secretName && con.Info.SecretNamespace == secretNamespace {
@@ -77,6 +78,9 @@ func (c *SSHHostCache) UpdateSecret(secretName, secretNamespace, username, passw
 			changedHosts = append(changedHosts, name)
 		}
 	}
+	if len(changedHosts) > 0 {
+		log.Logger.Infof("update ssh status username for host %v", changedHosts)
+	}
 	return changedHosts
 }
 
@@ -84,7 +88,7 @@ func (c *SSHHostCache) UpdateSecret(secretName, secretNamespace, username, passw
 func (c *SSHHostCache) UpdateSSHKey(secretName, secretNamespace, sshKey string) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	var changedHosts []string
 	for name, con := range c.hosts {
 		if con.Info.SecretName == secretName && con.Info.SecretNamespace == secretNamespace && con.SSHKeyAuth {

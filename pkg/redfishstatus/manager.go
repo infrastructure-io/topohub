@@ -99,7 +99,7 @@ func (c *redfishStatusController) UpdateSecret(secretName, secretNamespace, user
 	}
 
 	c.log.Debugf("updating secet in cache for secret %s/%s", secretNamespace, secretName)
-	changedHosts := redfishstatusdata.RedfishCacheDatabase.UpdateSecet(secretName, secretNamespace, username, password)
+	changedHosts := redfishstatusdata.RedfishCacheDatabase.UpdateSecret(secretName, secretNamespace, username, password)
 	for _, name := range changedHosts {
 		c.log.Infof("update redfishStatus %s after secret is changed", name)
 		if err := c.UpdateRedfishStatusInfoWrapper(name); err != nil {
