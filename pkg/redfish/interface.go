@@ -36,11 +36,12 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 
 	url := buildRedfishEndpoint(hostCon)
 	config := gofish.ClientConfig{
-		Endpoint:         url,
-		Username:         hostCon.Username,
-		Password:         hostCon.Password,
-		Insecure:         true,
-		ReuseConnections: true,
+		Endpoint:            url,
+		Username:            hostCon.Username,
+		Password:            hostCon.Password,
+		Insecure:            true,
+		ReuseConnections:    true,
+		TLSHandshakeTimeout: 5,
 	}
 
 	if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {

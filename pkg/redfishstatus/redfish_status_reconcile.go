@@ -424,11 +424,27 @@ func (c *redfishStatusController) cacheRedfishStatusData(redfishStatus *topohubv
 	// check if the redfishStatus data is already cached
 	existingData := redfishstatusdata.RedfishCacheDatabase.Get(redfishStatus.Name)
 
-	// get the authentication information
-	var username, password string
-	var err error
-	if len(redfishStatus.Status.Basic.SecretName) > 0 && len(redfishStatus.Status.Basic.SecretNamespace) > 0 {
-		username, password, err = c.getSecretData(
+	// create a new connection object
+	var newConnectCon redfishstatusdata.RedfishConnectCon
+	if existingData != nil {
+		newConnectCon = redfishstatusdata.RedfishConnectCon{
+			Info:     &redfishStatus.Status.Basic,
+			Username: existingData.Username,
+			Password: existingData.Password,
+			DhcpHost: redfishStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP,
+		}
+		if reflect.DeepEqual(existingData, &newConnectCon) {
+			logger.Debugf("RedfishStatus %s cache data unchanged, skipping update", redfishStatus.Name)
+			return nil
+		}
+	} else {
+		if len(redfishStatus.Status.Basic.SecretName) == 0 || len(redfishStatus.Status.Basic.SecretNamespace) == 0 {
+			logger.Warnf("RedfishStatus %s has no secret name or namespace", redfishStatus.Name)
+			return nil
+		}
+
+		// get the authentication information
+		username, password, err := c.getSecretData(
 			redfishStatus.Status.Basic.SecretName,
 			redfishStatus.Status.Basic.SecretNamespace,
 		)
@@ -436,37 +452,18 @@ func (c *redfishStatusController) cacheRedfishStatusData(redfishStatus *topohubv
 			logger.Errorf("Failed to get secret data for RedfishStatus %s: %v", redfishStatus.Name, err)
 			return err
 		}
-		logger.Debugf("Preparing RedfishStatus %s cache with username: %s",
-			redfishStatus.Name, username)
-	} else {
-		logger.Debugf("Preparing RedfishStatus %s cache with empty username", redfishStatus.Name)
-	}
-
-	// create a new connection object
-	newConnectCon := redfishstatusdata.RedfishConnectCon{
-		Info:     &redfishStatus.Status.Basic,
-		Username: username,
-		Password: password,
-		DhcpHost: redfishStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP,
-	}
-
-	// if the redfishStatus data is already cached, check if it needs to be updated
-	if existingData != nil {
-		// check if the critical fields have changed
-		// compare the entire Basic structure and other critical fields
-		if existingData.Username == username &&
-			existingData.Password == password &&
-			existingData.DhcpHost == newConnectCon.DhcpHost &&
-			reflect.DeepEqual(existingData.Info, &redfishStatus.Status.Basic) {
-			logger.Debugf("RedfishStatus %s cache data unchanged, skipping update", redfishStatus.Name)
-			return nil
+		newConnectCon = redfishstatusdata.RedfishConnectCon{
+			Info:     &redfishStatus.Status.Basic,
+			Username: username,
+			Password: password,
+			DhcpHost: redfishStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP,
 		}
+
 	}
 
 	// update the cache
 	redfishstatusdata.RedfishCacheDatabase.Add(redfishStatus.Name, newConnectCon)
 	logger.Debugf("Successfully cached RedfishStatus %s data (IP: %s)", redfishStatus.Name, redfishStatus.Status.Basic.IpAddr)
-
 	return nil
 }
 
