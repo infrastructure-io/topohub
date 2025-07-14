@@ -233,7 +233,7 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 		updated := existing.DeepCopy()
 		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		updated.Status.Basic = topohubv1beta1.SSHBasicInfo{
-			Type:   topohubv1beta1.HostTypeSSH,
+			Type:   topohubv1beta1.HostTypeEndpoint,
 			IpAddr: hostEndpoint.Spec.IPAddr,
 			Port:   *hostEndpoint.Spec.Port,
 		}
