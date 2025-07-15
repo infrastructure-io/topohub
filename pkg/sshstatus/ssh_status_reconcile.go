@@ -363,9 +363,7 @@ func (c *sshStatusController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Process SSHStatus (including getting basic information from OwnerReferences and updating status)
 	if err := c.processSSHStatus(sshStatus, logger); err != nil {
 		logger.Error(err, "Failed to process SSHStatus, will retry")
-		return ctrl.Result{
-			RequeueAfter: time.Second * 5,
-		}, nil
+		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{}, nil

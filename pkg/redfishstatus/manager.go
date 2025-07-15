@@ -75,10 +75,10 @@ func (c *redfishStatusController) Stop() {
 
 // SetupWithManager 设置 controller-runtime manager
 func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
-
+	c.log.Info("Starting RedfishStatus controller")
 	go func() {
-		<-mgr.Elected()
-		c.log.Info("Elected as leader, begin to start all controllers")
+		// <-mgr.Elected()
+		// c.log.Info("Elected as leader, begin to start all controllers")
 		// 启动 DHCP 事件处理
 		go c.processDHCPEvents()
 		// 启动 redfishstatus spec.info 的	周期更新
@@ -88,7 +88,7 @@ func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&topohubv1beta1.RedfishStatus{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 30, // 设置你希望的并发数量
+			MaxConcurrentReconciles: 5, // 设置你希望的并发数量
 		}).
 		Complete(c)
 }

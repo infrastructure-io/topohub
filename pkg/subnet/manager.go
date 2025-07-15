@@ -177,8 +177,8 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 
 	// start all dhcp server when we are the leader
 	go func() {
-		<-mgr.Elected()
-		s.log.Info("Elected as leader, begin to start all controllers")
+		// <-mgr.Elected()
+		// s.log.Info("Elected as leader, begin to start all controllers")
 
 		// 获取所有的 Subnet 实例并启动 DHCP 服务器
 		var subnetList topohubv1beta1.SubnetList

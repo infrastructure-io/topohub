@@ -84,15 +84,22 @@ func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogE
 
 // UpdateRedfishStatusInfo updates redfishstatus spec.info
 func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfishstatusdata.RedfishConnectCon) (bool, error) {
-	// lock for updateing redfishStatus instance
-	c.log.Debugf("lock for updateing redfishStatus instance %s", name)
+	c.log.Debugf("lock for updating redfishStatus instance %s", name)
 	lock := lock.LockManagerInstance.GetLock(name)
 	lock.Lock()
 	defer lock.Unlock()
 
 	// Create redfish client
 	var healthy bool
-	client, err1 := redfish.NewClient(*d, c.log)
+	var client redfish.RefishClient
+	var err1 error
+
+	protocol := "http"
+	if d.Info.Https {
+		protocol = "https"
+	}
+
+	client, err1 = redfish.NewClient(*d, c.log)
 	if err1 != nil {
 		c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
 		healthy = false
@@ -100,10 +107,11 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 		healthy = true
 	}
 
-	protocol := "http"
-	if d.Info.Https {
-		protocol = "https"
-	}
+	defer func() {
+		if client != nil {
+			client.Logout()
+		}
+	}()
 
 	hasAuth := len(d.Username) > 0 && len(d.Password) > 0
 	c.log.Debugf("try to check redfish with url: %s://%s:%d (auth: %v)", protocol, d.Info.IpAddr, d.Info.Port, hasAuth)
@@ -117,7 +125,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 	}
 	updated := existing.DeepCopy()
 
-	// Update health status
+	// // Update health status
 	updated.Status.Healthy = healthy
 	if healthy {
 		infoData, err := client.GetInfo()
@@ -136,7 +144,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 		c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, existing.Status.Healthy, healthy)
 	}
 
-	// Update log
+	// // Update log
 	if healthy {
 		logEntrys, err := client.GetLog()
 		if err != nil {
@@ -174,6 +182,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 		return true, nil
 	}
 	return false, nil
+
 }
 
 // UpdateRedfishStatusInfoWrapper updates redfishstatus spec.info
@@ -517,9 +526,7 @@ func (c *redfishStatusController) Reconcile(ctx context.Context, req ctrl.Reques
 	// Process RedfishStatus (including getting basic information from OwnerReferences and updating status)
 	if err := c.processRedfishStatus(redfishStatus, logger); err != nil {
 		logger.Error(err, "Failed to process RedfishStatus, will retry")
-		return ctrl.Result{
-			RequeueAfter: time.Second * 2,
-		}, nil
+		return ctrl.Result{}, nil
 	}
 
 	logger.Debugf("Successfully processed RedfishStatus %s", redfishStatus.Name)

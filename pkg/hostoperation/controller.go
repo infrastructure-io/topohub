@@ -74,7 +74,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		if d == nil {
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
 			logger.Warnf("Failed to get connect config %s from cache, retry later", hostOp.Spec.RedfishStatusName)
-			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+			return ctrl.Result{}, nil
 		}
 		logger.Debugf("get connect config %s from cache: %+v", hostOp.Spec.RedfishStatusName, d)
 
