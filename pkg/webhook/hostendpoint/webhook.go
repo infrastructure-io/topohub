@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"reflect"
 
 	"go.uber.org/zap"
 
@@ -121,13 +120,6 @@ func (w *HostEndpointWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj
 	// Validate that Type cannot be changed
 	if *oldHostEndpoint.Spec.Type != *newHostEndpoint.Spec.Type {
 		err := fmt.Errorf("hostEndpoint Type cannot be changed")
-		w.log.Error(err.Error())
-		return nil, err
-	}
-
-	// Validate that ClusterName cannot be changed
-	if !reflect.DeepEqual(oldHostEndpoint.Spec.ClusterName, newHostEndpoint.Spec.ClusterName) {
-		err := fmt.Errorf("hostEndpoint ClusterName cannot be changed")
 		w.log.Error(err.Error())
 		return nil, err
 	}

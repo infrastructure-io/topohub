@@ -186,7 +186,7 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 
 // specEqual checks if the RedfishStatus basic info matches the HostEndpoint spec
 // Only compare mutable fields: IPAddr、SecretName、SecretNamespace、HTTPS、Port
-// Do not compare immutable fields: name、type、clusterName
+// Do not compare immutable fields: name、type
 func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
 	if basic.IpAddr != spec.IPAddr {
 		return false
@@ -205,6 +205,10 @@ func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointS
 	}
 
 	if spec.Port != nil && basic.Port != *spec.Port {
+		return false
+	}
+
+	if spec.ClusterName != nil && basic.ClusterName != *spec.ClusterName {
 		return false
 	}
 
@@ -321,7 +325,7 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 
 // Check if the SSH status basic info matches the host endpoint spec
 // Only compare mutable fields: IPAddr、SecretName、SecretNamespace、Port
-// Do not compare immutable fields: name、type、clusterName
+// Do not compare immutable fields: name、type
 func specEqualSSH(basic topohubv1beta1.SSHBasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
 	if basic.IpAddr != spec.IPAddr {
 		return false
@@ -336,6 +340,10 @@ func specEqualSSH(basic topohubv1beta1.SSHBasicInfo, spec topohubv1beta1.HostEnd
 	}
 
 	if spec.SecretNamespace != nil && basic.SecretNamespace != *spec.SecretNamespace {
+		return false
+	}
+
+	if spec.ClusterName != nil && basic.ClusterName != *spec.ClusterName {
 		return false
 	}
 
