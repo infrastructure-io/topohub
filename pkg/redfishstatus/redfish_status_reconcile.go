@@ -10,7 +10,6 @@ import (
 	"time"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
 	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	gofishredfish "github.com/stmcginnis/gofish/redfish"
@@ -18,7 +17,6 @@ import (
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -84,96 +82,111 @@ func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogE
 
 // UpdateRedfishStatusInfo updates redfishstatus spec.info
 func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfishstatusdata.RedfishConnectCon) (bool, error) {
-	// lock for updateing redfishStatus instance
-	c.log.Debugf("lock for updateing redfishStatus instance %s", name)
-	lock := lock.LockManagerInstance.GetLock(name)
-	lock.Lock()
-	defer lock.Unlock()
+	c.log.Debugf("lock for updating redfishStatus instance %s", name)
+	// lock := lock.LockManagerInstance.GetLock(name)
+	// lock.Lock()
+	// defer lock.Unlock()
 
 	// Create redfish client
-	var healthy bool
-	client, err1 := redfish.NewClient(*d, c.log)
-	if err1 != nil {
-		c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
-		healthy = false
-	} else {
-		healthy = true
-	}
+	// var healthy bool
+	// var client redfish.RefishClient
+	// var err1 error
 
-	protocol := "http"
-	if d.Info.Https {
-		protocol = "https"
-	}
+	// protocol := "http"
+	// if d.Info.Https {
+	// 	protocol = "https"
+	// }
 
-	hasAuth := len(d.Username) > 0 && len(d.Password) > 0
-	c.log.Debugf("try to check redfish with url: %s://%s:%d (auth: %v)", protocol, d.Info.IpAddr, d.Info.Port, hasAuth)
+	// client, err1 = redfish.NewClient(*d, c.log)
+	// if err1 != nil {
+	// 	c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
+	// 	healthy = false
+	// } else {
+	// 	healthy = true
+	// }
 
-	// Get existing RedfishStatus
-	existing := &topohubv1beta1.RedfishStatus{}
-	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
-	if err != nil {
-		c.log.Errorf("Failed to get RedfishStatus %s: %v", name, err)
-		return false, err
-	}
-	updated := existing.DeepCopy()
+	// c.log.Debugf("RedfishStatus %s is healthy: %v", name, healthy)
+	// if healthy {
+	// 	client.GetInfo()
+	// }
 
-	// Update health status
-	updated.Status.Healthy = healthy
-	if healthy {
-		infoData, err := client.GetInfo()
-		if err != nil {
-			c.log.Errorf("Failed to get info of RedfishStatus %s: %v", name, err)
-			healthy = false
-		} else {
-			updated.Status.Info = infoData
-		}
-	}
-	if !healthy {
-		c.log.Debugf("RedfishStatus %s is not healthy, set info to empty", name)
-		updated.Status.Info = map[string]string{}
-	}
-	if updated.Status.Healthy != existing.Status.Healthy {
-		c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, existing.Status.Healthy, healthy)
-	}
+	// hasAuth := len(d.Username) > 0 && len(d.Password) > 0
+	// c.log.Debugf("try to check redfish with url: %s://%s:%d (auth: %v)", protocol, d.Info.IpAddr, d.Info.Port, hasAuth)
 
-	// Update log
-	if healthy {
-		logEntrys, err := client.GetLog()
-		if err != nil {
-			c.log.Warnf("Failed to get logs of RedfishStatus %s: %v", name, err)
-		} else {
-			lastLogTime := ""
-			if updated.Status.Log.LastestLog != nil {
-				lastLogTime = updated.Status.Log.LastestLog.Time
-			}
-			newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg, totalMsgCount, warningMsgCount, newLogAccount := c.GenerateEvents(logEntrys, name, lastLogTime)
-			if newLastestTime != "" {
-				updated.Status.Log.TotalLogAccount = int32(totalMsgCount)
-				updated.Status.Log.WarningLogAccount = int32(warningMsgCount)
-				updated.Status.Log.LastestLog = &topohubv1beta1.LogEntry{
-					Time:    newLastestTime,
-					Message: newLastestMsg,
-				}
-				updated.Status.Log.LastestWarningLog = &topohubv1beta1.LogEntry{
-					Time:    newLastestWarningTime,
-					Message: newLastestWarningMsg,
-				}
-				c.log.Infof("find %d new logs for redfishStatus %s", newLogAccount, name)
-			}
-		}
-	}
+	// // Get existing RedfishStatus
+	// existing := &topohubv1beta1.RedfishStatus{}
+	// err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
+	// if err != nil {
+	// 	c.log.Errorf("Failed to get RedfishStatus %s: %v", name, err)
+	// 	return false, err
+	// }
+	// updated := existing.DeepCopy()
+
+	// // Update health status
+	// updated.Status.Healthy = healthy
+	// if healthy {
+	// 	infoData, err := client.GetInfo()
+	// 	if err != nil {
+	// 		c.log.Errorf("Failed to get info of RedfishStatus %s: %v", name, err)
+	// 		healthy = false
+	// 	} else {
+	// 		updated.Status.Info = infoData
+	// 	}
+	// }
+	// if !healthy {
+	// 	c.log.Debugf("RedfishStatus %s is not healthy, set info to empty", name)
+	// 	updated.Status.Info = map[string]string{}
+	// }
+	// if updated.Status.Healthy != existing.Status.Healthy {
+	// 	c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, existing.Status.Healthy, healthy)
+	// }
+
+	// defer func() {
+	// 	if client != nil {
+	// 		client.Logout()
+	// 		// updated = nil
+	// 	}
+	// }()
+
+	// // Update log
+	// if healthy {
+	// 	logEntrys, err := client.GetLog()
+	// 	if err != nil {
+	// 		c.log.Warnf("Failed to get logs of RedfishStatus %s: %v", name, err)
+	// 	} else {
+	// 		lastLogTime := ""
+	// 		if updated.Status.Log.LastestLog != nil {
+	// 			lastLogTime = updated.Status.Log.LastestLog.Time
+	// 		}
+	// 		newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg, totalMsgCount, warningMsgCount, newLogAccount := c.GenerateEvents(logEntrys, name, lastLogTime)
+	// 		if newLastestTime != "" {
+	// 			updated.Status.Log.TotalLogAccount = int32(totalMsgCount)
+	// 			updated.Status.Log.WarningLogAccount = int32(warningMsgCount)
+	// 			updated.Status.Log.LastestLog = &topohubv1beta1.LogEntry{
+	// 				Time:    newLastestTime,
+	// 				Message: newLastestMsg,
+	// 			}
+	// 			updated.Status.Log.LastestWarningLog = &topohubv1beta1.LogEntry{
+	// 				Time:    newLastestWarningTime,
+	// 				Message: newLastestWarningMsg,
+	// 			}
+	// 			c.log.Infof("find %d new logs for redfishStatus %s", newLogAccount, name)
+	// 		}
+	// 	}
+	// }
 
 	// Update RedfishStatus
-	if !compareRedfishStatus(updated.Status, existing.Status, c.log) {
-		c.log.Debugf("status changed, existing: %v, updated: %v", existing.Status, updated.Status)
-		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			return true, err
-		}
-		c.log.Infof("Successfully updated redfishStatus %s status", name)
-		return true, nil
-	}
-	return false, nil
+	// if !compareRedfishStatus(updated.Status, existing.Status, c.log) {
+	// 	c.log.Debugf("status changed, existing: %v, updated: %v", existing.Status, updated.Status)
+	// 	updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
+	// 	if err := c.client.Status().Update(context.Background(), updated); err != nil {
+	// 		return true, err
+	// 	}
+	// 	c.log.Infof("Successfully updated redfishStatus %s status", name)
+	// 	return true, nil
+	// }
+	// return false, nil
+	return true, nil
 }
 
 // UpdateRedfishStatusInfoWrapper updates redfishstatus spec.info
@@ -221,23 +234,23 @@ func (c *redfishStatusController) UpdateRedfishStatusInfoWrapper(name string) er
 
 // UpdateRedfishStatusAtInterval updates redfishstatus spec.info at interval
 func (c *redfishStatusController) UpdateRedfishStatusAtInterval() {
-	interval := time.Duration(c.config.RedfishStatusUpdateInterval) * time.Second
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	c.log.Infof("begin to update all redfishStatus at interval of %v seconds", c.config.RedfishStatusUpdateInterval)
+	// interval := time.Duration(c.config.RedfishStatusUpdateInterval) * time.Second
+	// ticker := time.NewTicker(interval)
+	// defer ticker.Stop()
+	// c.log.Infof("begin to update all redfishStatus at interval of %v seconds", c.config.RedfishStatusUpdateInterval)
 
-	for {
-		select {
-		case <-c.stopCh:
-			c.log.Info("Stopping UpdateRedfishStatusAtInterval")
-			return
-		case <-ticker.C:
-			c.log.Debugf("update all redfishStatus at interval ")
-			if err := c.UpdateRedfishStatusInfoWrapper(""); err != nil {
-				c.log.Errorf("Failed to update redfish status: %v", err)
-			}
-		}
-	}
+	// for {
+	// 	select {
+	// 	case <-c.stopCh:
+	// 		c.log.Info("Stopping UpdateRedfishStatusAtInterval")
+	// 		return
+	// 	case <-ticker.C:
+	// 		c.log.Debugf("update all redfishStatus at interval ")
+	// 		if err := c.UpdateRedfishStatusInfoWrapper(""); err != nil {
+	// 			c.log.Errorf("Failed to update redfish status: %v", err)
+	// 		}
+	// 	}
+	// }
 }
 
 // updateRedfishStatusResource updates RedfishStatus resource status
@@ -517,9 +530,7 @@ func (c *redfishStatusController) Reconcile(ctx context.Context, req ctrl.Reques
 	// Process RedfishStatus (including getting basic information from OwnerReferences and updating status)
 	if err := c.processRedfishStatus(redfishStatus, logger); err != nil {
 		logger.Error(err, "Failed to process RedfishStatus, will retry")
-		return ctrl.Result{
-			RequeueAfter: time.Second * 2,
-		}, nil
+		return ctrl.Result{}, nil
 	}
 
 	logger.Debugf("Successfully processed RedfishStatus %s", redfishStatus.Name)

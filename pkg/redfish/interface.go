@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"reflect"
 	"time"
 
 	"github.com/stmcginnis/gofish"
@@ -23,6 +22,7 @@ type RefishClient interface {
 	GetLog() ([]*redfish.LogEntry, error)
 	GetSystemsLogEntries() ([]*redfish.LogEntry, error)
 	GetManagersLogEntries() ([]*redfish.LogEntry, error)
+	Logout()
 }
 
 // redfishClient implements the RefishClient interface
@@ -30,6 +30,16 @@ type redfishClient struct {
 	config gofish.ClientConfig
 	logger *zap.SugaredLogger
 	client *gofish.APIClient
+}
+
+var _ RefishClient = (*redfishClient)(nil)
+
+// Logout closes the Redfish connection
+func (c *redfishClient) Logout() {
+	if c.client != nil {
+		c.client.Logout()
+	}
+	c = nil
 }
 
 var _ RefishClient = (*redfishClient)(nil)
@@ -49,39 +59,36 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		},
 		MaxIdleConns:          defaultTransport.MaxIdleConns,
 		MaxIdleConnsPerHost:   defaultTransport.MaxIdleConnsPerHost, // max idle connections per host
-		IdleConnTimeout:       defaultTransport.IdleConnTimeout,     // idle connection timeout
+		IdleConnTimeout:       20 * time.Second,                     // idle connection timeout
 		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
-		TLSHandshakeTimeout:   5 * time.Second,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
 	}
 
 	config := gofish.ClientConfig{
-		Endpoint:            url,
-		Username:            hostCon.Username,
-		Password:            hostCon.Password,
-		Insecure:            true,
-		ReuseConnections:    true,
-		TLSHandshakeTimeout: 5,
+		Endpoint: url,
+		Username: hostCon.Username,
+		Password: hostCon.Password,
+		Insecure: true,
 		HTTPClient: &http.Client{
 			Transport: transport,
-			Timeout:   5 * time.Second,
 		},
 	}
 
-	if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
-		if reflect.DeepEqual(config, c.config) {
-			_, err := c.client.Service.Systems()
-			if err == nil {
-				log.Debugf("use cached redfish client for %s", hostCon.Info.IpAddr)
-				return c, nil
-			}
-		}
-		log.Debugf("logout invalid cached redfish client for %s", hostCon.Info.IpAddr)
-		c.client.Logout()
-		delete(CacheClient, hostCon.Info.IpAddr)
-	}
+	// if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
+	// 	if reflect.DeepEqual(config, c.config) {
+	// 		_, err := c.client.Service.Systems()
+	// 		if err == nil {
+	// 			log.Debugf("use cached redfish client for %s", hostCon.Info.IpAddr)
+	// 			return c, nil
+	// 		}
+	// 	}
+	// 	log.Debugf("logout invalid cached redfish client for %s", hostCon.Info.IpAddr)
+	// 	c.client.Logout()
+	// 	delete(CacheClient, hostCon.Info.IpAddr)
+	// }
 
 	log.Debugf("create new redfish client for %s", hostCon.Info.IpAddr)
 	client, err := gofish.Connect(config)
@@ -96,7 +103,7 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		client: client,
 	}
 
-	CacheClient[hostCon.Info.IpAddr] = c
+	// CacheClient[hostCon.Info.IpAddr] = c
 	return c, nil
 }
 

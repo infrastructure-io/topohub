@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/stmcginnis/gofish/redfish"
 )
@@ -106,35 +105,35 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	// memory info
 	setData(result, "MemoryTotalGiB", fmt.Sprintf("%.0f", system.MemorySummary.TotalSystemMemoryGiB))
 	setData(result, "MemoryStatus", string(system.MemorySummary.Status.Health))
-	mms, err := system.Memory()
-	if err != nil {
-		c.logger.Errorf("failed to get memory: %+v", err)
-		return nil, err
-	}
-	setData(result, "MemoryChipsAccount", fmt.Sprintf("%d", len(mms)))
-	//在内存条不变时，有时数组的顺序的变换，导致 后续 redfishstatus 会做无意义的更新，暂时 取消这些信息
-	for n, mm := range mms {
-		//c.logger.Debugf("Memory[%d]: %+v", n, mm)
-		setData(result, fmt.Sprintf("Memory[%d].Manufacturer", n), string(mm.Manufacturer))
-		setData(result, fmt.Sprintf("Memory[%d].MemoryType", n), string(mm.MemoryType))
-		setData(result, fmt.Sprintf("Memory[%d].MemoryDeviceType", n), string(mm.MemoryDeviceType))
-		setData(result, fmt.Sprintf("Memory[%d].Manufacturer", n), string(mm.Manufacturer))
-		setData(result, fmt.Sprintf("Memory[%d].Model", n), string(mm.Model))
-		setData(result, fmt.Sprintf("Memory[%d].CapacityGiB", n), fmt.Sprintf("%.2f", float64(mm.CapacityMiB)/1024))
-		setData(result, fmt.Sprintf("Memory[%d].Health", n), string(mm.Status.Health))
-		setData(result, fmt.Sprintf("Memory[%d].State", n), string(mm.Status.State))
-		// theses fields is dynamic, so we don't set them
-		//setData(result, fmt.Sprintf("Memory[%d].Name", n), string(mm.Name))
-		//if len(mm.AllowedSpeedsMHz) > 0 {
-		//	setData(result, fmt.Sprintf("Memory[%d].AllowedSpeedsMHz", n), fmt.Sprintf("%d", mm.AllowedSpeedsMHz[0]))
-		//}
-		//setData(result, fmt.Sprintf("Memory[%d].OperatingSpeedMhz", n), fmt.Sprintf("%d", mm.OperatingSpeedMhz))
-	}
+	// mms, err := system.Memory()
+	// if err != nil {
+	// 	c.logger.Errorf("failed to get memory: %+v", err)
+	// 	return nil, err
+	// }
+	// setData(result, "MemoryChipsAccount", fmt.Sprintf("%d", len(mms)))
+	// //在内存条不变时，有时数组的顺序的变换，导致 后续 redfishstatus 会做无意义的更新，暂时 取消这些信息
+	// for n, mm := range mms {
+	// 	//c.logger.Debugf("Memory[%d]: %+v", n, mm)
+	// 	setData(result, fmt.Sprintf("Memory[%d].Manufacturer", n), string(mm.Manufacturer))
+	// 	setData(result, fmt.Sprintf("Memory[%d].MemoryType", n), string(mm.MemoryType))
+	// 	setData(result, fmt.Sprintf("Memory[%d].MemoryDeviceType", n), string(mm.MemoryDeviceType))
+	// 	setData(result, fmt.Sprintf("Memory[%d].Manufacturer", n), string(mm.Manufacturer))
+	// 	setData(result, fmt.Sprintf("Memory[%d].Model", n), string(mm.Model))
+	// 	setData(result, fmt.Sprintf("Memory[%d].CapacityGiB", n), fmt.Sprintf("%.2f", float64(mm.CapacityMiB)/1024))
+	// 	setData(result, fmt.Sprintf("Memory[%d].Health", n), string(mm.Status.Health))
+	// 	setData(result, fmt.Sprintf("Memory[%d].State", n), string(mm.Status.State))
+	// 	// theses fields is dynamic, so we don't set them
+	// 	//setData(result, fmt.Sprintf("Memory[%d].Name", n), string(mm.Name))
+	// 	//if len(mm.AllowedSpeedsMHz) > 0 {
+	// 	//	setData(result, fmt.Sprintf("Memory[%d].AllowedSpeedsMHz", n), fmt.Sprintf("%d", mm.AllowedSpeedsMHz[0]))
+	// 	//}
+	// 	//setData(result, fmt.Sprintf("Memory[%d].OperatingSpeedMhz", n), fmt.Sprintf("%d", mm.OperatingSpeedMhz))
+	// }
 
-	// storage info - try SimpleStorage first, fallback to Storage
-	if err := c.getStorageInfoWithFallback(system, result); err != nil {
-		c.logger.Errorf("failed to get storage info: %+v", err)
-	}
+	// // storage info - try SimpleStorage first, fallback to Storage
+	// if err := c.getStorageInfoWithFallback(system, result); err != nil {
+	// 	c.logger.Errorf("failed to get storage info: %+v", err)
+	// }
 
 	// network info
 	// interfaces, err := system.NetworkInterfaces()
@@ -163,91 +162,91 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	// 	}
 	// }
 
-	// pcie info
-	cs, err := service.Chassis()
-	if err != nil {
-		c.logger.Errorf("failed to get chassis: %+v", err)
-		if len(cs) == 0 {
-			return nil, fmt.Errorf("failed to get chassis")
-		}
-	}
+	// // pcie info
+	// cs, err := service.Chassis()
+	// if err != nil {
+	// 	c.logger.Errorf("failed to get chassis: %+v", err)
+	// 	if len(cs) == 0 {
+	// 		return nil, fmt.Errorf("failed to get chassis")
+	// 	}
+	// }
 
-	c.logger.Debugf("chassis amount: %d", len(cs))
-	for count, chassis := range cs {
-		pcieList, err := chassis.PCIeDevices()
-		if err != nil {
-			c.logger.Errorf("failed to get pcie devices: %+v", err)
-			return nil, err
-		}
-		c.logger.Debugf("chassis[%d] pcie devices amount: %d", count, len(pcieList))
-		if len(pcieList) == 0 {
-			continue
-		}
+	// c.logger.Debugf("chassis amount: %d", len(cs))
+	// for count, chassis := range cs {
+	// 	pcieList, err := chassis.PCIeDevices()
+	// 	if err != nil {
+	// 		c.logger.Errorf("failed to get pcie devices: %+v", err)
+	// 		return nil, err
+	// 	}
+	// 	c.logger.Debugf("chassis[%d] pcie devices amount: %d", count, len(pcieList))
+	// 	if len(pcieList) == 0 {
+	// 		continue
+	// 	}
 
-	LOOP_PCIEDEVICE:
-		for m, item := range pcieList {
-			// c.logger.Debugf("PCIeDevices[%d]: %+v", m, item)
+	// LOOP_PCIEDEVICE:
+	// 	for m, item := range pcieList {
+	// 		// c.logger.Debugf("PCIeDevices[%d]: %+v", m, item)
 
-			switch strings.ToLower(item.Description) {
-			case "GPU Device":
-				setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_GPU)
-			case "NVMeSSD Device":
-				setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_Storage)
-			case "NIC device":
-				setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_NIC)
-			default:
-				setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_Unknown)
-			}
+	// 		switch strings.ToLower(item.Description) {
+	// 		case "GPU Device":
+	// 			setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_GPU)
+	// 		case "NVMeSSD Device":
+	// 			setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_Storage)
+	// 		case "NIC device":
+	// 			setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_NIC)
+	// 		default:
+	// 			setData(result, fmt.Sprintf("PCIeDevices[%d].DeviceType", m), DeviceType_Unknown)
+	// 		}
 
-			setData(result, fmt.Sprintf("PCIeDevices[%d].Name", m), item.Name)
-			setData(result, fmt.Sprintf("PCIeDevices[%d].Manufacturer", m), item.Manufacturer)
-			setData(result, fmt.Sprintf("PCIeDevices[%d].Model", m), item.Model)
-			setData(result, fmt.Sprintf("PCIeDevices[%d].Description", m), item.Description)
-			setData(result, fmt.Sprintf("PCIeDevices[%d].FirmwareVersion", m), item.FirmwareVersion)
-			setData(result, fmt.Sprintf("PCIeDevices[%d].PCIeType", m), string(item.PCIeInterface.PCIeType))
-			setData(result, fmt.Sprintf("PCIeDevices[%d].MaxPCIeType", m), string(item.PCIeInterface.MaxPCIeType))
-			setData(result, fmt.Sprintf("PCIeDevices[%d].LanesInUse", m), fmt.Sprintf("%d", item.PCIeInterface.LanesInUse))
-			setData(result, fmt.Sprintf("PCIeDevices[%d].MaxLanes", m), fmt.Sprintf("%d", item.PCIeInterface.MaxLanes))
-			setData(result, fmt.Sprintf("PCIeDevices[%d].Health", m), string(item.Status.Health))
-			setData(result, fmt.Sprintf("PCIeDevices[%d].State", m), string(item.Status.State))
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].Name", m), item.Name)
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].Manufacturer", m), item.Manufacturer)
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].Model", m), item.Model)
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].Description", m), item.Description)
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].FirmwareVersion", m), item.FirmwareVersion)
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].PCIeType", m), string(item.PCIeInterface.PCIeType))
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].MaxPCIeType", m), string(item.PCIeInterface.MaxPCIeType))
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].LanesInUse", m), fmt.Sprintf("%d", item.PCIeInterface.LanesInUse))
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].MaxLanes", m), fmt.Sprintf("%d", item.PCIeInterface.MaxLanes))
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].Health", m), string(item.Status.Health))
+	// 		setData(result, fmt.Sprintf("PCIeDevices[%d].State", m), string(item.Status.State))
 
-			pfcs, err := item.PCIeFunctions()
-			if err == nil && len(pfcs) > 0 {
-				c.logger.Debugf("pcie devices[%d] functions amount: %d", m, len(pfcs))
-				for n, pfc := range pfcs {
-					c.logger.Debugf("PCIeDevices[%d].PCIeFunctions[%d]: %+v", m, n, pfc)
-					// for network device function
-					ints, err := pfc.EthernetInterfaces()
-					if err == nil && len(ints) > 0 {
-						setData(result, fmt.Sprintf("PCIeDevices[%d].NetworkInterfacePortCount", m), fmt.Sprintf("%d", len(ints)))
-						for t, netint := range ints {
-							c.logger.Debugf("PCIeDevices[%d].PCIeFunctions[%d].EthernetInterfaces[%d]: %+v", m, n, t, netint)
-							setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].MACAddress", m, n, t), netint.MACAddress)
-							setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].SpeedGbps", m, n, t), fmt.Sprintf("%.2f", float64(netint.SpeedMbps)/1000))
-							setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].State", m, n, t), string(netint.Status.State))
-							setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].Health", m, n, t), string(netint.Status.Health))
-						}
-						continue LOOP_PCIEDEVICE
-					}
+	// 		pfcs, err := item.PCIeFunctions()
+	// 		if err == nil && len(pfcs) > 0 {
+	// 			c.logger.Debugf("pcie devices[%d] functions amount: %d", m, len(pfcs))
+	// 			for n, pfc := range pfcs {
+	// 				c.logger.Debugf("PCIeDevices[%d].PCIeFunctions[%d]: %+v", m, n, pfc)
+	// 				// for network device function
+	// 				ints, err := pfc.EthernetInterfaces()
+	// 				if err == nil && len(ints) > 0 {
+	// 					setData(result, fmt.Sprintf("PCIeDevices[%d].NetworkInterfacePortCount", m), fmt.Sprintf("%d", len(ints)))
+	// 					for t, netint := range ints {
+	// 						c.logger.Debugf("PCIeDevices[%d].PCIeFunctions[%d].EthernetInterfaces[%d]: %+v", m, n, t, netint)
+	// 						setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].MACAddress", m, n, t), netint.MACAddress)
+	// 						setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].SpeedGbps", m, n, t), fmt.Sprintf("%.2f", float64(netint.SpeedMbps)/1000))
+	// 						setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].State", m, n, t), string(netint.Status.State))
+	// 						setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].EthernetInterfaces[%d].Health", m, n, t), string(netint.Status.Health))
+	// 					}
+	// 					continue LOOP_PCIEDEVICE
+	// 				}
 
-					// for storage device function
-					stors, err := pfc.StorageControllers()
-					if err == nil && len(stors) > 0 {
-						setData(result, fmt.Sprintf("PCIeDevices[%d].StorageControllerPortCount", m), fmt.Sprintf("%d", len(stors)))
-						for t, stor := range stors {
-							c.logger.Debugf("PCIeDevices[%d].Functions[%d].StorageControllers[%d]: %+v", m, n, t, stor)
-							setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].StorageControllers[%d].Health", m, n, t), string(stor.Status.Health))
-							setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].StorageControllers[%d].State", m, n, t), string(stor.Status.State))
-						}
-						continue LOOP_PCIEDEVICE
-					}
-				}
-			}
+	// 				// for storage device function
+	// 				stors, err := pfc.StorageControllers()
+	// 				if err == nil && len(stors) > 0 {
+	// 					setData(result, fmt.Sprintf("PCIeDevices[%d].StorageControllerPortCount", m), fmt.Sprintf("%d", len(stors)))
+	// 					for t, stor := range stors {
+	// 						c.logger.Debugf("PCIeDevices[%d].Functions[%d].StorageControllers[%d]: %+v", m, n, t, stor)
+	// 						setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].StorageControllers[%d].Health", m, n, t), string(stor.Status.Health))
+	// 						setData(result, fmt.Sprintf("PCIeDevices[%d].Functions[%d].StorageControllers[%d].State", m, n, t), string(stor.Status.State))
+	// 					}
+	// 					continue LOOP_PCIEDEVICE
+	// 				}
+	// 			}
+	// 		}
 
-		}
+	// 	}
 
-		break
-	}
+	// 	break
+	// }
 
 	// ?? 是否可以取出安装的 os 信息
 

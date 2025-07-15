@@ -10,9 +10,6 @@ import (
 
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
-	"github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
-	sshdata "github.com/infrastructure-io/topohub/pkg/sshstatus/data"
-	"k8s.io/apimachinery/pkg/api/errors"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -61,37 +58,37 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Reconcile handles the reconciliation of HostEndpoint objects
 func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := r.log.With("secret", req.Name)
+	// logger := r.log.With("secret", req.Name)
 
-	logger.Debugf("Reconciling Secret %s", req.Name)
+	// logger.Debugf("Reconciling Secret %s", req.Name)
 
-	secret := &corev1.Secret{}
-	if err := r.client.Get(ctx, req.NamespacedName, secret); err != nil {
-		if errors.IsNotFound(err) {
-			logger.Debugf("Secret not found, ignoring")
-			return reconcile.Result{}, nil
-		}
-		logger.Error(err, "Failed to get Secret")
-		return reconcile.Result{}, err
-	}
+	// secret := &corev1.Secret{}
+	// if err := r.client.Get(ctx, req.NamespacedName, secret); err != nil {
+	// 	if errors.IsNotFound(err) {
+	// 		logger.Debugf("Secret not found, ignoring")
+	// 		return reconcile.Result{}, nil
+	// 	}
+	// 	logger.Error(err, "Failed to get Secret")
+	// 	return reconcile.Result{}, err
+	// }
 
-	if _, ok := secret.Data["username"]; !ok {
-		return reconcile.Result{}, nil
-	}
-	if _, ok := secret.Data["password"]; !ok {
-		return reconcile.Result{}, nil
-	}
+	// if _, ok := secret.Data["username"]; !ok {
+	// 	return reconcile.Result{}, nil
+	// }
+	// if _, ok := secret.Data["password"]; !ok {
+	// 	return reconcile.Result{}, nil
+	// }
 
-	username := string(secret.Data["username"])
-	password := string(secret.Data["password"])
+	// username := string(secret.Data["username"])
+	// password := string(secret.Data["password"])
 
-	logger.Debugf("retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
+	// logger.Debugf("retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
 
-	// Update RedfishCacheDatabase in goroutine
-	go data.RedfishCacheDatabase.UpdateSecret(secret.Name, secret.Namespace, username, password)
+	// // Update RedfishCacheDatabase in goroutine
+	// go data.RedfishCacheDatabase.UpdateSecret(secret.Name, secret.Namespace, username, password)
 
-	// Update SSHCacheDatabase in goroutine
-	go sshdata.SSHCacheDatabase.UpdateSecret(secret.Name, secret.Namespace, username, password)
+	// // Update SSHCacheDatabase in goroutine
+	// go sshdata.SSHCacheDatabase.UpdateSecret(secret.Name, secret.Namespace, username, password)
 
 	return reconcile.Result{}, nil
 }

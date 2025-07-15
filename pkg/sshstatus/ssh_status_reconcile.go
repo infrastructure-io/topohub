@@ -133,26 +133,26 @@ func (c *sshStatusController) UpdateSSHStatusInfoWrapper(name string) error {
 
 // UpdateSSHStatusAtInterval periodically updates all SSH status information
 func (c *sshStatusController) UpdateSSHStatusAtInterval() {
-	interval := time.Duration(c.config.SSHStatusUpdateInterval) * time.Second
-	if interval == 0 {
-		interval = 60 * time.Second // Default to 60 seconds
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	c.log.Infof("begin to update all sshStatus at interval of %v seconds", interval/time.Second)
+	// interval := time.Duration(c.config.SSHStatusUpdateInterval) * time.Second
+	// if interval == 0 {
+	// 	interval = 60 * time.Second // Default to 60 seconds
+	// }
+	// ticker := time.NewTicker(interval)
+	// defer ticker.Stop()
+	// c.log.Infof("begin to update all sshStatus at interval of %v seconds", interval/time.Second)
 
-	for {
-		select {
-		case <-c.stopCh:
-			c.log.Info("Stopping UpdateSSHStatusAtInterval")
-			return
-		case <-ticker.C:
-			c.log.Debugf("update all sshStatus at interval")
-			if err := c.UpdateSSHStatusInfoWrapper(""); err != nil {
-				c.log.Errorf("Failed to update SSH status: %v", err)
-			}
-		}
-	}
+	// for {
+	// 	select {
+	// 	case <-c.stopCh:
+	// 		c.log.Info("Stopping UpdateSSHStatusAtInterval")
+	// 		return
+	// 	case <-ticker.C:
+	// 		c.log.Debugf("update all sshStatus at interval")
+	// 		if err := c.UpdateSSHStatusInfoWrapper(""); err != nil {
+	// 			c.log.Errorf("Failed to update SSH status: %v", err)
+	// 		}
+	// 	}
+	// }
 }
 
 // checks if the SSHStatus IP is in the Subnet's dhcpClientDetails and updates the subnetName
@@ -363,9 +363,7 @@ func (c *sshStatusController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Process SSHStatus (including getting basic information from OwnerReferences and updating status)
 	if err := c.processSSHStatus(sshStatus, logger); err != nil {
 		logger.Error(err, "Failed to process SSHStatus, will retry")
-		return ctrl.Result{
-			RequeueAfter: time.Second * 5,
-		}, nil
+		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{}, nil

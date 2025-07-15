@@ -5,7 +5,6 @@ import (
 	"flag"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/infrastructure-io/topohub/pkg/bindingip"
 	"github.com/infrastructure-io/topohub/pkg/config"
@@ -28,7 +26,6 @@ import (
 	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
-	"github.com/infrastructure-io/topohub/pkg/secret"
 	"github.com/infrastructure-io/topohub/pkg/sshstatus"
 	"github.com/infrastructure-io/topohub/pkg/subnet"
 	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
@@ -54,7 +51,7 @@ func init() {
 func main() {
 	// Parse command line flags
 	probePort := flag.String("health-probe-port", "8081", "The address the probe endpoint binds to.")
-	webhookPort := flag.String("webhook-port", "8082", "The address the probe endpoint binds to.")
+	// webhookPort := flag.String("webhook-port", "8082", "The address the probe endpoint binds to.")
 	metricsPort := flag.String("metrics-port", "8083", "The address the metric endpoint binds to.")
 	pyroscopeAddress := flag.String("pyroscope-address", "", "The server address where the pyroscope data is pushed.")
 	pyroscopeTag := flag.String("pyroscope-tag", "", "The tag used for pyroscope.")
@@ -95,7 +92,7 @@ func main() {
 	log.Logger.Debugf("configuration details: %+v", agentConfig)
 
 	// Create manager
-	webhookPortInt, err := strconv.Atoi(*webhookPort)
+	// webhookPortInt, err := strconv.Atoi(*webhookPort)
 	if err != nil {
 		log.Logger.Errorf("Failed to convert webhook port to int: %v", err)
 		os.Exit(1)
@@ -106,10 +103,10 @@ func main() {
 			BindAddress: ":" + *metricsPort,
 		},
 		HealthProbeBindAddress: ":" + *probePort,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: webhookPortInt,
-			//CertDir: agentConfig.WebhookCertDir,
-		}),
+		// WebhookServer: webhook.NewServer(webhook.Options{
+		// 	Port: webhookPortInt,
+		// 	//CertDir: agentConfig.WebhookCertDir,
+		// }),
 
 		// Leader Election disabled for single pod deployment
 		LeaderElection: false,
@@ -173,15 +170,15 @@ func main() {
 	}
 
 	// Initialize secret controller
-	secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
-	if err != nil {
-		log.Logger.Errorf("Failed to create secret controller: %v", err)
-		os.Exit(1)
-	}
-	if err = secretCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create secret controller: %v", err)
-		os.Exit(1)
-	}
+	// secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
+	// if err != nil {
+	// 	log.Logger.Errorf("Failed to create secret controller: %v", err)
+	// 	os.Exit(1)
+	// }
+	// if err = secretCtrl.SetupWithManager(mgr); err != nil {
+	// 	log.Logger.Errorf("Unable to create secret controller: %v", err)
+	// 	os.Exit(1)
+	// }
 
 	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus
 	hostEndpointCtrl, err := hostendpoint.NewHostEndpointReconciler(mgr, k8sClient, agentConfig)

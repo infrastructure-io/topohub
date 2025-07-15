@@ -12,7 +12,9 @@ data:
     {{ "{{ end }}" }}
     dhcp-authoritative
     dhcp-leasefile={{ "{{ .LeaseFile }}" }}
+    {{ "{{ if .LogFile }}" }}
     log-facility={{ "{{ .LogFile }}" }}
+    {{ "{{ end }}" }}
     log-dhcp
     bind-interfaces
     interface={{ "{{ .Interface }}" }}

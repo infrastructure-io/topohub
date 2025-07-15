@@ -70,8 +70,8 @@ func (c *sshStatusController) Stop() {
 // SetupWithManager sets up the controller with the manager
 func (c *sshStatusController) SetupWithManager(mgr ctrl.Manager) error {
 	go func() {
-		<-mgr.Elected()
-		c.log.Info("Elected as leader, begin to start SSH status controller")
+		// <-mgr.Elected()
+		// c.log.Info("Elected as leader, begin to start SSH status controller")
 		// Start periodic SSH status updates
 		go c.UpdateSSHStatusAtInterval()
 	}()
@@ -79,7 +79,7 @@ func (c *sshStatusController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&topohubv1beta1.SSHStatus{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 30, // Set the number of concurrent reconciles
+			MaxConcurrentReconciles: 5, // Set the number of concurrent reconciles
 		}).
 		Complete(c)
 }

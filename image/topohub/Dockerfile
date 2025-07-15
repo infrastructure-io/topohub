@@ -21,6 +21,9 @@ ENV ENV_GIT_COMMIT_TIMESTAMP=${GIT_COMMIT_TIME}
 ARG PROJECT_VERSION
 ENV ENV_PROJECT_VERSION=${PROJECT_VERSION}
 
+# Set GODEBUG for memory optimization
+ENV GODEBUG=madvdontneed=1
+
 # Install dhcpd binary
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
