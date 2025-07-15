@@ -1,8 +1,13 @@
 package redfish
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
 	"reflect"
+	"time"
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
@@ -11,7 +16,7 @@ import (
 	redfishstatusData "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 )
 
-// Client 定义了 Redfish 客户端接口
+// Client defines the redfish client interface
 type RefishClient interface {
 	Power(string) error
 	GetInfo() (map[string]string, error)
@@ -20,7 +25,7 @@ type RefishClient interface {
 	GetManagersLogEntries() ([]*redfish.LogEntry, error)
 }
 
-// redfishClient 实现了 Client 接口
+// redfishClient implements the RefishClient interface
 type redfishClient struct {
 	config gofish.ClientConfig
 	logger *zap.SugaredLogger
@@ -31,10 +36,27 @@ var _ RefishClient = (*redfishClient)(nil)
 
 var CacheClient = make(map[string]*redfishClient)
 
-// NewClient 创建一个新的 Redfish 客户端
+// NewClient creates a new redfish client
 func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogger) (RefishClient, error) {
-
 	url := buildRedfishEndpoint(hostCon)
+
+	// create custom HTTP client
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+	transport := &http.Transport{
+		Proxy: defaultTransport.Proxy,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return net.DialTimeout(network, addr, 5*time.Second)
+		},
+		MaxIdleConns:          defaultTransport.MaxIdleConns,
+		MaxIdleConnsPerHost:   defaultTransport.MaxIdleConnsPerHost, // max idle connections per host
+		IdleConnTimeout:       defaultTransport.IdleConnTimeout,     // idle connection timeout
+		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+		TLSHandshakeTimeout:   5 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
 	config := gofish.ClientConfig{
 		Endpoint:            url,
 		Username:            hostCon.Username,
@@ -42,6 +64,10 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		Insecure:            true,
 		ReuseConnections:    true,
 		TLSHandshakeTimeout: 5,
+		HTTPClient: &http.Client{
+			Transport: transport,
+			Timeout:   5 * time.Second,
+		},
 	}
 
 	if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
@@ -74,7 +100,7 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 	return c, nil
 }
 
-// buildRedfishEndpoint 根据 RedfishConnectCon 构建 Redfish 服务的端点 URL
+// buildRedfishEndpoint builds the redfish endpoint
 func buildRedfishEndpoint(redfishCon redfishstatusData.RedfishConnectCon) string {
 	protocol := "http"
 	if redfishCon.Info.Https {
