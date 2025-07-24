@@ -329,20 +329,20 @@ func (c *redfishClient) GetSupportedResetTypes(system *redfish.ComputerSystem) s
 func (c *redfishClient) getStorageInfoWithFallback(system *redfish.ComputerSystem, result map[string]string) error {
 	// Try SimpleStorage first
 	var err error
-	if err = c.getSimpleStorageInfo(system, result); err != nil {
+	var count int
+	if count, err = c.getSimpleStorageInfo(system, result); err != nil {
 		c.logger.Errorf("Failed to retrieve storage info using SimpleStorage interface: %v", err)
 	}
-	if len(result) > 0 {
+	if count > 0 {
 		c.logger.Debugf("Successfully retrieved storage info using SimpleStorage interface")
 		return nil
 	}
-	c.logger.Debugf("SimpleStorage interface not available or failed: %v, trying Storage interface", err)
 	// Fallback to Storage interface
-	if err = c.getStorageInfoAsSimpleStorage(system, result); err != nil {
+	if count, err = c.getStorageInfoAsSimpleStorage(system, result); err != nil {
 		c.logger.Errorf("Both SimpleStorage and Storage interfaces failed: %v", err)
 		return err
 	}
-	if len(result) == 0 {
+	if count == 0 {
 		c.logger.Debugf("Both SimpleStorage and Storage interfaces failed: %v", err)
 		return nil
 	}
@@ -351,10 +351,10 @@ func (c *redfishClient) getStorageInfoWithFallback(system *redfish.ComputerSyste
 }
 
 // getSimpleStorageInfo retrieves storage information using SimpleStorage interface
-func (c *redfishClient) getSimpleStorageInfo(system *redfish.ComputerSystem, result map[string]string) error {
+func (c *redfishClient) getSimpleStorageInfo(system *redfish.ComputerSystem, result map[string]string) (int, error) {
 	simpleStorages, err := system.SimpleStorages()
 	if err != nil {
-		return fmt.Errorf("failed to get SimpleStorage: %v", err)
+		return 0, fmt.Errorf("failed to get SimpleStorage: %v", err)
 	}
 
 	c.logger.Debugf("SimpleStorage amount: %d", len(simpleStorages))
@@ -372,15 +372,15 @@ func (c *redfishClient) getSimpleStorageInfo(system *redfish.ComputerSystem, res
 		}
 	}
 
-	return nil
+	return len(simpleStorages), nil
 }
 
 // getStorageInfoAsSimpleStorage retrieves storage information using Storage interface
 // but keeps the original Storage format as fallback
-func (c *redfishClient) getStorageInfoAsSimpleStorage(system *redfish.ComputerSystem, result map[string]string) error {
+func (c *redfishClient) getStorageInfoAsSimpleStorage(system *redfish.ComputerSystem, result map[string]string) (int, error) {
 	storages, err := system.Storage()
 	if err != nil {
-		return fmt.Errorf("failed to get Storage: %v", err)
+		return 0, fmt.Errorf("failed to get Storage: %v", err)
 	}
 
 	c.logger.Debugf("Storage amount: %d (fallback from SimpleStorage)", len(storages))
@@ -404,5 +404,5 @@ func (c *redfishClient) getStorageInfoAsSimpleStorage(system *redfish.ComputerSy
 		}
 	}
 
-	return nil
+	return len(storages), nil
 }
