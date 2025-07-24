@@ -51,24 +51,24 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		MaxIdleConnsPerHost:   defaultTransport.MaxIdleConnsPerHost, // max idle connections per host
 		IdleConnTimeout:       defaultTransport.IdleConnTimeout,     // idle connection timeout
 		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
-		TLSHandshakeTimeout:   5 * time.Second,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
 	}
 
 	config := gofish.ClientConfig{
-		Endpoint:            url,
-		Username:            hostCon.Username,
-		Password:            hostCon.Password,
-		Insecure:            true,
-		ReuseConnections:    true,
-		TLSHandshakeTimeout: 5,
+		Endpoint:         url,
+		Username:         hostCon.Username,
+		Password:         hostCon.Password,
+		Insecure:         true,
+		ReuseConnections: true,
 		HTTPClient: &http.Client{
 			Transport: transport,
-			Timeout:   5 * time.Second,
 		},
 	}
+
+	log.Debugf("Creating Redfish client,Endpoint %s Username %s Password %s ", hostCon.Info.IpAddr, hostCon.Username, hostCon.Password)
 
 	if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
 		if reflect.DeepEqual(config, c.config) {
