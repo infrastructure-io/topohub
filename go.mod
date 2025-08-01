@@ -1,6 +1,6 @@
 module github.com/infrastructure-io/topohub
 
-go 1.24.4
+go 1.24.5
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
