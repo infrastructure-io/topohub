@@ -66,6 +66,7 @@ func (c *redfishClient) Power(bootCmd string) error {
 				BootSourceOverrideTarget: redfish.PxeBootSourceOverrideTarget,
 				// boot (one time) to the Boot Source Override Target
 				BootSourceOverrideEnabled: redfish.OnceBootSourceOverrideEnabled,
+				BootSourceOverrideMode:    redfish.UEFIBootSourceOverrideMode,
 			}
 			c.logger.Infof("pxe reboot %s for System: %+v \n", c.config.Endpoint, system.Name)
 
