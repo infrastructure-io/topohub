@@ -80,6 +80,11 @@ func (c *sshStatusController) UpdateSSHStatusInfo(name string, d *sshstatusdata.
 		}
 	}
 
+	// Ensure status.info is never nil to avoid validation errors
+	if updated.Status.Info == nil {
+		updated.Status.Info = map[string]string{}
+	}
+
 	// If status hasn't changed, don't update
 	if compareSSHStatus(updated.Status, existing.Status, c.log) {
 		c.log.Debugf("SSHStatus %s has no changes, skipping update", name)
