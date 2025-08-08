@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"reflect"
 	"time"
 
 	"github.com/stmcginnis/gofish"
@@ -23,6 +22,7 @@ type RefishClient interface {
 	GetLog() ([]*redfish.LogEntry, error)
 	GetSystemsLogEntries() ([]*redfish.LogEntry, error)
 	GetManagersLogEntries() ([]*redfish.LogEntry, error)
+	Logout()
 }
 
 // redfishClient implements the RefishClient interface
@@ -33,8 +33,6 @@ type redfishClient struct {
 }
 
 var _ RefishClient = (*redfishClient)(nil)
-
-var CacheClient = make(map[string]*redfishClient)
 
 // NewClient creates a new redfish client
 func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogger) (RefishClient, error) {
@@ -68,22 +66,7 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		},
 	}
 
-	log.Debugf("Creating Redfish client,Endpoint %s Username %s Password %s ", hostCon.Info.IpAddr, hostCon.Username, hostCon.Password)
-
-	if c, ok := CacheClient[hostCon.Info.IpAddr]; ok {
-		if reflect.DeepEqual(config, c.config) {
-			_, err := c.client.Service.Systems()
-			if err == nil {
-				log.Debugf("use cached redfish client for %s", hostCon.Info.IpAddr)
-				return c, nil
-			}
-		}
-		log.Debugf("logout invalid cached redfish client for %s", hostCon.Info.IpAddr)
-		c.client.Logout()
-		delete(CacheClient, hostCon.Info.IpAddr)
-	}
-
-	log.Debugf("create new redfish client for %s", hostCon.Info.IpAddr)
+	log.Debugf("create new redfish client for %s", hostCon.IPAddr)
 	client, err := gofish.Connect(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %+v", err)
@@ -96,15 +79,22 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		client: client,
 	}
 
-	CacheClient[hostCon.Info.IpAddr] = c
 	return c, nil
 }
 
 // buildRedfishEndpoint builds the redfish endpoint
 func buildRedfishEndpoint(redfishCon redfishstatusData.RedfishConnectCon) string {
-	protocol := "http"
-	if redfishCon.Info.Https {
-		protocol = "https"
+	protocol := "https"
+	if redfishCon.Http {
+		protocol = "http"
 	}
-	return fmt.Sprintf("%s://%s:%d", protocol, redfishCon.Info.IpAddr, redfishCon.Info.Port)
+	return fmt.Sprintf("%s://%s:%d", protocol, redfishCon.IPAddr, redfishCon.Port)
+}
+
+// Logout terminates the session with the Redfish service and releases resources
+func (c *redfishClient) Logout() {
+	if c != nil && c.client != nil {
+		c.logger.Debug("Logging out from Redfish service")
+		c.client.Logout()
+	}
 }

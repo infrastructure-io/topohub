@@ -152,18 +152,6 @@ func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndp
 		}
 	}
 
-	// Check IP address conflict with existing RedfishStatus
-	redfishStatusList := &topohubv1beta1.RedfishStatusList{}
-	if err := w.Client.List(ctx, redfishStatusList); err != nil {
-		return fmt.Errorf("failed to list RedfishStatus: %v", err)
-	}
-
-	for _, redfishStatus := range redfishStatusList.Items {
-		if redfishStatus.Status.Basic.IpAddr == hostEndpoint.Spec.IPAddr {
-			return fmt.Errorf("IP address %s is already used by RedfishStatus %s", hostEndpoint.Spec.IPAddr, redfishStatus.Name)
-		}
-	}
-
 	// Validate secret if both secretName and secretNamespace are provided
 	if (hostEndpoint.Spec.SecretName != nil && *hostEndpoint.Spec.SecretName != "") && (hostEndpoint.Spec.SecretNamespace != nil && *hostEndpoint.Spec.SecretNamespace != "") {
 		secret := &corev1.Secret{}

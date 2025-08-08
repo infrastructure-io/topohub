@@ -3,6 +3,7 @@ package sshstatus
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +34,13 @@ func (c *sshStatusController) getSecretData(secretName, secretNamespace string) 
 }
 
 // compareSSHStatus checks if two SSHStatus are equal, ignoring pointer issues
-func compareSSHStatus(a, b topohubv1beta1.SSHStatusStatus, logger *zap.SugaredLogger) bool {
+func compareSSHStatus(a, b *topohubv1beta1.SSHStatusStatus, logger *zap.SugaredLogger) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
 	if a.Healthy != b.Healthy {
 		if logger != nil {
 			logger.Debugf("compareSSHStatus Healthy changed: %v -> %v", b.Healthy, a.Healthy)
@@ -47,46 +54,9 @@ func compareSSHStatus(a, b topohubv1beta1.SSHStatusStatus, logger *zap.SugaredLo
 		return false
 	}
 
-	// Compare Basic fields
-	if a.Basic.Type != b.Basic.Type {
+	if !reflect.DeepEqual(a.Basic, b.Basic) {
 		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.Type changed: %v -> %v", b.Basic.Type, a.Basic.Type)
-		}
-		return false
-	}
-	if a.Basic.IpAddr != b.Basic.IpAddr {
-		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.IpAddr changed: %v -> %v", b.Basic.IpAddr, a.Basic.IpAddr)
-		}
-		return false
-	}
-	if a.Basic.Port != b.Basic.Port {
-		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.Port changed: %v -> %v", b.Basic.Port, a.Basic.Port)
-		}
-		return false
-	}
-	if a.Basic.SecretName != b.Basic.SecretName {
-		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.SecretName changed: %v -> %v", b.Basic.SecretName, a.Basic.SecretName)
-		}
-		return false
-	}
-	if a.Basic.SecretNamespace != b.Basic.SecretNamespace {
-		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.SecretNamespace changed: %v -> %v", b.Basic.SecretNamespace, a.Basic.SecretNamespace)
-		}
-		return false
-	}
-	if a.Basic.SSHKeyAuth != b.Basic.SSHKeyAuth {
-		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.SSHKeyAuth changed: %v -> %v", b.Basic.SSHKeyAuth, a.Basic.SSHKeyAuth)
-		}
-		return false
-	}
-	if a.Basic.ClusterName != b.Basic.ClusterName {
-		if logger != nil {
-			logger.Debugf("compareSSHStatus Basic.ClusterName changed: %v -> %v", b.Basic.ClusterName, a.Basic.ClusterName)
+			logger.Debugf("compareSSHStatus Basic changed: %v -> %v", b.Basic, a.Basic)
 		}
 		return false
 	}

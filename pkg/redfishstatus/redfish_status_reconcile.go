@@ -4,21 +4,18 @@ package redfishstatus
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"time"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
 	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 	gofishredfish "github.com/stmcginnis/gofish/redfish"
 
-	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -83,16 +80,60 @@ func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogE
 }
 
 // UpdateRedfishStatusInfo updates redfishstatus spec.info
-func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfishstatusdata.RedfishConnectCon) (bool, error) {
+func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topohubv1beta1.RedfishStatus) error {
+	name := oldRedfishStatus.Name
+
 	// lock for updateing redfishStatus instance
 	c.log.Debugf("lock for updateing redfishStatus instance %s", name)
 	lock := lock.LockManagerInstance.GetLock(name)
 	lock.Lock()
 	defer lock.Unlock()
 
+	// create a copy of redfishStatus
+	if oldRedfishStatus.Status == nil {
+		oldRedfishStatus.Status = &topohubv1beta1.RedfishStatusStatus{}
+	}
+	updated := oldRedfishStatus.DeepCopy()
+
+	// get hostEndpoint
+	hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
+	if err != nil {
+		return fmt.Errorf("Failed to get hostEndpoint for RedfishStatus %s: %v", oldRedfishStatus.Name, err)
+	}
+
+	// get connection data
+	username, password, err := c.getSecretData(
+		*hostEndpoint.Spec.SecretName,
+		*hostEndpoint.Spec.SecretNamespace,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+	}
+	connInfo := &redfishstatusdata.RedfishConnectCon{
+		Username: username,
+		Password: password,
+		IPAddr:   hostEndpoint.Spec.IPAddr,
+		Port:     int(*hostEndpoint.Spec.Port),
+		Http:     !*hostEndpoint.Spec.HTTPS,
+	}
+
+	// update subnetName from range
+	subnetName, err := tools.GetSubnetNameByIP(connInfo.IPAddr, c.client, c.log)
+	if err != nil {
+		c.log.Errorf("Failed to update subnet name from range: %v", err)
+	} else {
+		c.log.Infof("Updated subnetName to %s for RedfishStatus %s (IP: %s)", subnetName, name, connInfo.IPAddr)
+		updated.Status.Basic.SubnetName = subnetName
+	}
+
+	// update clusterName
+	if hostEndpoint.Spec.ClusterName != nil {
+		updated.Status.Basic.ClusterName = *hostEndpoint.Spec.ClusterName
+	}
+
 	// Create redfish client
 	var healthy bool
-	client, err1 := redfish.NewClient(*d, c.log)
+	client, err1 := redfish.NewClient(*connInfo, c.log)
 	if err1 != nil {
 		c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
 		healthy = false
@@ -100,22 +141,15 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 		healthy = true
 	}
 
+	defer client.Logout()
+
 	protocol := "http"
-	if d.Info.Https {
+	if !connInfo.Http {
 		protocol = "https"
 	}
 
-	hasAuth := len(d.Username) > 0 && len(d.Password) > 0
-	c.log.Debugf("try to check redfish with url: %s://%s:%d (auth: %v)", protocol, d.Info.IpAddr, d.Info.Port, hasAuth)
-
-	// Get existing RedfishStatus
-	existing := &topohubv1beta1.RedfishStatus{}
-	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
-	if err != nil {
-		c.log.Errorf("Failed to get RedfishStatus %s: %v", name, err)
-		return false, err
-	}
-	updated := existing.DeepCopy()
+	hasAuth := len(connInfo.Username) > 0 && len(connInfo.Password) > 0
+	c.log.Debugf("try to check redfish with url: %s://%s:%d (auth: %v)", protocol, connInfo.IPAddr, connInfo.Port, hasAuth)
 
 	// Update health status
 	updated.Status.Healthy = healthy
@@ -125,15 +159,20 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 			c.log.Errorf("Failed to get info of RedfishStatus %s: %v", name, err)
 			healthy = false
 		} else {
-			updated.Status.Info = infoData
+			if infoData != nil {
+				updated.Status.Info = infoData
+			} else {
+				c.log.Warnf("GetInfo returned nil for RedfishStatus %s", name)
+				updated.Status.Info = make(map[string]string)
+			}
 		}
 	}
 	if !healthy {
 		c.log.Debugf("RedfishStatus %s is not healthy, set info to empty", name)
 		updated.Status.Info = map[string]string{}
 	}
-	if updated.Status.Healthy != existing.Status.Healthy {
-		c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, existing.Status.Healthy, healthy)
+	if updated.Status.Healthy != oldRedfishStatus.Status.Healthy {
+		c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, oldRedfishStatus.Status.Healthy, healthy)
 	}
 
 	// Update log
@@ -164,59 +203,64 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(name string, d *redfis
 	}
 
 	// Update RedfishStatus
-	if !compareRedfishStatus(updated.Status, existing.Status, c.log) {
-		c.log.Debugf("status changed, existing: %v, updated: %v", existing.Status, updated.Status)
+	if !compareRedfishStatus(updated.Status, oldRedfishStatus.Status, c.log) {
+		c.log.Debugf("status changed, existing: %v, updated: %v", oldRedfishStatus.Status, updated.Status)
 		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			return true, err
+			return err
 		}
 		c.log.Infof("Successfully updated redfishStatus %s status", name)
-		return true, nil
 	}
-	return false, nil
+	return nil
 }
 
 // UpdateRedfishStatusInfoWrapper updates redfishstatus spec.info
-func (c *redfishStatusController) UpdateRedfishStatusInfoWrapper(name string) error {
-	syncData := make(map[string]redfishstatusdata.RedfishConnectCon)
+func (c *redfishStatusController) UpdateRedfishStatusInfoWrapper(status *topohubv1beta1.RedfishStatus) error {
+	// get redfishStatus list
+	var redfishStatusList topohubv1beta1.RedfishStatusList = topohubv1beta1.RedfishStatusList{}
 	modeinfo := ""
-	if len(name) == 0 {
-		syncData = redfishstatusdata.RedfishCacheDatabase.GetAll()
-		if len(syncData) == 0 {
-			return nil
+	listOpts := []client.ListOption{}
+	// if status is nil, list all redfishStatus
+	if status == nil {
+		if err := c.client.List(context.Background(), &redfishStatusList, listOpts...); err != nil {
+			c.log.Errorf("Failed to list RedfishStatus: %v", err)
+			return err
 		}
-		modeinfo = " during periodic update"
 	} else {
-		d := redfishstatusdata.RedfishCacheDatabase.Get(name)
-		if d != nil {
-			syncData[name] = *d
-		}
-		if len(syncData) == 0 {
-			c.log.Errorf("no cache data found for redfishStatus %s ", name)
-			return fmt.Errorf("no cache data found for redfishStatus %s ", name)
-		}
-		modeinfo = " during redfishStatus reconcile"
+		redfishStatusList.Items = append(redfishStatusList.Items, *status)
 	}
 
-	failed := false
-	for item, t := range syncData {
-		c.log.Debugf("updating status of the redfishStatus %s", item)
-		if updated, err := c.UpdateRedfishStatusInfo(item, &t); err != nil {
-			c.log.Errorf("failed to update status of redfishStatus %s, %s: %v", item, modeinfo, err)
-			failed = true
-		} else {
-			if updated {
-				c.log.Debugf("succeeded to update status of the redfishStatus %s, %s", item, modeinfo)
-			} else {
-				c.log.Debugf("no need to update status of the redfishStatus %s, %s", item, modeinfo)
+	// update each redfishStatus
+	for _, redfishStatus := range redfishStatusList.Items {
+		c.log.Debugf("Updating status of RedfishStatus %s", redfishStatus.Name)
+		if err := c.UpdateRedfishStatusInfo(&redfishStatus); err != nil {
+			c.log.Errorf("Failed to update status of RedfishStatus %s%s: %v",
+				redfishStatus.Name, modeinfo, err)
+		}
+	}
+	return nil
+}
+
+func (c *redfishStatusController) getHostEndpoint(redfishStatus *topohubv1beta1.RedfishStatus) (*topohubv1beta1.HostEndpoint, error) {
+	// all RedfishStatus should have ownerReferences
+	if len(redfishStatus.OwnerReferences) > 0 {
+		for _, ownerRef := range redfishStatus.OwnerReferences {
+			if ownerRef.Kind == topohubv1beta1.KindHostEndpoint {
+				c.log.Infof("Found HostEndpoint owner reference: %s", ownerRef.Name)
+
+				// get HostEndpoint
+				hostEndpoint := &topohubv1beta1.HostEndpoint{}
+				if err := c.client.Get(context.TODO(), client.ObjectKey{Name: ownerRef.Name}, hostEndpoint); err != nil {
+					c.log.Errorf("Failed to get HostEndpoint %s: %v", ownerRef.Name, err)
+					return nil, err
+				}
+
+				return hostEndpoint, nil
 			}
 		}
 	}
 
-	if failed {
-		return fmt.Errorf("failed to update redfishStatus")
-	}
-	return nil
+	return nil, fmt.Errorf("Failed to get connection info for RedfishStatus %s", redfishStatus.Name)
 }
 
 // UpdateRedfishStatusAtInterval updates redfishstatus spec.info at interval
@@ -233,259 +277,16 @@ func (c *redfishStatusController) UpdateRedfishStatusAtInterval() {
 			return
 		case <-ticker.C:
 			c.log.Debugf("update all redfishStatus at interval ")
-			if err := c.UpdateRedfishStatusInfoWrapper(""); err != nil {
+			if err := c.UpdateRedfishStatusInfoWrapper(nil); err != nil {
 				c.log.Errorf("Failed to update redfish status: %v", err)
 			}
 		}
 	}
 }
 
-// updateRedfishStatusResource updates RedfishStatus resource status
-func (c *redfishStatusController) updateRedfishStatusResource(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	if err := c.client.Status().Update(context.TODO(), redfishStatus); err != nil {
-		logger.Errorf("Failed to update status of RedfishStatus %s: %v", redfishStatus.Name, err)
-		return err
-	}
-	logger.Infof("Successfully updated status for RedfishStatus %s", redfishStatus.Name)
-	return nil
-}
-
-// processRedfishStatus reconciles redfishStatus, trigger updates
-func (c *redfishStatusController) processRedfishStatus(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	// Step 1: Process RedfishStatus based on mode (DHCP or HostEndpoint)
-	if err := c.processRedfishStatusByMode(redfishStatus, logger); err != nil {
-		return err
-	}
-
-	// Step 2: Cache the redfishStatus data locally
-	if err := c.cacheRedfishStatusData(redfishStatus, logger); err != nil {
-		return err
-	}
-
-	// Step 3: Update RedfishStatus info if needed
-	return c.updateRedfishStatusInfoIfNeeded(redfishStatus, logger)
-}
-
-// processRedfishStatusByMode handles the mode-specific processing logic
-func (c *redfishStatusController) processRedfishStatusByMode(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	// DHCP client mode: load basic info from annotation and verify connection
-	if redfishStatus.ObjectMeta.Labels != nil && redfishStatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] == topohubv1beta1.HostTypeDHCP {
-		return c.processDHCPMode(redfishStatus, logger)
-	}
-
-	// HostEndpoint mode: get HostEndpoint info from OwnerReference
-	if len(redfishStatus.Status.Basic.IpAddr) == 0 && len(redfishStatus.OwnerReferences) > 0 {
-		return c.processHostEndpointMode(redfishStatus, logger)
-	}
-
-	return nil
-}
-
-// processDHCPMode handles DHCP client mode processing
-func (c *redfishStatusController) processDHCPMode(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	if redfishStatus.ObjectMeta.Annotations == nil {
-		logger.Warnf("RedfishStatus %s has no annotations", redfishStatus.Name)
-		return nil
-	}
-
-	basicInfoJSON, ok := redfishStatus.ObjectMeta.Annotations[BasicInfoAnnotation]
-	if !ok || basicInfoJSON == "" {
-		return nil
-	}
-
-	// Parse basic info from annotation
-	var basicInfo topohubv1beta1.BasicInfo
-	if err := json.Unmarshal([]byte(basicInfoJSON), &basicInfo); err != nil {
-		logger.Errorf("Failed to unmarshal basicInfo from annotation for RedfishStatus %s: %v", redfishStatus.Name, err)
-		return nil
-	}
-
-	// Update RedfishStatus with basic info
-	c.updateRedfishStatusWithBasicInfo(redfishStatus, &basicInfo)
-	logger.Infof("Successfully loaded basicInfo from annotation for RedfishStatus %s", redfishStatus.Name)
-
-	// Update status to Kubernetes
-	if err := c.updateRedfishStatusResource(redfishStatus, logger); err != nil {
-		return err
-	}
-
-	// Verify Redfish connection for DHCP clients
-	return c.verifyRedfishConnectionForDHCP(redfishStatus, &basicInfo, logger)
-}
-
-// processHostEndpointMode handles HostEndpoint mode processing
-func (c *redfishStatusController) processHostEndpointMode(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	for _, ownerRef := range redfishStatus.OwnerReferences {
-		if ownerRef.Kind == topohubv1beta1.KindHostEndpoint {
-			logger.Infof("Found HostEndpoint owner reference: %s", ownerRef.Name)
-
-			// Get HostEndpoint
-			hostEndpoint := &topohubv1beta1.HostEndpoint{}
-			if err := c.client.Get(context.TODO(), client.ObjectKey{Name: ownerRef.Name}, hostEndpoint); err != nil {
-				logger.Errorf("Failed to get HostEndpoint %s: %v", ownerRef.Name, err)
-				return err
-			}
-
-			// Update RedfishStatus with HostEndpoint information
-			c.updateRedfishStatusWithHostEndpoint(redfishStatus, hostEndpoint)
-
-			// Update status to Kubernetes
-			if err := c.updateRedfishStatusResource(redfishStatus, logger); err != nil {
-				return err
-			}
-			logger.Infof("Successfully updated RedfishStatus %s with basic information", redfishStatus.Name)
-			break
-		}
-	}
-	return nil
-}
-
-// updateRedfishStatusWithBasicInfo updates RedfishStatus with basic info from annotation
-func (c *redfishStatusController) updateRedfishStatusWithBasicInfo(redfishStatus *topohubv1beta1.RedfishStatus, basicInfo *topohubv1beta1.BasicInfo) {
-	redfishStatus.Status.Basic = *basicInfo
-	if redfishStatus.Status.Info == nil {
-		redfishStatus.Status.Info = make(map[string]string)
-	}
-	redfishStatus.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
-}
-
-// updateRedfishStatusWithHostEndpoint updates RedfishStatus with HostEndpoint information
-func (c *redfishStatusController) updateRedfishStatusWithHostEndpoint(redfishStatus *topohubv1beta1.RedfishStatus, hostEndpoint *topohubv1beta1.HostEndpoint) {
-	clusterName := ""
-	if hostEndpoint.Spec.ClusterName != nil {
-		clusterName = *hostEndpoint.Spec.ClusterName
-	}
-
-	redfishStatus.Status = topohubv1beta1.RedfishStatusStatus{
-		Healthy:        false,
-		LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
-		Basic: topohubv1beta1.BasicInfo{
-			Type:        topohubv1beta1.HostTypeEndpoint,
-			IpAddr:      hostEndpoint.Spec.IPAddr,
-			Https:       true,
-			Port:        443,
-			ClusterName: clusterName,
-		},
-		Info: map[string]string{},
-		Log: topohubv1beta1.LogStruct{
-			TotalLogAccount:   0,
-			WarningLogAccount: 0,
-			LastestLog:        nil,
-			LastestWarningLog: nil,
-		},
-	}
-
-	// Set optional fields
-	if hostEndpoint.Spec.SecretName != nil {
-		redfishStatus.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
-	}
-	if hostEndpoint.Spec.SecretNamespace != nil {
-		redfishStatus.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
-	}
-	if hostEndpoint.Spec.HTTPS != nil {
-		redfishStatus.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
-	}
-	if hostEndpoint.Spec.Port != nil {
-		redfishStatus.Status.Basic.Port = *hostEndpoint.Spec.Port
-	}
-}
-
-// verifyRedfishConnectionForDHCP verifies Redfish connection for DHCP clients
-func (c *redfishStatusController) verifyRedfishConnectionForDHCP(redfishStatus *topohubv1beta1.RedfishStatus, basicInfo *topohubv1beta1.BasicInfo, logger *zap.SugaredLogger) error {
-	username, password, err := c.getSecretData(c.config.RedfishSecretName, c.config.RedfishSecretNamespace)
-	if err != nil {
-		logger.Errorf("Failed to get secret data from secret %s/%s when processing redfishstatus for %s: %v",
-			c.config.RedfishSecretNamespace, c.config.RedfishSecretName, redfishStatus.Name, err)
-		return err
-	}
-
-	d := redfishstatusdata.RedfishConnectCon{
-		Info:     basicInfo,
-		Username: username,
-		Password: password,
-		DhcpHost: true,
-	}
-
-	if _, err := redfish.NewClient(d, logger); err != nil {
-		logger.Warnf("Failed to connect to Redfish for DHCP client %s: %v", redfishStatus.Name, err)
-		// We don't return error here, just log a warning and continue processing
-	}
-	return nil
-}
-
-// cacheRedfishStatusData caches the redfishStatus data locally
-func (c *redfishStatusController) cacheRedfishStatusData(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	logger.Debugf("Processing RedfishStatus: %s (Type: %s, IP: %s, Health: %v)",
-		redfishStatus.Name,
-		redfishStatus.Status.Basic.Type,
-		redfishStatus.Status.Basic.IpAddr,
-		redfishStatus.Status.Healthy)
-
-	// check if the redfishStatus data is already cached
-	existingData := redfishstatusdata.RedfishCacheDatabase.Get(redfishStatus.Name)
-
-	// create a new connection object
-	var newConnectCon redfishstatusdata.RedfishConnectCon
-	if existingData != nil {
-		newConnectCon = redfishstatusdata.RedfishConnectCon{
-			Info:     &redfishStatus.Status.Basic,
-			Username: existingData.Username,
-			Password: existingData.Password,
-			DhcpHost: redfishStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP,
-		}
-		if reflect.DeepEqual(existingData, &newConnectCon) {
-			logger.Debugf("RedfishStatus %s cache data unchanged, skipping update", redfishStatus.Name)
-			return nil
-		}
-	} else {
-		if len(redfishStatus.Status.Basic.SecretName) == 0 || len(redfishStatus.Status.Basic.SecretNamespace) == 0 {
-			logger.Warnf("RedfishStatus %s has no secret name or namespace", redfishStatus.Name)
-			return nil
-		}
-
-		// get the authentication information
-		username, password, err := c.getSecretData(
-			redfishStatus.Status.Basic.SecretName,
-			redfishStatus.Status.Basic.SecretNamespace,
-		)
-		if err != nil {
-			logger.Errorf("Failed to get secret data for RedfishStatus %s: %v", redfishStatus.Name, err)
-			return err
-		}
-		newConnectCon = redfishstatusdata.RedfishConnectCon{
-			Info:     &redfishStatus.Status.Basic,
-			Username: username,
-			Password: password,
-			DhcpHost: redfishStatus.Status.Basic.Type == topohubv1beta1.HostTypeDHCP,
-		}
-
-	}
-
-	// update the cache
-	redfishstatusdata.RedfishCacheDatabase.Add(redfishStatus.Name, newConnectCon)
-	logger.Debugf("Successfully cached RedfishStatus %s data (IP: %s)", redfishStatus.Name, redfishStatus.Status.Basic.IpAddr)
-	return nil
-}
-
-// updateRedfishStatusInfoIfNeeded updates RedfishStatus info if needed
-func (c *redfishStatusController) updateRedfishStatusInfoIfNeeded(redfishStatus *topohubv1beta1.RedfishStatus, logger *zap.SugaredLogger) error {
-	if len(redfishStatus.Status.Info) == 0 {
-		if err := c.UpdateRedfishStatusInfoWrapper(redfishStatus.Name); err != nil {
-			//logger.Errorf("failed to update redfishStatus %s: %v", redfishStatus.Name, err)
-			return err
-		}
-	} else {
-		logger.Debugf("RedfishStatus %s has already been processed, skipping the first time update", redfishStatus.Name)
-	}
-	return nil
-}
-
-// Only leader executes Reconcile
-// Reconcile implements the reconcile.Reconciler interface
-// Responsible for the first update of redfish information after redfishstatus creation (subsequent updates are handled by UpdateRedfishStatusAtInterval)
+// Responsible for the first update of redfish information after redfishstatus creation
 func (c *redfishStatusController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := c.log.With("redfishstatus", req.Name)
-
 	logger.Debugf("Reconciling RedfishStatus %s", req.Name)
 
 	// Get RedfishStatus
@@ -493,33 +294,22 @@ func (c *redfishStatusController) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := c.client.Get(ctx, req.NamespacedName, redfishStatus); err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debugf("RedfishStatus not found")
-			data := redfishstatusdata.RedfishCacheDatabase.Get(req.Name)
-			if data != nil {
-				// try to delete the binding setting in dhcp server config
-				logger.Infof("delete redfishStatus %s in cache, %+v", req.Name, *data)
-				redfishstatusdata.RedfishCacheDatabase.Delete(req.Name)
-			}
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Failed to get RedfishStatus")
-		return ctrl.Result{}, err
-	}
-
-	// if IP address is not empty, cache the redfishStatus data and return
-	if len(redfishStatus.Status.Basic.IpAddr) != 0 {
-		if err := c.cacheRedfishStatusData(redfishStatus, logger); err != nil {
-			logger.Error(err, "Failed to cache RedfishStatus data")
-		}
-		logger.Debugf("RedfishStatus %s has IP address, skipping further processing", redfishStatus.Name)
 		return ctrl.Result{}, nil
 	}
 
-	// Process RedfishStatus (including getting basic information from OwnerReferences and updating status)
-	if err := c.processRedfishStatus(redfishStatus, logger); err != nil {
+	// return if redfishStatus.Status is not nil
+	if redfishStatus.Status != nil {
+		logger.Debugf("RedfishStatus %s has already been processed, skipping update", redfishStatus.Name)
+		return ctrl.Result{}, nil
+	}
+
+	// update redfishStatus status
+	if err := c.UpdateRedfishStatusInfoWrapper(redfishStatus); err != nil {
 		logger.Error(err, "Failed to process RedfishStatus, will retry")
-		return ctrl.Result{
-			RequeueAfter: time.Second * 2,
-		}, nil
+		return ctrl.Result{}, nil
 	}
 
 	logger.Debugf("Successfully processed RedfishStatus %s", redfishStatus.Name)

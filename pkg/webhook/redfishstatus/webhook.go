@@ -2,8 +2,6 @@ package redfishstatus
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"go.uber.org/zap"
 
@@ -40,71 +38,16 @@ func SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // Default implements webhook.Defaulter
 func (w *RedfishStatusWebhook) Default(ctx context.Context, obj runtime.Object) error {
-	redfishstatus, ok := obj.(*topohubv1beta1.RedfishStatus)
-	if !ok {
-		err := fmt.Errorf("object is not a RedfishStatus")
-		w.log.Error(err.Error())
-		return err
-	}
-
-	w.log.Debugf("Processing Default webhook for RedfishStatus %s", redfishstatus.Name)
-
-	if redfishstatus.ObjectMeta.Labels == nil {
-		redfishstatus.ObjectMeta.Labels = make(map[string]string)
-	}
-
-	// cluster name
-	if redfishstatus.Status.Basic.ClusterName != "" {
-		w.log.Debugf("Processing ClusterName for RedfishStatus %s: %s",
-			redfishstatus.Name, redfishstatus.Status.Basic.ClusterName)
-		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = redfishstatus.Status.Basic.ClusterName
-	}
-
-	// ip
-	if redfishstatus.Status.Basic.IpAddr != "" {
-		IpAddr := strings.Split(redfishstatus.Status.Basic.IpAddr, "/")[0]
-		w.log.Debugf("Setting IpAddr label for RedfishStatus %s: %s",
-			redfishstatus.Name, IpAddr)
-		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
-	}
-
-	// mode
-	w.log.Debugf("Setting ClientMode label for RedfishStatus %s based on type: %s",
-		redfishstatus.Name, redfishstatus.Status.Basic.Type)
-	if redfishstatus.Status.Basic.Type != "" {
-		redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeEndpoint
-	}
-
-	w.log.Debugf("Finished processing webhook for RedfishStatus %s", redfishstatus.Name)
-
 	return nil
 }
 
 // ValidateCreate implements webhook.Validator
 func (w *RedfishStatusWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	redfishstatus, ok := obj.(*topohubv1beta1.RedfishStatus)
-	if !ok {
-		err := fmt.Errorf("object is not a RedfishStatus")
-		w.log.Error(err.Error())
-		return nil, err
-	}
-
-	w.log.Debugf("Validating creation of RedfishStatus %s", redfishstatus.Name)
-
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator
 func (w *RedfishStatusWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	redfishstatus, ok := newObj.(*topohubv1beta1.RedfishStatus)
-	if !ok {
-		err := fmt.Errorf("object is not a RedfishStatus")
-		w.log.Error(err.Error())
-		return nil, err
-	}
-
-	w.log.Debugf("Validating update of RedfishStatus %s", redfishstatus.Name)
-
 	return nil, nil
 }
 

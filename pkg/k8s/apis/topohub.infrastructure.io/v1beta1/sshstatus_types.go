@@ -15,15 +15,13 @@ const (
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="CLUSTERNAME",type="string",JSONPath=".status.basic.clusterName"
 // +kubebuilder:printcolumn:name="HEALTHY",type="boolean",JSONPath=".status.healthy"
-// +kubebuilder:printcolumn:name="IPADDR",type="string",JSONPath=".status.basic.ipAddr"
-// +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".status.basic.type"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 type SSHStatus struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Status SSHStatusStatus `json:"status,omitempty"`
+	Status *SSHStatusStatus `json:"status,omitempty"`
 }
 
 type SSHStatusStatus struct {
@@ -35,13 +33,7 @@ type SSHStatusStatus struct {
 
 // SSHBasicInfo incluse SSH connection basic info
 type SSHBasicInfo struct {
-	ClusterName     string `json:"clusterName"`
-	Type            string `json:"type"`
-	IpAddr          string `json:"ipAddr"`
-	SecretName      string `json:"secretName"`
-	SecretNamespace string `json:"secretNamespace"`
-	Port            int32  `json:"port"`
-	SSHKeyAuth      bool   `json:"sshKeyAuth,omitempty"`
+	ClusterName string `json:"clusterName"`
 	// SubnetName is the name of the subnet this host belongs to
 	// +optional
 	SubnetName *string `json:"subnetName,omitempty"`
