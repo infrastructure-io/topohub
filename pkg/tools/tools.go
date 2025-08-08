@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -9,6 +10,10 @@ import (
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
+
+	"go.uber.org/zap"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ValidateIPInSubnet checks if an IP address is within a subnet
@@ -392,6 +397,55 @@ func IsIPInRange(ip net.IP, ipRange string) bool {
 	return false
 }
 
+// GetSubnetNameByIP returns the subnet name for a given IP address by checking if the IP is within the subnet's CIDR range
+// Example:
+//   - Input: "192.168.1.100", client, logger
+//   - Returns: "subnet1" if the IP is within subnet1's CIDR range
+//   - Returns: "" if no matching subnet is found
+func GetSubnetNameByIP(ip string, client client.Client, logger *zap.SugaredLogger) (string, error) {
+	if ip == "" {
+		return "", nil
+	}
+
+	// Parse the input IP
+	ipAddr := net.ParseIP(ip)
+	if ipAddr == nil {
+		return "", fmt.Errorf("invalid IP address: %s", ip)
+	}
+
+	// Get all Subnet resources
+	subnets := &topohubv1beta1.SubnetList{}
+	if err := client.List(context.TODO(), subnets); err != nil {
+		return "", fmt.Errorf("failed to list subnets: %v", err)
+	}
+
+	// Check each subnet's CIDR range
+	for _, subnet := range subnets.Items {
+		// Get the subnet CIDR from spec
+		cidr := subnet.Spec.IPv4Subnet.Subnet
+		if cidr == "" {
+			continue
+		}
+
+		// Parse the CIDR
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			logger.Warnf("Failed to parse CIDR %s for subnet %s: %v", cidr, subnet.Name, err)
+			continue
+		}
+
+		// Check if IP is in the subnet's CIDR range
+		if ipNet.Contains(ipAddr) {
+			logger.Debugf("Found IP %s in subnet %s (CIDR: %s)", ip, subnet.Name, cidr)
+			return subnet.Name, nil
+		}
+	}
+
+	// No matching subnet found
+	logger.Debugf("No subnet found for IP %s", ip)
+	return "", nil
+}
+
 // ipToUint32 converts an IPv4 address to uint32
 // Example:
 //   - Input: net.ParseIP("192.168.1.1")
@@ -413,7 +467,7 @@ func ipToUint32(ip net.IP) uint32 {
 //   - Error case: Returns error if interface does not exist, subnet IP is invalid or does not match
 func ValidateHostInterfaceSubnet(parent netlink.Link, iface *topohubv1beta1.InterfaceSpec) error {
 	// Get host interface IP addresses and subnet information
-	hostAddrs, err := netlink.AddrList(parent, netlink.FAMILY_V4)
+	hostAddrs, err := netlink.AddrList(parent, unix.AF_INET)
 	if err != nil {
 		return fmt.Errorf("failed to get host interface IP addresses: %v", err)
 	}

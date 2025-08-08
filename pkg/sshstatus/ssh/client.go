@@ -23,9 +23,6 @@ type Client struct {
 
 // NewClient creates a new SSH client
 func NewClient(hostInfo sshstatusdata.SSHConnectCon, logger *zap.SugaredLogger) (*Client, error) {
-	if hostInfo.Info == nil {
-		return nil, fmt.Errorf("host info is nil")
-	}
 
 	authMethods := []ssh.AuthMethod{}
 
@@ -52,7 +49,7 @@ func NewClient(hostInfo sshstatusdata.SSHConnectCon, logger *zap.SugaredLogger) 
 	}
 
 	// Build connection address
-	addr := net.JoinHostPort(hostInfo.Info.IpAddr, strconv.Itoa(int(hostInfo.Info.Port)))
+	addr := net.JoinHostPort(hostInfo.IPAddr, strconv.Itoa(int(hostInfo.Port)))
 
 	// Establish SSH connection
 	conn, err := ssh.Dial("tcp", addr, config)

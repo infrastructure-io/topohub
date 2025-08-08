@@ -16,7 +16,6 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
-	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
 )
 
@@ -73,7 +72,7 @@ func (c *redfishStatusController) Stop() {
 	c.log.Info("RedfishStatus controller stopped successfully")
 }
 
-// SetupWithManager 设置 controller-runtime manager
+// SetupWithManager setup controller-runtime manager
 func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 
 	go func() {
@@ -94,16 +93,5 @@ func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (c *redfishStatusController) UpdateSecret(secretName, secretNamespace, username, password string) {
-	if secretName == c.config.RedfishSecretName && secretNamespace == c.config.RedfishSecretNamespace {
-		c.log.Info("update default secret")
-	}
 
-	c.log.Debugf("updating secet in cache for secret %s/%s", secretNamespace, secretName)
-	changedHosts := redfishstatusdata.RedfishCacheDatabase.UpdateSecret(secretName, secretNamespace, username, password)
-	for _, name := range changedHosts {
-		c.log.Infof("update redfishStatus %s after secret is changed", name)
-		if err := c.UpdateRedfishStatusInfoWrapper(name); err != nil {
-			c.log.Errorf("Failed to update redfish status: %v", err)
-		}
-	}
 }

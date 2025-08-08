@@ -4,21 +4,17 @@ import (
 	"context"
 
 	"go.uber.org/zap"
-
-	"github.com/infrastructure-io/topohub/pkg/log"
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/infrastructure-io/topohub/pkg/config"
-	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
-	"github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
-	sshdata "github.com/infrastructure-io/topohub/pkg/sshstatus/data"
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	corev1 "k8s.io/api/core/v1"
-
+	"k8s.io/apimachinery/pkg/api/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/infrastructure-io/topohub/pkg/config"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
 )
 
 type SecretReconciler struct {
@@ -46,8 +42,8 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		if labels == nil {
 			return false
 		}
-		// Check if the secret has the topohub.io/secret-credential label (any value)
-		if _, exists := labels["topohub.io/secret-credential"]; exists {
+		// Check if the secret has the secret-credential label (any value)
+		if _, exists := labels[topohubv1beta1.LabelSecretCredential]; exists {
 			return true
 		}
 		return false
@@ -82,16 +78,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	username := string(secret.Data["username"])
-	password := string(secret.Data["password"])
-
 	logger.Debugf("retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
-
-	// Update RedfishCacheDatabase in goroutine
-	go data.RedfishCacheDatabase.UpdateSecret(secret.Name, secret.Namespace, username, password)
-
-	// Update SSHCacheDatabase in goroutine
-	go sshdata.SSHCacheDatabase.UpdateSecret(secret.Name, secret.Namespace, username, password)
 
 	return reconcile.Result{}, nil
 }

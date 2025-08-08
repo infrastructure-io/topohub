@@ -15,8 +15,6 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
-	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
-	sshstatusdata "github.com/infrastructure-io/topohub/pkg/sshstatus/data"
 )
 
 // HostEndpointReconciler reconciles a HostEndpoint object
@@ -37,12 +35,11 @@ func NewHostEndpointReconciler(mgr ctrl.Manager, kubeClient kubernetes.Interface
 	}, nil
 }
 
-// 只有 leader 才会执行 Reconcile
 // Reconcile handles the reconciliation of HostEndpoint objects
 func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := r.log.With("hostendpoint", req.Name)
 
-	// 获取 HostEndpoint
+	// get the HostEndpoint
 	hostEndpoint := &topohubv1beta1.HostEndpoint{}
 	if err := r.client.Get(ctx, req.NamespacedName, hostEndpoint); err != nil {
 		if errors.IsNotFound(err) {
@@ -53,7 +50,7 @@ func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// 处理 HostEndpoint
+	// handle the HostEndpoint
 	if err := r.handleHostEndpoint(ctx, hostEndpoint, logger); err != nil {
 		logger.Error(err, "Failed to handle HostEndpoint")
 		return reconcile.Result{
@@ -64,18 +61,18 @@ func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Re
 	return reconcile.Result{}, nil
 }
 
-// 根据 HostEndpoint ，同步更新对应的 RedfishStatus 或 SSHStatus
+// HandleHostEndpoint handles the HostEndpoint object
 func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint, logger *zap.SugaredLogger) error {
 	name := hostEndpoint.Name
 	logger.Debugf("Processing HostEndpoint %s (IP: %s)", name, hostEndpoint.Spec.IPAddr)
 
-	// 获取 HostEndpoint 的类型，默认为 redfish
+	// get the type of HostEndpoint, default is redfish
 	endpointType := topohubv1beta1.EndpointTypeRedfish
 	if hostEndpoint.Spec.Type != nil {
 		endpointType = *hostEndpoint.Spec.Type
 	}
 
-	// 根据类型选择不同的处理逻辑
+	// according to the type of HostEndpoint, call different handler
 	switch endpointType {
 	case topohubv1beta1.EndpointTypeSSH:
 		return r.handleSSHEndpoint(ctx, hostEndpoint, logger)
@@ -87,68 +84,22 @@ func (r *HostEndpointReconciler) handleHostEndpoint(ctx context.Context, hostEnd
 	}
 }
 
-// 处理 Redfish 类型的 HostEndpoint
-// 根据 HostEndpoint ，同步更新对应的 RedfishStatus
+// handle Redfish endpoint
 func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint, logger *zap.SugaredLogger) error {
 	name := hostEndpoint.Name
 	logger.Debugf("Processing HostEndpoint %s (IP: %s)", name, hostEndpoint.Spec.IPAddr)
 
-	// Try to get existing RedfishStatus
+	// try to get existing RedfishStatus
 	existing := &topohubv1beta1.RedfishStatus{}
+
+	// return nil if RedfishStatus already exists
 	err := r.client.Get(ctx, client.ObjectKey{Name: name}, existing)
 	if err == nil {
-		// RedfishStatus exists, check if spec changed
-		if specEqual(existing.Status.Basic, hostEndpoint.Spec) {
-			logger.Debugf("RedfishStatus %s exists with same spec, no update needed", name)
-			return nil
-		}
-
-		// Spec changed, update the object
-		logger.Infof("Updating RedfishStatus %s due to spec change", name)
-
-		// Create a copy of the existing object to avoid modifying the cache
-		updated := existing.DeepCopy()
-		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		updated.Status.Basic = topohubv1beta1.BasicInfo{
-			Type:   topohubv1beta1.HostTypeEndpoint,
-			IpAddr: hostEndpoint.Spec.IPAddr,
-			Https:  *hostEndpoint.Spec.HTTPS,
-			Port:   *hostEndpoint.Spec.Port,
-		}
-		if hostEndpoint.Spec.SecretName != nil {
-			updated.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
-		}
-		if hostEndpoint.Spec.SecretNamespace != nil {
-			updated.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
-		}
-		if hostEndpoint.Spec.HTTPS != nil {
-			updated.Status.Basic.Https = *hostEndpoint.Spec.HTTPS
-		}
-		if hostEndpoint.Spec.Port != nil {
-			updated.Status.Basic.Port = *hostEndpoint.Spec.Port
-		}
-		if hostEndpoint.Spec.ClusterName != nil {
-			updated.Status.Basic.ClusterName = *hostEndpoint.Spec.ClusterName
-		}
-
-		logger.Debugf("Before update RedfishStatus %s, Basic: %+v", name, updated.Status.Basic)
-
-		if err := r.client.Status().Update(ctx, updated); err != nil {
-			if errors.IsConflict(err) {
-				logger.Debugf("Conflict updating RedfishStatus %s, will retry", name)
-				return err
-			}
-			logger.Errorf("Failed to update RedfishStatus %s: %v", name, err)
-			return err
-		}
-		logger.Debugf("Successfully update RedfishStatus %s, Basic: %+v", name, updated.Status.Basic)
-
-		// delete the cache of RedfishStatus
-		redfishstatusdata.RedfishCacheDatabase.Delete(name)
-		logger.Debugf("Deleted RedfishStatus %s from cache due to spec change", name)
+		logger.Infof("RedfishStatus %s already exists, no need to create", name)
 		return nil
 	}
 
+	// if error is not not found, return error
 	if !errors.IsNotFound(err) {
 		logger.Errorf("Failed to get RedfishStatus %s: %v", name, err)
 		return err
@@ -159,8 +110,7 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				topohubv1beta1.LabelIPAddr:     hostEndpoint.Spec.IPAddr,
-				topohubv1beta1.LabelClientMode: topohubv1beta1.HostTypeEndpoint,
+				topohubv1beta1.LabelClientMode: topohubv1beta1.Redfish,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -184,37 +134,6 @@ func (r *HostEndpointReconciler) handleRedfishEndpoint(ctx context.Context, host
 	return nil
 }
 
-// specEqual checks if the RedfishStatus basic info matches the HostEndpoint spec
-// Only compare mutable fields: IPAddr、SecretName、SecretNamespace、HTTPS、Port
-// Do not compare immutable fields: name、type
-func specEqual(basic topohubv1beta1.BasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
-	if basic.IpAddr != spec.IPAddr {
-		return false
-	}
-
-	if spec.SecretName != nil && basic.SecretName != *spec.SecretName {
-		return false
-	}
-
-	if spec.SecretNamespace != nil && basic.SecretNamespace != *spec.SecretNamespace {
-		return false
-	}
-
-	if spec.HTTPS != nil && basic.Https != *spec.HTTPS {
-		return false
-	}
-
-	if spec.Port != nil && basic.Port != *spec.Port {
-		return false
-	}
-
-	if spec.ClusterName != nil && basic.ClusterName != *spec.ClusterName {
-		return false
-	}
-
-	return true
-}
-
 // Handle SSH type HostEndpoint
 func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint, logger *zap.SugaredLogger) error {
 	name := hostEndpoint.Name
@@ -224,68 +143,7 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 	existing := &topohubv1beta1.SSHStatus{}
 	err := r.client.Get(ctx, client.ObjectKey{Name: name}, existing)
 	if err == nil {
-		// SSHStatus exists, check if spec changed
-		if specEqualSSH(existing.Status.Basic, hostEndpoint.Spec) {
-			logger.Debugf("SSHStatus %s exists with same spec, no update needed", name)
-			return nil
-		}
-
-		// Spec changed, update the object
-		logger.Infof("Updating SSHStatus %s due to spec change", name)
-
-		// Create a copy of the existing object to avoid modifying the cache
-		updated := existing.DeepCopy()
-		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		updated.Status.Basic = topohubv1beta1.SSHBasicInfo{
-			Type:   topohubv1beta1.HostTypeEndpoint,
-			IpAddr: hostEndpoint.Spec.IPAddr,
-			Port:   *hostEndpoint.Spec.Port,
-		}
-
-		// Ensure Info field is initialized
-		if updated.Status.Info == nil {
-			updated.Status.Info = map[string]string{}
-		}
-
-		if hostEndpoint.Spec.SecretName != nil {
-			updated.Status.Basic.SecretName = *hostEndpoint.Spec.SecretName
-		}
-		if hostEndpoint.Spec.SecretNamespace != nil {
-			updated.Status.Basic.SecretNamespace = *hostEndpoint.Spec.SecretNamespace
-		}
-		if hostEndpoint.Spec.Port != nil {
-			updated.Status.Basic.Port = *hostEndpoint.Spec.Port
-		}
-		if hostEndpoint.Spec.ClusterName != nil {
-			updated.Status.Basic.ClusterName = *hostEndpoint.Spec.ClusterName
-		}
-
-		// Output detailed information before update
-		logger.Debugf("Updating SSHStatus with details - IP: %s, Secret: %s/%s, Port: %d, ClusterName: %s",
-			updated.Status.Basic.IpAddr,
-			updated.Status.Basic.SecretNamespace,
-			updated.Status.Basic.SecretName,
-			updated.Status.Basic.Port,
-			updated.Status.Basic.ClusterName)
-
-		if err := r.client.Status().Update(ctx, updated); err != nil {
-			if errors.IsConflict(err) {
-				logger.Debugf("Conflict updating SSHStatus %s, will retry", name)
-				return err
-			}
-			logger.Errorf("Failed to update SSHStatus %s: %v", name, err)
-			return err
-		}
-		logger.Infof("Successfully updated SSHStatus %s", name)
-		logger.Debugf("Updated SSHStatus details - IP: %s, Secret: %s/%s, Port: %d",
-			updated.Status.Basic.IpAddr,
-			updated.Status.Basic.SecretNamespace,
-			updated.Status.Basic.SecretName,
-			updated.Status.Basic.Port)
-
-		// delete the cache of SSHStatus
-		sshstatusdata.SSHCacheDatabase.Delete(name)
-		logger.Debugf("Deleted SSHStatus %s from cache due to spec change", name)
+		logger.Infof("SSHStatus %s already exists, no need to create", name)
 		return nil
 	}
 
@@ -299,8 +157,7 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				topohubv1beta1.LabelIPAddr:     hostEndpoint.Spec.IPAddr,
-				topohubv1beta1.LabelClientMode: topohubv1beta1.HostTypeSSH,
+				topohubv1beta1.LabelClientMode: topohubv1beta1.SSH,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -321,33 +178,6 @@ func (r *HostEndpointReconciler) handleSSHEndpoint(ctx context.Context, hostEndp
 		return err
 	}
 	return nil
-}
-
-// Check if the SSH status basic info matches the host endpoint spec
-// Only compare mutable fields: IPAddr、SecretName、SecretNamespace、Port
-// Do not compare immutable fields: name、type
-func specEqualSSH(basic topohubv1beta1.SSHBasicInfo, spec topohubv1beta1.HostEndpointSpec) bool {
-	if basic.IpAddr != spec.IPAddr {
-		return false
-	}
-
-	if spec.Port != nil && basic.Port != *spec.Port {
-		return false
-	}
-
-	if spec.SecretName != nil && basic.SecretName != *spec.SecretName {
-		return false
-	}
-
-	if spec.SecretNamespace != nil && basic.SecretNamespace != *spec.SecretNamespace {
-		return false
-	}
-
-	if spec.ClusterName != nil && basic.ClusterName != *spec.ClusterName {
-		return false
-	}
-
-	return true
 }
 
 // SetupWithManager sets up the controller with the Manager

@@ -2,6 +2,7 @@ package redfishstatus
 
 import (
 	"context"
+	"reflect"
 	"strings"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -33,7 +34,14 @@ func formatRedfishStatusName(ip string) string {
 }
 
 // 比较两个Status的内容是否相同，忽略指针等问题
-func compareRedfishStatus(a, b topohubv1beta1.RedfishStatusStatus, logger *zap.SugaredLogger) bool {
+func compareRedfishStatus(a, b *topohubv1beta1.RedfishStatusStatus, logger *zap.SugaredLogger) bool {
+	// 处理空指针情况
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
 	if a.Healthy != b.Healthy {
 		if logger != nil {
 			logger.Debugf("compareRedfishStatus Healthy changed: %v -> %v", b.Healthy, a.Healthy)
@@ -47,46 +55,9 @@ func compareRedfishStatus(a, b topohubv1beta1.RedfishStatusStatus, logger *zap.S
 		return false
 	}
 
-	// 比较Basic字段
-	if a.Basic.Type != b.Basic.Type {
+	if !reflect.DeepEqual(a.Basic, b.Basic) {
 		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.Type changed: %v -> %v", b.Basic.Type, a.Basic.Type)
-		}
-		return false
-	}
-	if a.Basic.IpAddr != b.Basic.IpAddr {
-		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.IpAddr changed: %v -> %v", b.Basic.IpAddr, a.Basic.IpAddr)
-		}
-		return false
-	}
-	if a.Basic.SecretName != b.Basic.SecretName {
-		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.SecretName changed: %v -> %v", b.Basic.SecretName, a.Basic.SecretName)
-		}
-		return false
-	}
-	if a.Basic.SecretNamespace != b.Basic.SecretNamespace {
-		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.SecretNamespace changed: %v -> %v", b.Basic.SecretNamespace, a.Basic.SecretNamespace)
-		}
-		return false
-	}
-	if a.Basic.Https != b.Basic.Https {
-		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.Https changed: %v -> %v", b.Basic.Https, a.Basic.Https)
-		}
-		return false
-	}
-	if a.Basic.Port != b.Basic.Port {
-		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.Port changed: %v -> %v", b.Basic.Port, a.Basic.Port)
-		}
-		return false
-	}
-	if a.Basic.ClusterName != b.Basic.ClusterName {
-		if logger != nil {
-			logger.Debugf("compareRedfishStatus Basic.ClusterName changed: %v -> %v", b.Basic.ClusterName, a.Basic.ClusterName)
+			logger.Debugf("compareRedfishStatus Basic changed: %v -> %v", b.Basic, a.Basic)
 		}
 		return false
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -14,7 +15,7 @@ import (
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
-	redfishstatusData "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
+	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	"go.uber.org/zap"
 )
 
@@ -35,14 +36,13 @@ func NewHostOperationController(mgr ctrl.Manager, agentConfig *config.AgentConfi
 	}, nil
 }
 
-// 只有 leader 才会执行 Reconcile
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.log.With("hostoperation", req.Name)
 
 	logger.Debugf("Starting reconcile for HostOperation %s", req.Name)
 
-	// 获取 HostOperation 对象
+	// get the HostOperation object
 	hostOp := &topohubv1beta1.HostOperation{}
 	if err := r.Get(ctx, req.NamespacedName, hostOp); err != nil {
 		if errors.IsNotFound(err) {
@@ -51,35 +51,51 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// 获取关联的 RedfishStatus
+	// get the RedfishStatus
 	redfishStatus := &topohubv1beta1.RedfishStatus{}
 	if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.RedfishStatusName}, redfishStatus); err != nil {
 		logger.Errorf("Failed to get RedfishStatus %s: %v", hostOp.Spec.RedfishStatusName, err)
 		return ctrl.Result{}, err
 	}
 
-	// 检查状态是否为空
+	// check if the host operation is pending
 	if hostOp.Status.Status == "" || hostOp.Status.Status == topohubv1beta1.HostOperationStatusPending {
 		logger.Infof("Processing HostOperation %s : %+v", hostOp.Name, hostOp.Spec)
 
-		// 更新状态
+		// update status
 		hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
 		hostOp.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		hostOp.Status.ClusterName = redfishStatus.Status.Basic.ClusterName
-		hostOp.Status.IpAddr = redfishStatus.Status.Basic.IpAddr
 
-		// 调用 redfish 接口 完成操作
-		// get connect config from cache
-		d := redfishstatusData.RedfishCacheDatabase.Get(hostOp.Spec.RedfishStatusName)
-		if d == nil {
+		// get HostEndpoint
+		hostEndpoint, connErr := r.getHostEndpoint(redfishStatus)
+		if connErr != nil {
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
-			logger.Warnf("Failed to get connect config %s from cache, retry later", hostOp.Spec.RedfishStatusName)
-			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+			logger.Warnf("Failed to get connection info for %s: %v, retry later", hostOp.Spec.RedfishStatusName, connErr)
+			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 		}
-		logger.Debugf("get connect config %s from cache: %+v", hostOp.Spec.RedfishStatusName, d)
+		logger.Debugf("get connect config %s: %+v", hostOp.Spec.RedfishStatusName, hostEndpoint)
+		hostOp.Status.ClusterName = *hostEndpoint.Spec.ClusterName
+		hostOp.Status.IpAddr = hostEndpoint.Spec.IPAddr
 
-		var err error
-		c, terr := redfish.NewClient(*d, logger)
+		// get secret data
+		username, password, err := r.getSecretData(
+			*hostEndpoint.Spec.SecretName,
+			*hostEndpoint.Spec.SecretNamespace,
+		)
+		if err != nil {
+			r.log.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+			return ctrl.Result{}, err
+		}
+
+		connInfo := &redfishstatusdata.RedfishConnectCon{
+			Username: username,
+			Password: password,
+			IPAddr:   hostEndpoint.Spec.IPAddr,
+			Port:     int(*hostEndpoint.Spec.Port),
+			Http:     !*hostEndpoint.Spec.HTTPS,
+		}
+
+		c, terr := redfish.NewClient(*connInfo, logger)
 		if terr != nil {
 			err = terr
 			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.RedfishStatusName, err)
@@ -136,4 +152,43 @@ func (r *HostOperationController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&topohubv1beta1.HostOperation{}).
 		Complete(r)
+}
+
+func (r *HostOperationController) getHostEndpoint(redfishStatus *topohubv1beta1.RedfishStatus) (*topohubv1beta1.HostEndpoint, error) {
+	// all RedfishStatus should have ownerReferences
+	if len(redfishStatus.OwnerReferences) > 0 {
+		for _, ownerRef := range redfishStatus.OwnerReferences {
+			if ownerRef.Kind == topohubv1beta1.KindHostEndpoint {
+				r.log.Infof("Found HostEndpoint owner reference: %s", ownerRef.Name)
+
+				// get HostEndpoint
+				hostEndpoint := &topohubv1beta1.HostEndpoint{}
+				if err := r.Get(context.TODO(), client.ObjectKey{Name: ownerRef.Name}, hostEndpoint); err != nil {
+					r.log.Errorf("Failed to get HostEndpoint %s: %v", ownerRef.Name, err)
+					return nil, err
+				}
+
+				return hostEndpoint, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("Failed to get HostEndpoint for RedfishStatus %s", redfishStatus.Name)
+}
+
+// getSecretData 从 Secret 中获取用户名和密码
+func (r *HostOperationController) getSecretData(secretName, secretNamespace string) (string, string, error) {
+	r.log.Debugf("Attempting to get secret data for %s/%s", secretNamespace, secretName)
+
+	// 使用 controller-runtime client 获取 Secret
+	secret := &corev1.Secret{}
+	if err := r.Client.Get(context.TODO(), client.ObjectKey{Name: secretName, Namespace: secretNamespace}, secret); err != nil {
+		r.log.Errorf("Failed to get secret %s/%s: %v", secretNamespace, secretName, err)
+		return "", "", err
+	}
+
+	username := string(secret.Data["username"])
+	password := string(secret.Data["password"])
+	r.log.Debugf("Successfully retrieved secret data for %s/%s", secretNamespace, secretName)
+	return username, password, nil
 }

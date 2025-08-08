@@ -2,15 +2,13 @@ package redfishstatus
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/subnet/dhcpserver"
-	"k8s.io/apimachinery/pkg/api/errors"
+	errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -18,9 +16,6 @@ import (
 const (
 	// retryDelay is the delay before retrying a failed operation
 	retryDelay = time.Second
-
-	// BasicInfoAnnotation is the annotation key for storing basicInfo as JSON
-	BasicInfoAnnotation = "topohub.infrastructure.io/basic-info"
 )
 
 func shouldRetry(err error) bool {
@@ -130,136 +125,56 @@ func (c *redfishStatusController) createBindingIpForredfishstatus(client dhcpser
 	return false
 }
 
-// create the redfishstatus for the dhcp client
+// do the dhcp add event, create the hostendpoint, and the redfishstatus will be created by the hostendpoint controller
 func (c *redfishStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo) error {
-
 	name := formatRedfishStatusName(client.IP)
 	c.log.Debugf("Processing DHCP add event: %+v ", client)
 
-	// Try to get existing redfishstatus
-	existing := &topohubv1beta1.RedfishStatus{}
-	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existing)
+	// check if the hostendpoint exists
+	existingHostEndpoint := &topohubv1beta1.HostEndpoint{}
+	err := c.client.Get(context.Background(), types.NamespacedName{Name: name}, existingHostEndpoint)
 	if err == nil {
-		// Create a copy of the existing object to avoid modifying the cache
-		updated := existing.DeepCopy()
-
-		// redfishstatus exists, check if MAC changed,  or if failed to update status after creating
-		if updated.Status.Basic.Mac != client.MAC {
-			// MAC changed, update the object
-			c.log.Infof("Updating redfishstatus %s: MAC changed from %s to %s",
-				name, updated.Status.Basic.Mac, client.MAC)
-			updated.Status.Basic.Mac = client.MAC
-		}
-		expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
-		if updated.Status.Basic.DhcpExpireTime == nil || *updated.Status.Basic.DhcpExpireTime != expireTimeStr {
-			oldTime := ""
-			if updated.Status.Basic.DhcpExpireTime != nil {
-				oldTime = *updated.Status.Basic.DhcpExpireTime
-			}
-			// DHCP expire time changed, update the object
-			c.log.Infof("Updating redfishstatus %s: DHCP ip %s expire time changed from %s to %s",
-				name, &client.IP, oldTime, expireTimeStr)
-			updated.Status.Basic.DhcpExpireTime = &expireTimeStr
-		}
-
-		if !reflect.DeepEqual(existing.Status, updated.Status) {
-			updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-			if err := c.client.Status().Update(context.Background(), updated); err != nil {
-				if errors.IsConflict(err) {
-					c.log.Debugf("Conflict updating redfishstatus %s, will retry", name)
-					return err
-				}
-				c.log.Errorf("Failed to update redfishstatus %s: %v", name, err)
-				return err
-			}
-			c.log.Infof("Successfully updated redfishstatus %s", name)
-		}
-
-		// make sure the binding ip
-		if c.createBindingIpForredfishstatus(client, existing.GetUID()) {
-			return fmt.Errorf("failed to create binding ip for redfishstatus %s: %+v", name, client)
-		}
-
+		c.log.Debugf("HostEndpoint %s already exists, using existing one", name)
 		return nil
 	}
 
 	if !errors.IsNotFound(err) {
-		c.log.Errorf("Failed to get redfishstatus %s: %v", name, err)
+		c.log.Errorf("Failed to check if HostEndpoint %s exists: %v", name, err)
 		return err
 	}
 
-	// check connecting to the host
-	c.log.Debugf("checking connecting to the redfishstatus %s", client.IP)
-	basicInfo := topohubv1beta1.BasicInfo{
-		Type:             topohubv1beta1.HostTypeDHCP,
-		IpAddr:           client.IP,
-		Mac:              client.MAC,
-		Port:             int32(c.config.RedfishPort),
-		Https:            c.config.RedfishHttps,
-		ActiveDhcpClient: true,
-		ClusterName:      client.ClusterName,
-		SubnetName:       &client.SubnetName,
-		DhcpExpireTime: func() *string {
-			expireTimeStr := client.DhcpExpireTime.Format(time.RFC3339)
-			return &expireTimeStr
-		}(),
-		Hostname:        &client.Hostname,
-		SecretName:      c.config.RedfishSecretName,
-		SecretNamespace: c.config.RedfishSecretNamespace,
-	}
+	// the hostendpoint does not exist, create it
+	c.log.Debugf("Creating new HostEndpoint %s for DHCP mode", name)
+	// create the hostendpoint
+	endpointType := topohubv1beta1.EndpointTypeRedfish
+	port := int32(c.config.RedfishPort)
 
-	c.log.Debugf("succeed to checking the redfishstatus %s, and create redfishstatus for it", client.IP)
-	redfishstatus := &topohubv1beta1.RedfishStatus{
+	hostEndpoint := &topohubv1beta1.HostEndpoint{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				// topohubv1beta1.LabelIPAddr:       strings.Split(client.IP, "/")[0],
-				// topohubv1beta1.LabelClientMode:   topohubv1beta1.HostTypeDHCP,
-				// topohubv1beta1.LabelClientActive: "true",
-				// topohubv1beta1.LabelClusterName:  client.ClusterName,
+				topohubv1beta1.LabelSourceType: topohubv1beta1.HostTypeDHCP,
 				topohubv1beta1.LabelSubnetName: client.SubnetName,
 			},
 		},
+		Spec: topohubv1beta1.HostEndpointSpec{
+			Type:            &endpointType,
+			ClusterName:     &client.ClusterName,
+			IPAddr:          client.IP,
+			HTTPS:           &c.config.RedfishHttps,
+			Port:            &port,
+			SecretName:      &c.config.RedfishSecretName,
+			SecretNamespace: &c.config.RedfishSecretNamespace,
+		},
 	}
-	c.log.Debugf("Creating new redfishstatus %s", name)
-
-	// redfishstatus doesn't exist, create new one
-	// write basicInfo to annotation
-	if redfishstatus.ObjectMeta.Annotations == nil {
-		redfishstatus.ObjectMeta.Annotations = make(map[string]string)
-	}
-
-	basicInfoJSON, err := json.Marshal(basicInfo)
-	if err != nil {
-		c.log.Errorf("Failed to marshal basicInfo for redfishstatus %s: %v", name, err)
+	if err := c.client.Create(context.Background(), hostEndpoint); err != nil {
+		c.log.Errorf("Failed to create HostEndpoint %s: %v", name, err)
 		return err
 	}
-	redfishstatus.ObjectMeta.Annotations[BasicInfoAnnotation] = string(basicInfoJSON)
+	c.log.Infof("Successfully created HostEndpoint %s for DHCP mode", name)
 
-	// update the labels
-	if redfishstatus.ObjectMeta.Labels == nil {
-		redfishstatus.ObjectMeta.Labels = make(map[string]string)
-	}
-	// cluster name
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClusterName] = basicInfo.ClusterName
-	// ip
-	IpAddr := strings.Split(basicInfo.IpAddr, "/")[0]
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelIPAddr] = IpAddr
-	// mode
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientMode] = topohubv1beta1.HostTypeDHCP
-	// dhcp
-	redfishstatus.ObjectMeta.Labels[topohubv1beta1.LabelClientActive] = "true"
-
-	// create resource
-	if err := c.client.Create(context.Background(), redfishstatus); err != nil {
-		c.log.Errorf("Failed to create redfishstatus %s: %v", name, err)
-		return err
-	}
-
-	c.log.Infof("Successfully created redfishstatus %s", name)
-	c.log.Debugf("DHCP client details - %+v", client)
-
-	if c.createBindingIpForredfishstatus(client, redfishstatus.GetUID()) {
+	// create binding ip
+	if c.createBindingIpForredfishstatus(client, hostEndpoint.GetUID()) {
 		return fmt.Errorf("failed to create binding ip for redfishstatus %s: %+v", name, client)
 	}
 
@@ -290,29 +205,12 @@ func (c *redfishStatusController) handleDHCPDelete(client dhcpserver.DhcpClientI
 	}
 	// update labels
 	updated.Labels[topohubv1beta1.LabelClientActive] = "false"
-	updated.Status.Basic.ActiveDhcpClient = false
 	// update object
 	if err := c.client.Update(context.Background(), updated); err != nil {
 		c.log.Errorf("Failed to update labels of redfishstatus %s: %v", name, err)
 		return err
 	}
 	c.log.Infof("Successfully disactivate the dhcp client of redfishstatus %s", name)
-
-	// log.Logger.Infof("Disable Bind DhcpIP, so delete the redfishstatus - IP: %s, MAC: %s", client.IP, client.MAC)
-	// existing := &topohubv1beta1.redfishstatus{
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name: name,
-	// 	},
-	// }
-	// if err := c.client.Delete(context.Background(), existing); err != nil {
-	// 	if errors.IsNotFound(err) {
-	// 		log.Logger.Debugf("redfishstatus %s not found, already deleted", name)
-	// 		return nil
-	// 	}
-	// 	log.Logger.Errorf("Failed to delete redfishstatus %s: %v", name, err)
-	// 	return err
-	// }
-	// log.Logger.Infof("Successfully deleted redfishstatus %s", name)
 
 	return nil
 }
