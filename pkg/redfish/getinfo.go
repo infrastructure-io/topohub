@@ -86,7 +86,8 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	cpus, err := system.Processors()
 	if err != nil {
 		c.logger.Errorf("failed to get processors: %+v", err)
-		return nil, err
+		// Continue without processor details
+		cpus = []*redfish.Processor{}
 	}
 	c.logger.Debugf("cpus amount: %d", len(cpus))
 	for n, cpu := range cpus {
@@ -109,7 +110,8 @@ func (c *redfishClient) GetInfo() (map[string]string, error) {
 	mms, err := system.Memory()
 	if err != nil {
 		c.logger.Errorf("failed to get memory: %+v", err)
-		return nil, err
+		// Continue without memory details
+		mms = []*redfish.Memory{}
 	}
 	setData(result, "MemoryChipsAccount", fmt.Sprintf("%d", len(mms)))
 	//在内存条不变时，有时数组的顺序的变换，导致 后续 redfishstatus 会做无意义的更新，暂时 取消这些信息

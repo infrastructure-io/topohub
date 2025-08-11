@@ -60,6 +60,10 @@ type HostEndpointSpec struct {
 	// +kubebuilder:default=redfish
 	// +kubebuilder:validation:Enum=redfish;ssh
 	Type *string `json:"type,omitempty"`
+
+	// PXE boot type, either "ipmi" or "redfish"
+	// +kubebuilder:validation:Enum=ipmi;redfish
+	PxeBootType string `json:"pxeBootType,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

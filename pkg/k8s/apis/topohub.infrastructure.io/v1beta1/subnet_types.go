@@ -87,6 +87,10 @@ type FeatureSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	EnableDhcpTrustedOnly bool `json:"enableDhcpTrustedOnly"`
+
+	// PXE boot type, either "ipmi" or "redfish"
+	// +kubebuilder:validation:Enum=ipmi;redfish
+	PxeBootType string `json:"pxeBootType,omitempty"`
 }
 
 // SyncRedfishstatusSpec defines the sync endpoint configuration

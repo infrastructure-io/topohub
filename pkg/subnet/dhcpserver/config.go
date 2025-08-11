@@ -199,6 +199,7 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 			SubnetName:                   s.subnet.Name,
 			ClusterName:                  clusterName,
 			EnableBindIpForRedfishstatus: &enableBindIP,
+			PxeBootType:                  s.subnet.Spec.Feature.PxeBootType,
 		}
 		currentLeaseClients[clientInfo.IP] = clientInfo
 

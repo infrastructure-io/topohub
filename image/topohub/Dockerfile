@@ -21,13 +21,14 @@ ENV ENV_GIT_COMMIT_TIMESTAMP=${GIT_COMMIT_TIME}
 ARG PROJECT_VERSION
 ENV ENV_PROJECT_VERSION=${PROJECT_VERSION}
 
-# Install dhcpd binary
+# Install required packages including ipmitool
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     dnsmasq \
     iproute2 \
     isc-dhcp-client \
     vim \
+    ipmitool \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /

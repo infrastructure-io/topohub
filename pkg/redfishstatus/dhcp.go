@@ -165,8 +165,10 @@ func (c *redfishStatusController) handleDHCPAdd(client dhcpserver.DhcpClientInfo
 			Port:            &port,
 			SecretName:      &c.config.RedfishSecretName,
 			SecretNamespace: &c.config.RedfishSecretNamespace,
+			PxeBootType:     client.PxeBootType,
 		},
 	}
+
 	if err := c.client.Create(context.Background(), hostEndpoint); err != nil {
 		c.log.Errorf("Failed to create HostEndpoint %s: %v", name, err)
 		return err

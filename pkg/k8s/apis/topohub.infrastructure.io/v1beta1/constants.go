@@ -16,6 +16,14 @@ const (
 	Redfish          = "redfish"
 )
 
+// Constants for PXE boot types
+const (
+	// PxeBootTypeIPMI represents IPMI PXE boot type
+	PxeBootTypeIPMI = "ipmi"
+	// PxeBootTypeRedfish represents Redfish PXE boot type
+	PxeBootTypeRedfish = "redfish"
+)
+
 // Constants for annotations
 const (
 	// AnnotationBasicInfo 是用于存储 BasicInfo 结构体 JSON 的 annotation key
