@@ -13,7 +13,6 @@ import (
 
 // generateDnsmasqConfig generates the dnsmasq configuration file
 func (s *dhcpServer) generateDnsmasqConfig() error {
-
 	s.log.Infof("generating config")
 
 	// 读取模板文件
@@ -93,7 +92,11 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 		}
 	}
 	s.log.Infof("Generated dnsmasq config file: %s", configFile)
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			s.log.Errorf("failed to close config file: %v", err)
+		}
+	}()
 
 	s.log.Debugf("Generated dnsmasq config: %+v", data)
 
@@ -251,7 +254,6 @@ func (s *dhcpServer) processDhcpLease(ignoreLeaseExistenceError bool) (clientCha
 // 1. For ipMacMapAdded: if IP exists, update its MAC; if IP doesn't exist, add new binding
 // 2. For ipMacMapDeleted: delete binding only if both IP and MAC match exactly
 func (s *dhcpServer) UpdateDhcpBindings() error {
-
 	// 读取现有的配置文件
 	_, err := os.ReadFile(s.HostIpBindingsConfigPath)
 	if err != nil {

@@ -16,7 +16,6 @@ import (
 
 // startDnsmasq starts the dnsmasq process
 func (s *dhcpServer) startDnsmasq() error {
-
 	if err := s.setupInterface(); err != nil {
 		return fmt.Errorf("failed to setup interface: %v", err)
 	}
@@ -81,15 +80,19 @@ func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
 
 // monitor monitors the lease file and updates status
 func (s *dhcpServer) monitor() {
-
 	leaseWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		s.log.Errorf("Failed to create lease file watcher: %v", err)
+		s.log.Errorf("failed to create lease file watcher: %v", err)
 		return
 	}
-	defer leaseWatcher.Close()
+	defer func() {
+		if err := leaseWatcher.Close(); err != nil {
+			s.log.Errorf("failed to close lease file watcher: %v", err)
+		}
+	}()
+
 	if err := leaseWatcher.Add(filepath.Dir(s.leasePath)); err != nil {
-		s.log.Errorf("Failed to watch lease file: %v", err)
+		s.log.Errorf("failed to watch lease file: %v", err)
 		return
 	}
 
@@ -237,6 +240,5 @@ func (s *dhcpServer) monitor() {
 			// in the startDnsmasq, it finish 's.statusUpdateCh <- struct{}{}'
 			// s.statusUpdateCh <- struct{}{}
 		}
-
 	}
 }

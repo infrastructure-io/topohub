@@ -72,8 +72,13 @@ type dhcpServer struct {
 }
 
 // NewDhcpServer creates a new DHCP server instance
-func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, client client.Client, addedDhcpClientForRedfishStatus chan DhcpClientInfo, deletedDhcpClientForRedfishStatus chan DhcpClientInfo) *dhcpServer {
-
+func NewDhcpServer(
+	config *config.AgentConfig,
+	subnet *topohubv1beta1.Subnet,
+	client client.Client,
+	addedDhcpClientForRedfishStatus chan DhcpClientInfo,
+	deletedDhcpClientForRedfishStatus chan DhcpClientInfo,
+) *dhcpServer {
 	return &dhcpServer{
 		config:                            config,
 		lockData:                          &lock.RWMutex{},
