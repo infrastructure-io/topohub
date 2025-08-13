@@ -52,6 +52,20 @@ func NewClient(hostCon redfishstatusData.RedfishConnectCon, log *zap.SugaredLogg
 		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
+			// Configure TLS to handle servers with weak DH keys
+			MinVersion: tls.VersionTLS10,
+			// Configure TLS to handle servers with weak DH keys
+			CipherSuites: []uint16{
+				// Specify cipher suites that don't use DH key exchange
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
 		},
 	}
 

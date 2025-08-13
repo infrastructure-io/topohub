@@ -3,6 +3,8 @@ package hostoperation
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +15,7 @@ import (
 
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/log"
+	logpkg "github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
 	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	"go.uber.org/zap"
@@ -32,7 +34,7 @@ func NewHostOperationController(mgr ctrl.Manager, agentConfig *config.AgentConfi
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		agentConfig: agentConfig,
-		log:         log.Logger.Named("HostOperationController"),
+		log:         logpkg.Logger.Named("HostOperationController"),
 	}, nil
 }
 
@@ -116,7 +118,22 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 			case topohubv1beta1.BootCmdGracefulRestart:
 				err = c.Power(hostOp.Spec.Action)
 			case topohubv1beta1.BootCmdResetPxeOnce:
-				err = c.Power(hostOp.Spec.Action)
+				// check pxe boot method
+				if strings.ToLower(hostEndpoint.Spec.PxeBootType) == topohubv1beta1.PxeBootTypeIPMI {
+					// use IPMI command to set PXE boot
+					logger.Infof("Using IPMI to set PXE boot for %s", hostEndpoint.Spec.IPAddr)
+					err = r.performIPMIPXEBoot(connInfo.IPAddr, connInfo.Username, connInfo.Password)
+					if err == nil {
+						hostOp.Status.Message = fmt.Sprintf("Successfully performed PXE boot via IPMI for %s", hostEndpoint.Spec.IPAddr)
+					}
+				} else {
+					// use default Redfish client
+					logger.Infof("Using Redfish method for %s", hostEndpoint.Spec.IPAddr)
+					err = r.performRedfishPXEBoot(connInfo, hostOp.Spec.Action)
+					if err == nil {
+						hostOp.Status.Message = fmt.Sprintf("Successfully performed PXE boot via Redfish method for %s", hostEndpoint.Spec.IPAddr)
+					}
+				}
 			default:
 				err = fmt.Errorf("invalid action %s", hostOp.Spec.Action)
 			}
@@ -191,4 +208,63 @@ func (r *HostOperationController) getSecretData(secretName, secretNamespace stri
 	password := string(secret.Data["password"])
 	r.log.Debugf("Successfully retrieved secret data for %s/%s", secretNamespace, secretName)
 	return username, password, nil
+}
+
+// performIPMIPXEBoot perform IPMI PXE boot
+func (r *HostOperationController) performIPMIPXEBoot(ipAddr, username, password string) error {
+	// set PXE boot via IPMI
+	r.log.Infof("Setting PXE boot via IPMI for %s", ipAddr)
+
+	// build set pxe boot command
+	setPxeCmd := exec.Command("ipmitool", "-I", "lanplus", "-H", ipAddr, "-U", username, "-P", password, "chassis", "bootdev", "pxe")
+	// print command (hide password)
+	r.log.Infof("Executing command: ipmitool -I lanplus -H %s -U %s -P %s chassis bootdev pxe", ipAddr, username, password)
+
+	// execute command
+	output, err := setPxeCmd.CombinedOutput()
+	if err != nil {
+		r.log.Errorf("Failed to set PXE boot via IPMI: %v, output: %s", err, string(output))
+		return fmt.Errorf("failed to set PXE boot via IPMI: %v", err)
+	}
+	r.log.Infof("Successfully set PXE boot via IPMI for %s: %s", ipAddr, strings.TrimSpace(string(output)))
+
+	// perform power reset via IPMI
+	r.log.Infof("Performing power reset via IPMI for %s", ipAddr)
+
+	// build power reset command
+	resetCmd := exec.Command("ipmitool", "-I", "lanplus", "-H", ipAddr, "-U", username, "-P", password, "power", "reset")
+	// print command (hide password)
+	r.log.Infof("Executing command: ipmitool -I lanplus -H %s -U %s -P %s power reset", ipAddr, username, password)
+
+	// execute command
+	output, err = resetCmd.CombinedOutput()
+	if err != nil {
+		r.log.Errorf("Failed to perform power reset via IPMI: %v, output: %s", err, string(output))
+		return fmt.Errorf("failed to perform power reset via IPMI: %v", err)
+	}
+	r.log.Infof("Successfully performed power reset via IPMI for %s: %s", ipAddr, strings.TrimSpace(string(output)))
+
+	return nil
+}
+
+// performRedfishPXEBoot perform Redfish PXE boot
+func (r *HostOperationController) performRedfishPXEBoot(connInfo *redfishstatusdata.RedfishConnectCon, action string) error {
+	// create Redfish client
+	r.log.Infof("Creating Redfish client for %s", connInfo.IPAddr)
+	client, err := redfish.NewClient(*connInfo, r.log)
+	if err != nil {
+		r.log.Errorf("Failed to create Redfish client: %v", err)
+		return fmt.Errorf("failed to create Redfish client: %v", err)
+	}
+	defer client.Logout()
+
+	// perform PXE boot
+	r.log.Infof("Performing PXE boot via Redfish for %s", connInfo.IPAddr)
+	if err := client.Power(action); err != nil {
+		r.log.Errorf("Failed to perform PXE boot via Redfish: %v", err)
+		return fmt.Errorf("failed to perform PXE boot via Redfish: %v", err)
+	}
+
+	r.log.Infof("Successfully performed PXE boot via Redfish for %s", connInfo.IPAddr)
+	return nil
 }

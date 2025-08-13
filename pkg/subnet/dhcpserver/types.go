@@ -14,6 +14,7 @@ type DhcpClientInfo struct {
 	SubnetName                   string    `json:"subnetName"`
 	ClusterName                  string    `json:"clusterName,omitempty"`
 	EnableBindIpForRedfishstatus *bool     `json:"enableBindIpForRedfishstatus,omitempty"`
+	PxeBootType                  string    `json:"pxeBootType,omitempty"`
 }
 
 // DhcpServerConfig represents the configuration for the DHCP server
