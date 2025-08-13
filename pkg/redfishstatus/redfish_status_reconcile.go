@@ -141,7 +141,11 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 		healthy = true
 	}
 
-	defer client.Logout()
+	defer func() {
+		if client != nil {
+			client.Logout()
+		}
+	}()
 
 	protocol := "http"
 	if !connInfo.Http {
