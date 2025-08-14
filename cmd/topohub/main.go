@@ -62,7 +62,7 @@ func main() {
 
 	// Initialize logger
 	logLevel := os.Getenv("LOG_LEVEL")
-	log.InitStdoutLogger(logLevel)
+	log.InitStdoutLogger(log.LogLevel(logLevel))
 
 	// start pprof server
 	debug.RunPProf(*pprofAddress, *pprofPort)

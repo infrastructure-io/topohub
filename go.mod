@@ -3,6 +3,7 @@ module github.com/infrastructure-io/topohub
 go 1.24.4
 
 require (
+	github.com/agiledragon/gomonkey/v2 v2.13.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/grafana/pyroscope-go v1.2.1
 	github.com/onsi/ginkgo/v2 v2.22.0

@@ -150,6 +150,9 @@ jobs:
       #   run: |
       #     make lint_golang_everything
 
+      - name: Run unit-test
+        run: go test -short -failfast -count=1 -v -gcflags=all=-l ./pkg/... ./cmd/...
+
   # unitest:
   #   needs: filter_changes
   #   if: ${{ needs.filter_changes.outputs.check == 'true' }}
