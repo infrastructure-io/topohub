@@ -7,21 +7,21 @@ import (
 	"fmt"
 	"time"
 
+	gofishredfish "github.com/stmcginnis/gofish/redfish"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/redfish"
 	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	"github.com/infrastructure-io/topohub/pkg/tools"
-	gofishredfish "github.com/stmcginnis/gofish/redfish"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ------------------------------  update the spec.info of the redfishstatus
-func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogEntry, redfishStatusName string, lastLogTime string,
+func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogEntry, redfishStatusName, lastLogTime string,
 ) (newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg string, totalMsgCount, warningMsgCount, newLogAccount int) {
 	totalMsgCount = 0
 	warningMsgCount = 0
@@ -37,10 +37,10 @@ func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogE
 
 	totalMsgCount = len(logEntrys)
 	for m, entry := range logEntrys {
-		//log.Logger.Debugf("log service entries[%d] timestamp: %+v", m, entry.Created)
-		//log.Logger.Debugf("log service entries[%d] severity: %+v", m, entry.Severity)
-		//log.Logger.Debugf("log service entries[%d] oemSensorType: %+v", m, entry.OemSensorType)
-		//log.Logger.Debugf("log service entries[%d] message: %+v", m, entry.Message)
+		// log.Logger.Debugf("log service entries[%d] timestamp: %+v", m, entry.Created)
+		// log.Logger.Debugf("log service entries[%d] severity: %+v", m, entry.Severity)
+		// log.Logger.Debugf("log service entries[%d] oemSensorType: %+v", m, entry.OemSensorType)
+		// log.Logger.Debugf("log service entries[%d] message: %+v", m, entry.Message)
 
 		msg := fmt.Sprintf("[%s][%s]: %s %s", entry.Created, entry.Severity, entry.OemSensorType, entry.Message)
 

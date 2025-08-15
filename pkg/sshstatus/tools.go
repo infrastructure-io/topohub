@@ -81,7 +81,7 @@ func compareSSHStatus(a, b *topohubv1beta1.SSHStatusStatus, logger *zap.SugaredL
 }
 
 // GenerateEvents creates Kubernetes events from SSH log entries and returns the latest messages and counts
-func (c *sshStatusController) GenerateEvents(logEntries []map[string]string, sshStatusName string, lastLogTime string) (newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg string, totalMsgCount, warningMsgCount, newLogAccount int) {
+func (c *sshStatusController) GenerateEvents(logEntries []map[string]string, sshStatusName, lastLogTime string) (newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg string, totalMsgCount, warningMsgCount, newLogAccount int) {
 	totalMsgCount = 0
 	warningMsgCount = 0
 	newLogAccount = 0

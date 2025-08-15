@@ -5,38 +5,39 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"time"
 	"strings"
-	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
-	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/tools"
-	"github.com/infrastructure-io/topohub/pkg/config"
-	"github.com/infrastructure-io/topohub/pkg/lock"
+	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	bindingipdata "github.com/infrastructure-io/topohub/pkg/bindingip/data"
+	"github.com/infrastructure-io/topohub/pkg/config"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	"github.com/infrastructure-io/topohub/pkg/lock"
 	"github.com/infrastructure-io/topohub/pkg/log"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
 var bindingIPLock = &lock.Mutex{}
 
 // bindingIPController 定义控制器结构
 type bindingIPController struct {
-	client   client.Client
-	log      *zap.SugaredLogger
-	config   *config.AgentConfig
+	client           client.Client
+	log              *zap.SugaredLogger
+	config           *config.AgentConfig
 	addedBindingIp   chan bindingipdata.BindingIPInfo
 	deletedBindingIp chan bindingipdata.BindingIPInfo
 }
 
 // NewBindingIPController 创建新的控制器实例
-func NewBindingIPController(mgr ctrl.Manager, config *config.AgentConfig, addedBindingIp chan bindingipdata.BindingIPInfo, deletedBindingIp chan bindingipdata.BindingIPInfo) *bindingIPController {
+func NewBindingIPController(mgr ctrl.Manager, config *config.AgentConfig, addedBindingIp, deletedBindingIp chan bindingipdata.BindingIPInfo) *bindingIPController {
 	return &bindingIPController{
-		client:   mgr.GetClient(),
-		log:      log.Logger.Named("bindingipReconcile"),
-		config:   config,
+		client:           mgr.GetClient(),
+		log:              log.Logger.Named("bindingipReconcile"),
+		config:           config,
 		addedBindingIp:   addedBindingIp,
 		deletedBindingIp: deletedBindingIp,
 	}
@@ -48,10 +49,10 @@ func (c *bindingIPController) processBindingIP(bindingIP *topohubv1beta1.Binding
 	name := bindingIP.Name
 
 	info := bindingipdata.BindingIPInfo{
-		Subnet:  bindingIP.Spec.Subnet,
-		IPAddr:  bindingIP.Spec.IpAddr,
-		MacAddr: bindingIP.Spec.MacAddr,
-		Valid:   bindingIP.Status.Valid,
+		Subnet:   bindingIP.Spec.Subnet,
+		IPAddr:   bindingIP.Spec.IpAddr,
+		MacAddr:  bindingIP.Spec.MacAddr,
+		Valid:    bindingIP.Status.Valid,
 		Hostname: bindingIP.Name,
 	}
 
@@ -96,9 +97,9 @@ func (c *bindingIPController) Reconcile(ctx context.Context, req ctrl.Request) (
 			if data := bindingipdata.BindingIPCacheDatabase.Get(req.Name); data != nil {
 				bindingipdata.BindingIPCacheDatabase.Delete(req.Name)
 				t := bindingipdata.BindingIPInfo{
-					IPAddr:  data.IPAddr,
-					MacAddr: data.MacAddr,
-					Subnet:  data.Subnet,
+					IPAddr:   data.IPAddr,
+					MacAddr:  data.MacAddr,
+					Subnet:   data.Subnet,
 					Hostname: data.Hostname,
 				}
 				c.deletedBindingIp <- t
@@ -125,7 +126,7 @@ func (c *bindingIPController) Reconcile(ctx context.Context, req ctrl.Request) (
 		logger.Errorf("failed to process BindingIP: %v", err)
 		return ctrl.Result{}, fmt.Errorf("failed to process BindingIP: %v", err)
 	}
- 
+
 	// requeue every minute, to check the status of the BindingIP
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
@@ -146,11 +147,11 @@ func (c *bindingIPController) updateBindingIPStatus(bindingIP *topohubv1beta1.Bi
 		if ip != nil && tools.IsIPInRange(ip, subnet.Spec.IPv4Subnet.IPRange) {
 			updated.Status.Valid = true
 			logger.Debugf("IP %s is in subnet %s range %s, set status.Valid to true",
-			updated.Spec.IpAddr, updated.Spec.Subnet, subnet.Spec.IPv4Subnet.IPRange)
+				updated.Spec.IpAddr, updated.Spec.Subnet, subnet.Spec.IPv4Subnet.IPRange)
 		} else {
 			updated.Status.Valid = false
 			logger.Debugf("IP %s is not in subnet %s range %s, set status.Valid to false",
-			updated.Spec.IpAddr, updated.Spec.Subnet, subnet.Spec.IPv4Subnet.IPRange)
+				updated.Spec.IpAddr, updated.Spec.Subnet, subnet.Spec.IPv4Subnet.IPRange)
 		}
 	}
 

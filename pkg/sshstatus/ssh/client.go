@@ -23,7 +23,6 @@ type Client struct {
 
 // NewClient creates a new SSH client
 func NewClient(hostInfo sshstatusdata.SSHConnectCon, logger *zap.SugaredLogger) (*Client, error) {
-
 	authMethods := []ssh.AuthMethod{}
 
 	// Choose different authentication methods based on the configuration

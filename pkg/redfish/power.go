@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/stmcginnis/gofish/redfish"
+
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )
 
 // https://github.com/DMTF/Redfish-Tacklebox/blob/main/scripts/rf_power_reset.py
 // post request to systems
 
 func (c *redfishClient) Power(bootCmd string) error {
-
 	// Attached the client to service root
 	service := c.client.Service
 	// Query the computer systems

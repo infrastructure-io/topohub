@@ -65,7 +65,7 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 	return retry.OnError(backoff,
 		func(err error) bool {
 			// Retry on any error
-			//return true
+			// return true
 			// 这里我们只在遇到冲突错误时重试
 			if errors.IsConflict(err) {
 				s.log.Warnf("conflict occurred while updating subnet status, will retry")

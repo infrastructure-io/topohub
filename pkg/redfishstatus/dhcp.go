@@ -24,7 +24,6 @@ func shouldRetry(err error) bool {
 
 // processDHCPEvents processes DHCP events from the DHCP manager
 func (c *redfishStatusController) processDHCPEvents() {
-
 	for {
 		select {
 		case <-c.stopCh:

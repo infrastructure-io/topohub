@@ -6,10 +6,10 @@ import (
 
 // BindingIPInfo 定义每一个 BindingIP 的信息
 type BindingIPInfo struct {
-	Subnet  string
-	IPAddr  string
-	MacAddr string
-	Valid   bool
+	Subnet   string
+	IPAddr   string
+	MacAddr  string
+	Valid    bool
 	Hostname string
 }
 

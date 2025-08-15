@@ -28,6 +28,15 @@ tools-image: build-tools-image
 build-tools-image:
 	docker build -t $(TOOLS_IMAGE_REF) -f image/tools/Dockerfile image/tools
 
+
+# Format targets
+
+FORMAT_PKG_SUBS=$(shell for it in `ls pkg | grep -vE "^k8s$$|^README.md$$"`; do echo "pkg/$$it"; done)
+.PHONY: gofmt
+gofmt:
+	gofumpt -extra -w cmd $(FORMAT_PKG_SUBS)
+
+
 # Helm chart
 #================== chart
 ROOT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
@@ -163,7 +172,8 @@ usage:
 	@echo "  chart           - Package Helm chart"
 	@echo "  e2e             - Run E2E tests"
 	@echo "  e2e-clean       - Clean up E2E environment"
-	@echo "  uninstall_e2e  - Uninstall E2E environment"
+	@echo "  uninstall_e2e   - Uninstall E2E environment"
+	@echo "  gofmt           - Format Go code"
 	@echo "  clean           - Remove build artifacts"
 	@echo "  usage           - Show this help message"
 	@echo ""

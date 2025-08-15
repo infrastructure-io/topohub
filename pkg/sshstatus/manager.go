@@ -87,5 +87,4 @@ func (c *sshStatusController) SetupWithManager(mgr ctrl.Manager) error {
 // UpdateSecret updates the authentication information for SSH hosts
 func (c *sshStatusController) UpdateSecret(secretName, secretNamespace, username, password string) {
 	c.log.Debugf("Updating secret %s/%s with username: %s", secretNamespace, secretName, username)
-
 }

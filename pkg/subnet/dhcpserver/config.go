@@ -30,7 +30,7 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 
 	// 准备目录
 	configFile := s.configPath
-	if err := os.MkdirAll(filepath.Dir(configFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(configFile), 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %v", err)
 	}
 
@@ -109,10 +109,10 @@ func (s *dhcpServer) generateDnsmasqConfig() error {
 	// make sure the binding config file exists
 	if _, err := os.ReadFile(s.HostIpBindingsConfigPath); err != nil && os.IsNotExist(err) {
 		// 如果文件不存在，创建文件
-		if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0o755); err != nil {
 			s.log.Panicf("failed to create directory for bindings file: %v", err)
 		}
-		if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
+		if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0o644); err != nil {
 			s.log.Panicf("failed to create bindings file: %v", err)
 		}
 		s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
@@ -259,16 +259,15 @@ func (s *dhcpServer) UpdateDhcpBindings() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// 如果文件不存在，创建文件
-			if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(s.HostIpBindingsConfigPath), 0o755); err != nil {
 				s.log.Panicf("failed to create directory for bindings file: %v", err)
 			}
-			if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0644); err != nil {
+			if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(""), 0o644); err != nil {
 				s.log.Panicf("failed to create bindings file: %v", err)
 			}
 			s.log.Infof("created new bindings file: %s", s.HostIpBindingsConfigPath)
 		} else {
 			return fmt.Errorf("failed to read bindings file, err: %v", err)
-
 		}
 	}
 
@@ -290,7 +289,7 @@ func (s *dhcpServer) UpdateDhcpBindings() error {
 	}
 
 	// 写入更新后的配置
-	if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(strings.Join(finalLines, "\n")+"\n"), 0644); err != nil {
+	if err := os.WriteFile(s.HostIpBindingsConfigPath, []byte(strings.Join(finalLines, "\n")+"\n"), 0o644); err != nil {
 		return fmt.Errorf("failed to write bindings file: %v", err)
 	}
 
