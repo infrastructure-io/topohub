@@ -9,7 +9,6 @@ import (
 
 // redfish url: /redfish/v1/Systems/Self/LogServices
 func (c *redfishClient) GetLog() ([]*redfish.LogEntry, error) {
-
 	result := []*redfish.LogEntry{}
 
 	// Attached the client to service root
@@ -68,7 +67,6 @@ func (c *redfishClient) GetLog() ([]*redfish.LogEntry, error) {
 
 // redfish url: /redfish/v1/Managers/Self/LogServices
 func (c *redfishClient) GetManagerLog() ([]*redfish.LogEntry, error) {
-
 	result := []*redfish.LogEntry{}
 
 	// Attached the client to service root

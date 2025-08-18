@@ -9,7 +9,7 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
-func RunPyroscope(serverAddress string, pyroscopeTag string) {
+func RunPyroscope(serverAddress, pyroscopeTag string) {
 	if serverAddress != "" {
 		// push mode ,  push to pyroscope server
 		log.Logger.Infof("pyroscope works in push mode, server %s, hostname %s ", serverAddress, pyroscopeTag)
@@ -42,5 +42,4 @@ func RunPyroscope(serverAddress string, pyroscopeTag string) {
 			log.Logger.Errorf("failed to setup pyroscope, reason=%v", e)
 		}
 	}
-
 }

@@ -3,18 +3,17 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"os/exec"
+	"gopkg.in/yaml.v2"
 
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/tools"
-	"gopkg.in/yaml.v2"
 )
 
 // AgentConfig represents the agent configuration
 type AgentConfig struct {
-
 	// pod namespace
 	PodNamespace string
 
@@ -150,7 +149,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 	// Check and create each subdirectory if it doesn't exist
 	for _, dir := range subdirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return fmt.Errorf("failed to create subdirectory %s: %v", dir, err)
 			}
 		}
@@ -160,7 +159,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 	if err := os.Chown(c.StoragePathTftp, 65534, 65534); err != nil { // 65534 is nobody:nogroup
 		return fmt.Errorf("failed to change ownership of TFTP directory: %v", err)
 	}
-	if err := os.Chmod(c.StoragePathTftp, 0777); err != nil {
+	if err := os.Chmod(c.StoragePathTftp, 0o777); err != nil {
 		return fmt.Errorf("failed to change permissions of TFTP directory: %v", err)
 	}
 
@@ -174,7 +173,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 			if err != nil {
 				return fmt.Errorf("failed to read core.efi: %v", err)
 			}
-			if err := os.WriteFile(targetFile, input, 0644); err != nil {
+			if err := os.WriteFile(targetFile, input, 0o644); err != nil {
 				return fmt.Errorf("failed to copy core.efi to %s: %v", targetFile, err)
 			}
 			log.Logger.Infof("Successfully copied core.efi to %s", targetFile)
@@ -187,7 +186,7 @@ func (c *AgentConfig) initStorageDirectory() error {
 	if err := os.RemoveAll(c.StoragePathHttpTools); err != nil {
 		return fmt.Errorf("failed to delete tools directory %s: %v", c.StoragePathHttpTools, err)
 	}
-	if err := os.MkdirAll(c.StoragePathHttpTools, 0755); err != nil {
+	if err := os.MkdirAll(c.StoragePathHttpTools, 0o755); err != nil {
 		return fmt.Errorf("failed to create tools directory %s: %v", c.StoragePathHttpTools, err)
 	}
 

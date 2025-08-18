@@ -65,7 +65,7 @@ func (c *SubnetCache) HasSpecChanged(subnet *topohubv1beta1.Subnet) bool {
 	}
 
 	// Deep equal comparison of the specs
-	//return !specEqual(cached.Spec, subnet.Spec)
+	// return !specEqual(cached.Spec, subnet.Spec)
 	return !reflect.DeepEqual(cached.Spec, subnet.Spec)
 }
 

@@ -133,7 +133,6 @@ func (w *HostEndpointWebhook) ValidateDelete(ctx context.Context, obj runtime.Ob
 }
 
 func (w *HostEndpointWebhook) validateHostEndpoint(ctx context.Context, hostEndpoint *topohubv1beta1.HostEndpoint) error {
-
 	// Validate IP address is in subnet
 	ip := net.ParseIP(hostEndpoint.Spec.IPAddr)
 	if ip == nil {

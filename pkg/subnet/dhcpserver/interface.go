@@ -10,7 +10,7 @@ import (
 const (
 	// note, the letter length of the interface must be less than 15
 	vlanInterfaceFormat = "%s.%d"
-	//macvlanInterfaceFormat = "%s.topohub"
+	// macvlanInterfaceFormat = "%s.topohub"
 )
 
 // setupInterface configures the network interface for DHCP server

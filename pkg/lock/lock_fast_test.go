@@ -4,25 +4,24 @@
 //go:build !lockdebug
 // +build !lockdebug
 
-package lock_test
+package lock
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	"github.com/infrastructure-io/topohub/pkg/lock"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
 )
 
 var _ = Describe("LockFast", Label("unitest"), func() {
-
 	// it is daemon , add more test here
 	It("test lock", func() {
-		l := &lock.Mutex{}
+		l := &Mutex{}
 		l.Lock()
 		time.Sleep(1 * time.Second)
 		l.Unlock()
 	})
 	It("test RWMutex lock", func() {
-		l := &lock.RWMutex{}
+		l := &RWMutex{}
 		l.RLock()
 		time.Sleep(1 * time.Second)
 		l.RUnlock()

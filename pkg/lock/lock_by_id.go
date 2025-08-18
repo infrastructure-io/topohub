@@ -13,7 +13,6 @@ var LockManagerInstance = &LockManager{
 
 // GetLock retrieves a lock for the given ID, creating one if it doesn't exist
 func (lm *LockManager) GetLock(name string) *Mutex {
-
 	lm.mu.RLock()
 	defer lm.mu.RUnlock()
 

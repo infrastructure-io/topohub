@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	LabelRedfishStatus       = GroupName + "/redfishstatus"
+	LabelRedfishStatus = GroupName + "/redfishstatus"
 )
 
 // +genclient
@@ -18,28 +18,27 @@ const (
 // +kubebuilder:printcolumn:name="MACADDR",type="string",JSONPath=".spec.macAddr"
 // +kubebuilder:printcolumn:name="VALID",type="string",JSONPath=".status.valid"
 
-
 type BindingIp struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec BindingIpSpec `json:"spec"`
-	Status BindingIpStatus `json:"status,omitempty"`
+	Spec              BindingIpSpec   `json:"spec"`
+	Status            BindingIpStatus `json:"status,omitempty"`
 }
 
 type BindingIpSpec struct {
 	// subnet name (required)
 	// +kubebuilder:validation:Required
-	Subnet         string            `json:"subnet"`
+	Subnet string `json:"subnet"`
 
 	// IP address (required)
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=`^([0-9]{1,3}\.){3}[0-9]{1,3}$`
-	IpAddr         string            `json:"ipAddr"`
+	IpAddr string `json:"ipAddr"`
 
 	// Mac address (required)
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=`^([0-9a-fA-F]{2}:){5}([0-9a-fA-F]{2})$`
-	MacAddr        string            `json:"macAddr"`
+	MacAddr string `json:"macAddr"`
 }
 
 type BindingIpStatus struct {

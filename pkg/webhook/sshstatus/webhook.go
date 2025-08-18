@@ -45,7 +45,6 @@ func (w *SSHStatusWebhook) ValidateCreate(ctx context.Context, obj runtime.Objec
 
 // ValidateUpdate implements webhook.Validator
 func (w *SSHStatusWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-
 	return nil, nil
 }
 

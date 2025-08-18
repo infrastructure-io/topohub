@@ -5,6 +5,10 @@
 
 package v1beta1
 
+// BindingIpListerExpansion allows custom methods to be added to
+// BindingIpLister.
+type BindingIpListerExpansion interface{}
+
 // HostEndpointListerExpansion allows custom methods to be added to
 // HostEndpointLister.
 type HostEndpointListerExpansion interface{}

@@ -15,6 +15,10 @@ type FakeTopohubV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeTopohubV1beta1) BindingIps() v1beta1.BindingIpInterface {
+	return newFakeBindingIps(c)
+}
+
 func (c *FakeTopohubV1beta1) HostEndpoints() v1beta1.HostEndpointInterface {
 	return newFakeHostEndpoints(c)
 }

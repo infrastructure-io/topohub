@@ -28,7 +28,7 @@ type DhcpServer interface {
 	UpdateService(subnet topohubv1beta1.Subnet) error
 
 	// UpdateBindingIpEvents updates the binding IP events
-	UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, deleted []bindingipdata.BindingIPInfo) error
+	UpdateBindingIpEvents(added, deleted []bindingipdata.BindingIPInfo) error
 }
 
 type dhcpServer struct {
@@ -149,7 +149,7 @@ func (s *dhcpServer) Stop() error {
 	return nil
 }
 
-func (s *dhcpServer) UpdateBindingIpEvents(added []bindingipdata.BindingIPInfo, deleted []bindingipdata.BindingIPInfo) error {
+func (s *dhcpServer) UpdateBindingIpEvents(added, deleted []bindingipdata.BindingIPInfo) error {
 	for _, ainfo := range added {
 		s.addedBindingIp <- ainfo
 	}

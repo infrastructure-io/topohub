@@ -74,7 +74,6 @@ func (c *redfishStatusController) Stop() {
 
 // SetupWithManager setup controller-runtime manager
 func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
-
 	go func() {
 		<-mgr.Elected()
 		c.log.Info("Elected as leader, begin to start all controllers")
@@ -93,5 +92,4 @@ func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (c *redfishStatusController) UpdateSecret(secretName, secretNamespace, username, password string) {
-
 }

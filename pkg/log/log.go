@@ -34,9 +34,9 @@ func InitStdoutLogger(logLevel string) {
 	config := zap.Config{
 		Level:            zap.NewAtomicLevelAt(level),
 		Development:      true,
-		Encoding:        "console",
-		EncoderConfig:   zap.NewDevelopmentEncoderConfig(),
-		OutputPaths:     []string{"stdout"},
+		Encoding:         "console",
+		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
+		OutputPaths:      []string{"stdout"},
 		ErrorOutputPaths: []string{"stderr"},
 	}
 
@@ -45,7 +45,7 @@ func InitStdoutLogger(logLevel string) {
 		panic(fmt.Sprintf("failed to initialize logger: %v", err))
 	}
 
-	//Logger = logger.Sugar().Named("bmc")
-	Logger=logger.Sugar()
+	// Logger = logger.Sugar().Named("bmc")
+	Logger = logger.Sugar()
 	Logger.Infof("Logger initialized with level: %s", logLevel)
 }

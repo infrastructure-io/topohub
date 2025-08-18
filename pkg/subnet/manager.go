@@ -67,7 +67,6 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 
 // update the status
 func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason, errorMsg string, logger *zap.SugaredLogger) (reconcile.Result, error) {
-
 	updated := subnet.DeepCopy()
 	if updated.Status.Conditions == nil {
 		updated.Status.Conditions = []metav1.Condition{}
@@ -213,7 +212,6 @@ func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 		// after all server is started , start to process binding ip event
 		time.Sleep(2 * time.Second)
 		go s.processBindingIpEvents()
-
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -243,7 +241,6 @@ func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, 
 }
 
 func (s *subnetManager) processBindingIpEvents() {
-
 	// handle bindingIP crd events, and configure it in the dhcp server
 	s.log.Infof("begin to process binding ip events")
 	for {

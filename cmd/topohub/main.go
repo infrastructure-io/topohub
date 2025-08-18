@@ -11,7 +11,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -37,14 +40,9 @@ import (
 	redfishstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/redfishstatus"
 	sshstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/sshstatus"
 	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	scheme = runtime.NewScheme()
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -108,7 +106,7 @@ func main() {
 		HealthProbeBindAddress: ":" + *probePort,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port: webhookPortInt,
-			//CertDir: agentConfig.WebhookCertDir,
+			// CertDir: agentConfig.WebhookCertDir,
 		}),
 
 		// Leader Election disabled for single pod deployment
