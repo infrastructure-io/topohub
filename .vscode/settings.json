@@ -1,0 +1,7 @@
+{
+     "go.testFlags": [
+        "-v",
+        "-count=1",
+        "-gcflags=all=-l"
+    ]
+}

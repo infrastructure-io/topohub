@@ -5,7 +5,6 @@ package log
 
 import (
 	"fmt"
-	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -13,19 +12,31 @@ import (
 
 var Logger *zap.SugaredLogger
 
+const (
+	LogLevelDebug LogLevel = "debug"
+	LogLevelInfo  LogLevel = "info"
+	LogLevelError LogLevel = "error"
+)
+
+type LogLevel string
+
+func init() {
+	InitStdoutLogger(LogLevelInfo)
+}
+
 // InitStdoutLogger initializes the global logger with the specified log level
-func InitStdoutLogger(logLevel string) {
+func InitStdoutLogger(logLevel LogLevel) {
 	if logLevel == "" {
-		logLevel = "debug" // default log level
+		logLevel = LogLevelInfo // default log level
 	}
 
 	var level zapcore.Level
-	switch strings.ToLower(logLevel) {
-	case "debug":
+	switch logLevel {
+	case LogLevelDebug:
 		level = zapcore.DebugLevel
-	case "info":
+	case LogLevelInfo:
 		level = zapcore.InfoLevel
-	case "error":
+	case LogLevelError:
 		level = zapcore.ErrorLevel
 	default:
 		level = zapcore.DebugLevel
