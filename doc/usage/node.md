@@ -97,7 +97,9 @@ status:
 ```
 
 > 注意：
-> * redfishstatus 中的 status.info 信息是系统周期性从 BMC 主机获取的，默认周期为 60 秒。您可以通过设置 configmap topohub-feature 中的 redfishStatusUpdateInterval 来调整这个周期
+> * redfishstatus 中的 status.info 信息是系统周期性从 BMC 主机获取的，分为高频和低频两种更新：
+>   * 高频更新：PowerState、BmcStatus 和 healthy 字段，默认周期为 60 秒。您可以通过设置 configmap topohub-feature 中的 redfishStatusBasicUpdateInterval 来调整这个周期
+>   * 低频更新：其他详细信息和日志，默认周期为 86400 秒（1天）。您可以通过设置 configmap topohub-feature 中的 redfishStatusInfoUpdateInterval 来调整这个周期
 
 > * topohub 在连接每个基于 dhcp 接入的主机时，都是会使用 helm 安装 topohub 时的 helm 选项 defaultConfig.redfish.username 和 defaultConfig.redfish.password 来连接 BMC 主机，这些认证信息存储在 secret topohub-redfish-auth 中，您可以通过修改该 secret 来修改默认的认证信息。
 

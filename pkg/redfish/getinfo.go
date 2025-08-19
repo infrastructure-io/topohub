@@ -24,6 +24,41 @@ const (
 	DeviceType_NIC     = "NIC"
 )
 
+func (c *redfishClient) GetBasicStatus() (powerState string, bmcStatus string, err error) {
+	c.logger.Debug("Getting basic status information")
+
+	// get system info
+	service := c.client.Service
+	systems, err := service.Systems()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get systems: %v", err)
+	}
+
+	if len(systems) == 0 {
+		return "", "", fmt.Errorf("no systems found")
+	}
+
+	// get power state
+	powerState = string(systems[0].PowerState)
+
+	// get bmc status
+	managers, err := service.Managers()
+	if err != nil {
+		return powerState, "Unknown", fmt.Errorf("failed to get managers: %v", err)
+	}
+
+	bmcStatus = "Unknown"
+	if len(managers) > 0 {
+		if managers[0].Status.State == "Enabled" && managers[0].Status.Health == "OK" {
+			bmcStatus = "OK"
+		} else {
+			bmcStatus = fmt.Sprintf("%s/%s", managers[0].Status.State, managers[0].Status.Health)
+		}
+	}
+
+	return powerState, bmcStatus, nil
+}
+
 func (c *redfishClient) GetInfo() (map[string]string, error) {
 	result := map[string]string{}
 

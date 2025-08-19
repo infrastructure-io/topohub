@@ -19,6 +19,7 @@ import (
 type RefishClient interface {
 	Power(string) error
 	GetInfo() (map[string]string, error)
+	GetBasicStatus() (powerState string, bmcStatus string, err error)
 	GetLog() ([]*redfish.LogEntry, error)
 	GetSystemsLogEntries() ([]*redfish.LogEntry, error)
 	GetManagersLogEntries() ([]*redfish.LogEntry, error)
