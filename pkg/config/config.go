@@ -42,12 +42,13 @@ type AgentConfig struct {
 	// FeatureConfigPath is the path to the feature configuration file
 	FeatureConfigPath string
 	// Redfish configuration
-	RedfishPort                 int
-	RedfishHttps                bool
-	RedfishSecretName           string
-	RedfishSecretNamespace      string
-	RedfishStatusUpdateInterval int
-	SSHStatusUpdateInterval     int
+	RedfishPort                      int
+	RedfishHttps                     bool
+	RedfishSecretName                string
+	RedfishSecretNamespace           string
+	RedfishStatusBasicUpdateInterval int // update interval for basic status (PowerState, BmcStatus and healthy fields)
+	RedfishStatusInfoUpdateInterval  int // update interval for detailed information and logs
+	SSHStatusUpdateInterval          int
 	// DHCP server configuration
 	DhcpServerInterface string
 	HttpEnabled         bool
@@ -56,15 +57,16 @@ type AgentConfig struct {
 
 // FeatureConfig represents the feature configuration loaded from YAML
 type FeatureConfig struct {
-	RedfishPort                 int    `yaml:"redfishPort"`
-	RedfishHttps                bool   `yaml:"redfishHttps"`
-	RedfishSecretname           string `yaml:"redfishSecretname"`
-	RedfishSecretNamespace      string `yaml:"redfishSecretNamespace"`
-	RedfishStatusUpdateInterval int    `yaml:"redfishStatusUpdateInterval"`
-	SSHStatusUpdateInterval     int    `yaml:"sshStatusUpdateInterval"`
-	DhcpServerInterface         string `yaml:"dhcpServerInterface"`
-	HttpServerPort              string `yaml:"httpServerPort"`
-	HttpServerEnabled           bool   `yaml:"httpServerEnabled"`
+	RedfishPort                      int    `yaml:"redfishPort"`
+	RedfishHttps                     bool   `yaml:"redfishHttps"`
+	RedfishSecretname                string `yaml:"redfishSecretname"`
+	RedfishSecretNamespace           string `yaml:"redfishSecretNamespace"`
+	RedfishStatusBasicUpdateInterval int    `yaml:"redfishStatusBasicUpdateInterval"`
+	RedfishStatusInfoUpdateInterval  int    `yaml:"redfishStatusInfoUpdateInterval"`
+	SSHStatusUpdateInterval          int    `yaml:"sshStatusUpdateInterval"`
+	DhcpServerInterface              string `yaml:"dhcpServerInterface"`
+	HttpServerPort                   string `yaml:"httpServerPort"`
+	HttpServerEnabled                bool   `yaml:"httpServerEnabled"`
 }
 
 // LoadFeatureConfig loads feature configuration from the config file
@@ -86,11 +88,20 @@ func (c *AgentConfig) loadFeatureConfig() error {
 	c.RedfishHttps = featureConfig.RedfishHttps
 	c.RedfishSecretName = featureConfig.RedfishSecretname
 	c.RedfishSecretNamespace = featureConfig.RedfishSecretNamespace
-	c.RedfishStatusUpdateInterval = featureConfig.RedfishStatusUpdateInterval
+	c.RedfishStatusBasicUpdateInterval = featureConfig.RedfishStatusBasicUpdateInterval
+	c.RedfishStatusInfoUpdateInterval = featureConfig.RedfishStatusInfoUpdateInterval
 	c.SSHStatusUpdateInterval = featureConfig.SSHStatusUpdateInterval
 	c.DhcpServerInterface = featureConfig.DhcpServerInterface
 	c.HttpPort = featureConfig.HttpServerPort
 	c.HttpEnabled = featureConfig.HttpServerEnabled
+
+	// 设置默认值
+	if c.RedfishStatusBasicUpdateInterval <= 0 {
+		c.RedfishStatusBasicUpdateInterval = 60 // 默认1分钟
+	}
+	if c.RedfishStatusInfoUpdateInterval <= 0 {
+		c.RedfishStatusInfoUpdateInterval = 86400 // 默认1天
+	}
 
 	// 验证必要的字段
 	if len(c.DhcpServerInterface) == 0 {

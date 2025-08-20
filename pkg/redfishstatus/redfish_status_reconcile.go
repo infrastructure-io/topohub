@@ -267,25 +267,216 @@ func (c *redfishStatusController) getHostEndpoint(redfishStatus *topohubv1beta1.
 	return nil, fmt.Errorf("Failed to get connection info for RedfishStatus %s", redfishStatus.Name)
 }
 
-// UpdateRedfishStatusAtInterval updates redfishstatus spec.info at interval
+// UpdateRedfishStatusAtInterval start two timer tasks, respectively for high and low frequency updates
 func (c *redfishStatusController) UpdateRedfishStatusAtInterval() {
-	interval := time.Duration(c.config.RedfishStatusUpdateInterval) * time.Second
+	// start high frequency update task (update basic status fields every minute)
+	go c.updateHighFrequencyFields()
+
+	// start low frequency update task (update detailed info and logs every day)
+	go c.updateLowFrequencyFields()
+
+	c.log.Infof("Started dual-frequency update tasks for RedfishStatus: high-freq=%vs, low-freq=%vs",
+		c.config.RedfishStatusBasicUpdateInterval, c.config.RedfishStatusInfoUpdateInterval)
+}
+
+// updateHighFrequencyFields update RedfishStatus basic status fields (PowerState, BmcStatus and healthy) at interval
+func (c *redfishStatusController) updateHighFrequencyFields() {
+	interval := time.Duration(c.config.RedfishStatusBasicUpdateInterval) * time.Second
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	c.log.Infof("begin to update all redfishStatus at interval of %v seconds", c.config.RedfishStatusUpdateInterval)
+	c.log.Infof("Begin high-frequency updates (basic status fields) at interval of %v seconds", c.config.RedfishStatusBasicUpdateInterval)
+
+	c.wg.Add(1)
+	defer c.wg.Done()
 
 	for {
 		select {
 		case <-c.stopCh:
-			c.log.Info("Stopping UpdateRedfishStatusAtInterval")
+			c.log.Info("Stopping high-frequency updates")
 			return
 		case <-ticker.C:
-			c.log.Debugf("update all redfishStatus at interval ")
-			if err := c.UpdateRedfishStatusInfoWrapper(nil); err != nil {
-				c.log.Errorf("Failed to update redfish status: %v", err)
+			c.log.Debugf("Running high-frequency updates for all RedfishStatus")
+			if err := c.updateBasicStatusForAll(); err != nil {
+				c.log.Errorf("Failed to update basic status for all RedfishStatus: %v", err)
 			}
 		}
 	}
+}
+
+// updateLowFrequencyFields update RedfishStatus detailed info and logs at interval
+func (c *redfishStatusController) updateLowFrequencyFields() {
+	interval := time.Duration(c.config.RedfishStatusInfoUpdateInterval) * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	c.log.Infof("Begin low-frequency updates (detailed info and logs) at interval of %v seconds", c.config.RedfishStatusInfoUpdateInterval)
+
+	c.wg.Add(1)
+	defer c.wg.Done()
+
+	for {
+		select {
+		case <-c.stopCh:
+			c.log.Info("Stopping low-frequency updates")
+			return
+		case <-ticker.C:
+			c.log.Debugf("Running low-frequency updates for all RedfishStatus")
+			if err := c.UpdateRedfishStatusInfoWrapper(nil); err != nil {
+				c.log.Errorf("Failed to update detailed redfish status: %v", err)
+			}
+		}
+	}
+}
+
+// updateBasicStatusForAll update RedfishStatus basic status fields (PowerState, BmcStatus and healthy)
+func (c *redfishStatusController) updateBasicStatusForAll() error {
+	// get RedfishStatus list
+	var redfishStatusList topohubv1beta1.RedfishStatusList
+	listOpts := []client.ListOption{}
+	if err := c.client.List(context.Background(), &redfishStatusList, listOpts...); err != nil {
+		c.log.Errorf("Failed to list RedfishStatus for basic status update: %v", err)
+		return err
+	}
+
+	// update each RedfishStatus basic status fields (PowerState, BmcStatus and healthy)
+	for _, redfishStatus := range redfishStatusList.Items {
+		c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
+		if err := c.updateBasicStatus(&redfishStatus); err != nil {
+			c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
+		}
+	}
+	return nil
+}
+
+// updateBasicStatus update single RedfishStatus basic status fields (PowerState, BmcStatus and healthy)
+func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1beta1.RedfishStatus) error {
+	name := oldRedfishStatus.Name
+
+	// lock resource to avoid concurrent update
+	c.log.Debugf("Lock for updating basic status of RedfishStatus %s", name)
+	lock := lock.LockManagerInstance.GetLock(name)
+	lock.Lock()
+	defer lock.Unlock()
+
+	// create a copy
+	if oldRedfishStatus.Status == nil {
+		oldRedfishStatus.Status = &topohubv1beta1.RedfishStatusStatus{}
+	}
+	updated := oldRedfishStatus.DeepCopy()
+
+	// get hostEndpoint
+	hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
+	if err != nil {
+		return fmt.Errorf("Failed to get hostEndpoint for RedfishStatus %s: %v", name, err)
+	}
+
+	// get connection data
+	username, password, err := c.getSecretData(
+		*hostEndpoint.Spec.SecretName,
+		*hostEndpoint.Spec.SecretNamespace,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+	}
+	connInfo := &redfishstatusdata.RedfishConnectCon{
+		Username: username,
+		Password: password,
+		IPAddr:   hostEndpoint.Spec.IPAddr,
+		Port:     int(*hostEndpoint.Spec.Port),
+		Http:     !*hostEndpoint.Spec.HTTPS,
+	}
+
+	// create redfish client
+	var healthy bool
+	client, err1 := redfish.NewClient(*connInfo, c.log)
+	if err1 != nil {
+		c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
+		healthy = false
+	} else {
+		healthy = true
+	}
+
+	defer func() {
+		if client != nil {
+			client.Logout()
+		}
+	}()
+
+	// update healthy status
+	updated.Status.Healthy = healthy
+
+	// only update high frequency fields (PowerState and BmcStatus)
+	if healthy {
+		powerState, bmcStatus, err := client.GetBasicStatus()
+		if err != nil {
+			c.log.Warnf("Failed to get basic status for RedfishStatus %s: %v", name, err)
+		} else {
+			// update PowerState
+			if updated.Status.Info == nil {
+				updated.Status.Info = make(map[string]string)
+			}
+			updated.Status.Info["PowerState"] = powerState
+
+			// update BmcStatus
+			oldBmcStatus := ""
+			if oldRedfishStatus.Status.Info != nil {
+				oldBmcStatus = oldRedfishStatus.Status.Info["BmcStatus"]
+			}
+			if oldBmcStatus != bmcStatus {
+				c.log.Infof("BmcStatus changed from %s to %s for RedfishStatus %s",
+					oldBmcStatus, bmcStatus, name)
+				updated.Status.Info["BmcStatus"] = bmcStatus
+			}
+		}
+	}
+
+	// compare and update status
+	if !compareBasicStatus(updated.Status, oldRedfishStatus.Status) {
+		c.log.Debugf("Basic status changed for RedfishStatus %s", name)
+		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
+		if err := c.client.Status().Update(context.Background(), updated); err != nil {
+			return err
+		}
+		c.log.Infof("Successfully updated basic status for RedfishStatus %s", name)
+	}
+
+	return nil
+}
+
+// compareBasicStatus compare RedfishStatusStatus basic status fields (PowerState, BmcStatus and healthy)
+func compareBasicStatus(a, b *topohubv1beta1.RedfishStatusStatus) bool {
+	// if both are nil, they are equal
+	if a == nil && b == nil {
+		return true
+	}
+	// if one of them is nil, they are not equal
+	if a == nil || b == nil {
+		return false
+	}
+
+	// compare healthy status
+	if a.Healthy != b.Healthy {
+		return false
+	}
+
+	// compare PowerState
+	aInfo := a.Info
+	bInfo := b.Info
+	if aInfo == nil && bInfo == nil {
+		return true
+	}
+	if aInfo == nil || bInfo == nil {
+		return false
+	}
+
+	// compare PowerState and BmcStatus
+	if aInfo["PowerState"] != bInfo["PowerState"] {
+		return false
+	}
+	if aInfo["BmcStatus"] != bInfo["BmcStatus"] {
+		return false
+	}
+
+	return true
 }
 
 // Responsible for the first update of redfish information after redfishstatus creation
