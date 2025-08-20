@@ -2,85 +2,43 @@ package main
 
 import (
 	"context"
-	"flag"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/infrastructure-io/topohub/pkg/bindingip"
+	"github.com/infrastructure-io/topohub/cmd/topohub/cmmanager"
+	"github.com/infrastructure-io/topohub/cmd/topohub/options"
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/debug"
-	"github.com/infrastructure-io/topohub/pkg/hostendpoint"
-	"github.com/infrastructure-io/topohub/pkg/hostoperation"
 	"github.com/infrastructure-io/topohub/pkg/httpserver"
-	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
-	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
-	"github.com/infrastructure-io/topohub/pkg/secret"
-	"github.com/infrastructure-io/topohub/pkg/sshstatus"
-	"github.com/infrastructure-io/topohub/pkg/subnet"
-	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
-	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
-	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
-	redfishstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/redfishstatus"
-	sshstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/sshstatus"
-	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
 )
 
-var scheme = runtime.NewScheme()
-
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(topohubv1beta1.AddToScheme(scheme))
-}
-
 func main() {
-	// Parse command line flags
-	probePort := flag.String("health-probe-port", "8081", "The address the probe endpoint binds to.")
-	webhookPort := flag.String("webhook-port", "8082", "The address the probe endpoint binds to.")
-	metricsPort := flag.String("metrics-port", "8083", "The address the metric endpoint binds to.")
-	pyroscopeAddress := flag.String("pyroscope-address", "", "The server address where the pyroscope data is pushed.")
-	pyroscopeTag := flag.String("pyroscope-tag", "", "The tag used for pyroscope.")
-	pprofAddress := flag.String("pprof-address", "", "The address the pprof endpoint binds to.")
-	pprofPort := flag.String("pprof-port", "", "The port used for pprof")
-	flag.Parse()
+	var opts options.TopohubFlags
+	options.ParseFlags(&opts)
+
+	// Create context that can be canceled
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Initialize logger
 	logLevel := os.Getenv("LOG_LEVEL")
 	log.InitStdoutLogger(log.LogLevel(logLevel))
-
-	// start pprof server
-	debug.RunPProf(*pprofAddress, *pprofPort)
-
-	// start pyroscope server
-	debug.RunPyroscope(*pyroscopeAddress, *pyroscopeTag)
-
 	// Set controller-runtime logger
 	ctrl.SetLogger(zap.New())
 
-	log.Logger.Info("Starting TopoHub")
+	log.Logger.Info("Starting topohub")
 
-	// Initialize Kubernetes clients
-	k8sClient, _, err := initClients()
-	if err != nil {
-		log.Logger.Errorf("Failed to initialize clients: %v", err)
-		os.Exit(1)
-	}
+	enableDebugs(&opts)
 
 	// Load agent configuration
 	agentConfig, err := config.LoadAgentConfig()
@@ -88,176 +46,30 @@ func main() {
 		log.Logger.Errorf("Failed to load agent configuration: %v", err)
 		os.Exit(1)
 	}
+	log.Logger.Info("Configuration loaded and validated successfully")
+	log.Logger.Debugf("Configuration details: %+v", agentConfig)
 
-	log.Logger.Info("configuration loaded and validated successfully")
-	log.Logger.Debugf("configuration details: %+v", agentConfig)
-
+	// Initialize Kubernetes clients
+	k8scli, _, err := initClients()
+	if err != nil {
+		log.Logger.Errorf("Failed to initialize clients, err: %v", err)
+		os.Exit(1)
+	}
 	// Create manager
-	webhookPortInt, err := strconv.Atoi(*webhookPort)
+	mgr, err := cmmanager.NewControllerManager(&opts)
 	if err != nil {
-		log.Logger.Errorf("Failed to convert webhook port to int: %v", err)
+		log.Logger.Errorf("Failed to create manager, err: %v", err)
 		os.Exit(1)
 	}
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress: ":" + *metricsPort,
-		},
-		HealthProbeBindAddress: ":" + *probePort,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: webhookPortInt,
-			// CertDir: agentConfig.WebhookCertDir,
-		}),
 
-		// Leader Election disabled for single pod deployment
-		LeaderElection: false,
-	})
+	stopFns, err := cmmanager.RegisterControllers(mgr, k8scli, agentConfig)
 	if err != nil {
-		log.Logger.Errorf("Unable to start manager: %v", err)
+		log.Logger.Error(err)
 		os.Exit(1)
 	}
 
-	// Setup HostEndpoint webhook
-	if err = (&hostendpointwebhook.HostEndpointWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
-		log.Logger.Errorf("unable to create webhook %s: %v", "HostEndpoint", err)
-		os.Exit(1)
-	}
-
-	// Setup HostOperation webhook
-	if err = (&hostoperationwebhook.HostOperationWebhook{}).SetupWebhookWithManager(mgr); err != nil {
-		log.Logger.Errorf("unable to create webhook %s: %v", "HostOperation", err)
-		os.Exit(1)
-	}
-
-	// Setup Subnet webhook
-	if err = (&subnetwebhook.SubnetWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
-		log.Logger.Errorf("unable to create webhook %s: %v", "DhcpSubnet", err)
-		os.Exit(1)
-	}
-
-	// setup binding ip webhook
-	if err = (&bindingipwebhook.BindingIPWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
-		log.Logger.Errorf("unable to create webhook %s: %v", "BindingIp", err)
-		os.Exit(1)
-	}
-
-	// Setup RedfishStatus webhook
-	if err := redfishstatuswebhook.SetupWebhookWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to setup redfishstatus webhook: %v", err)
-		os.Exit(1)
-	}
-
-	// Setup SSHStatus webhook
-	if err = (&sshstatuswebhook.SSHStatusWebhook{}).SetupWebhookWithManager(mgr); err != nil {
-		log.Logger.Errorf("unable to create webhook %s: %v", "SSHStatus", err)
-		os.Exit(1)
-	}
-
-	// todo: subnet manager
-	subnetMgr := subnet.NewSubnetReconciler(*agentConfig, k8sClient)
-	if err = subnetMgr.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Failed to setup subnet manager: %v", err)
-		os.Exit(1)
-	}
-
-	// dhcp client events for redfishstatus
-	addDhcpChan, deleteDhcpChan := subnetMgr.GetDhcpClientEventsForRedfishStatus()
-	addBindingIpChan, deleteBindingIpChan := subnetMgr.GetBindingIpEvents()
-	// Initialize redfishstatus controller
-	redfishStatusCtrl := redfishstatus.NewRedfishStatusController(k8sClient, agentConfig, mgr, addDhcpChan, deleteDhcpChan)
-	if err = redfishStatusCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create redfishstatus controller: %v", err)
-		os.Exit(1)
-	}
-
-	// Initialize secret controller
-	secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
-	if err != nil {
-		log.Logger.Errorf("Failed to create secret controller: %v", err)
-		os.Exit(1)
-	}
-	if err = secretCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create secret controller: %v", err)
-		os.Exit(1)
-	}
-
-	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus
-	hostEndpointCtrl, err := hostendpoint.NewHostEndpointReconciler(mgr, k8sClient, agentConfig)
-	if err != nil {
-		log.Logger.Errorf("Failed to create hostendpoint controller: %v", err)
-		os.Exit(1)
-	}
-	if err = hostEndpointCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create hostendpoint controller: %v", err)
-		os.Exit(1)
-	}
-
-	// Initialize hostoperation controller
-	hostOperationCtrl, err := hostoperation.NewHostOperationController(mgr, agentConfig)
-	if err != nil {
-		log.Logger.Errorf("Failed to create hostoperation controller: %v", err)
-		os.Exit(1)
-	}
-
-	if err = hostOperationCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create hostoperation controller: %v", err)
-		os.Exit(1)
-	}
-
-	// Initialize sshstatus controller
-	sshStatusCtrl := sshstatus.NewSSHStatusController(k8sClient, agentConfig, mgr)
-	if err = sshStatusCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create sshstatus controller: %v", err)
-		os.Exit(1)
-	}
-
-	// Initialize bindingIP controller
-	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig, addBindingIpChan, deleteBindingIpChan)
-	if err != nil {
-		log.Logger.Errorf("Failed to create bindingip controller: %v", err)
-		os.Exit(1)
-	}
-	if err = bindingIPCtrl.SetupWithManager(mgr); err != nil {
-		log.Logger.Errorf("Unable to create bindingip controller: %v", err)
-		os.Exit(1)
-	}
-
-	// start http server for pxe and ztp
-	if agentConfig.HttpEnabled {
-		log.Logger.Info("Http server is enabled for pxe and ztp")
-		httpServer := httpserver.NewHttpServer(*agentConfig)
-		httpServer.Run()
-	} else {
-		log.Logger.Info("Http server is disabled for pxe and ztp")
-	}
-
-	// Add health check
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		log.Logger.Errorf("Unable to set up health check: %v", err)
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		log.Logger.Errorf("Unable to set up ready check: %v", err)
-		os.Exit(1)
-	}
-
-	// Create context that can be canceled
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start manager
-	go func() {
-		log.Logger.Info("Starting manager")
-		if err := mgr.Start(ctx); err != nil {
-			log.Logger.Errorf("Problem running manager: %v", err)
-
-			// Stop DHCP server to remove ip if it was started
-
-			os.Exit(1)
-		}
-	}()
-
-	log.Logger.Info("Manager started successfully (single pod deployment)")
+	cmmanager.StartControllers(ctx, mgr)
+	startHttpServer(agentConfig)
 
 	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -267,21 +79,19 @@ func main() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
+	// Graceful shutdown and health Check
 	for {
 		select {
 		case <-ticker.C:
-			log.Logger.Debug("Agent still running...")
-
+			log.Logger.Debug("Topohub still running...")
 		case sig := <-sigChan:
 			log.Logger.Infof("Received signal %v, shutting down...", sig)
+			// TODO: Stop DHCP server to remove ip if it was started
 
-			// Stop DHCP server to remove ip if it was started
-
-			// Stop redfishstatus controller
-			redfishStatusCtrl.Stop()
-
-			// Stop sshstatus controller
-			sshStatusCtrl.Stop()
+			// Call stop functions that needs to stop the controller
+			for _, stopFn := range stopFns {
+				stopFn()
+			}
 
 			// Cancel context to stop manager
 			cancel()
@@ -291,8 +101,15 @@ func main() {
 	}
 }
 
+func enableDebugs(opts *options.TopohubFlags) {
+	// start pprof server
+	debug.RunPProf(opts.PprofAddress, opts.PprofPort)
+	// start pyroscope server
+	debug.RunPyroscope(opts.PyroscopeAddress, opts.PyroscopeTag)
+}
+
 // initClients initializes Kubernetes clients
-func initClients() (*kubernetes.Clientset, *crdclientset.TopohubV1beta1Client, error) {
+func initClients() (kubernetes.Interface, crdclientset.TopohubV1beta1Interface, error) {
 	var config *rest.Config
 	var err error
 
@@ -316,4 +133,15 @@ func initClients() (*kubernetes.Clientset, *crdclientset.TopohubV1beta1Client, e
 	}
 
 	return clientset, runtimeClient, nil
+}
+
+// start http server for pxe and ztp
+func startHttpServer(agentConfig *config.AgentConfig) {
+	if agentConfig.HttpEnabled {
+		log.Logger.Info("Http server is enabled for pxe and ztp")
+		httpServer := httpserver.NewHttpServer(agentConfig)
+		httpServer.Run()
+	} else {
+		log.Logger.Info("Http server is disabled for pxe and ztp")
+	}
 }
