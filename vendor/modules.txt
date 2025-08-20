@@ -173,6 +173,10 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
+# github.com/panjf2000/ants/v2 v2.11.3
+## explicit; go 1.18
+github.com/panjf2000/ants/v2
+github.com/panjf2000/ants/v2/pkg/sync
 # github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7
 ## explicit; go 1.17
 github.com/petermattis/goid

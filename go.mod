@@ -8,6 +8,7 @@ require (
 	github.com/grafana/pyroscope-go v1.2.1
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
+	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/sasha-s/go-deadlock v0.3.5
 	github.com/stmcginnis/gofish v0.20.0
 	github.com/stretchr/testify v1.10.0
