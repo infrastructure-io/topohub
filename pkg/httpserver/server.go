@@ -27,11 +27,11 @@ type httpServer struct {
 	stopCtxCancel context.CancelFunc
 }
 
-func NewHttpServer(config config.AgentConfig) HttpManager {
+func NewHttpServer(config *config.AgentConfig) HttpManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	server := &httpServer{
-		config:        &config,
+		config:        config,
 		stopCtx:       ctx,
 		stopCtxCancel: cancel,
 		log:           log.Logger.Named("httpserver"),
