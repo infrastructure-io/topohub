@@ -8,12 +8,12 @@ import (
 	"regexp"
 	"strings"
 
-	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
-
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )
 
 // ValidateIPInSubnet checks if an IP address is within a subnet
@@ -481,7 +481,7 @@ func ValidateHostInterfaceSubnet(parent netlink.Link, iface *topohubv1beta1.Inte
 	// Check if subnet IP is in the same subnet as host interface
 	for _, hostAddr := range hostAddrs {
 		// Check if in the same subnet
-		if hostAddr.IPNet.Contains(subnetAddr.IP) {
+		if hostAddr.Contains(subnetAddr.IP) {
 			if iface.VlanID != nil && *iface.VlanID > 0 {
 				return fmt.Errorf("subnet IP %s is in the same subnet as host interface %s (%s), but VLAN ID is not allowed",
 					iface.IPv4, iface.Interface, hostAddr.String())
