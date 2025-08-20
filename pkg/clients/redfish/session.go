@@ -61,14 +61,14 @@ func NewRedfishClientOperations(logger *zap.SugaredLogger) *RedfishClientOperati
 }
 
 // Check implantation
-var _ pool.ClientOperations[RefishClient] = (*RedfishClientOperations)(nil)
+var _ pool.ClientOperations[RedfishClient] = (*RedfishClientOperations)(nil)
 
 type RedfishClientOperations struct {
 	cfg *RedfishSessionConfig
 	log *zap.SugaredLogger
 }
 
-func (o *RedfishClientOperations) NewClient(cfg any) (RefishClient, error) {
+func (o *RedfishClientOperations) NewClient(cfg any) (RedfishClient, error) {
 	redfishCfg, err := verifyRedfishSessionConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (o *RedfishClientOperations) NewClient(cfg any) (RefishClient, error) {
 	return cli, nil
 }
 
-func (o *RedfishClientOperations) Ping(client RefishClient) error {
+func (o *RedfishClientOperations) Ping(client RedfishClient) error {
 	return client.Ping()
 }
 
@@ -89,7 +89,7 @@ func (RedfishClientOperations) Compare(old, new any) bool {
 	return reflect.DeepEqual(old, new)
 }
 
-func (o *RedfishClientOperations) Refresh(oldClient RefishClient, cfg any) (RefishClient, error) {
+func (o *RedfishClientOperations) Refresh(oldClient RedfishClient, cfg any) (RedfishClient, error) {
 	newcli, err := o.NewClient(cfg)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (o *RedfishClientOperations) Refresh(oldClient RefishClient, cfg any) (Refi
 	return newcli, nil
 }
 
-func (RedfishClientOperations) Close(client RefishClient) error {
+func (RedfishClientOperations) Close(client RedfishClient) error {
 	client.Logout()
 	return nil
 }
@@ -118,7 +118,7 @@ func verifyRedfishSessionConfig(cfg any) (*RedfishSessionConfig, error) {
 }
 
 // newRedfishClient creates a new redfish client
-func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (RefishClient, error) {
+func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (RedfishClient, error) {
 	if logger == nil {
 		logger = log.Logger.Named("redfishClient")
 	}

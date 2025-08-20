@@ -7,24 +7,23 @@ import (
 	"fmt"
 	"time"
 
-	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	"github.com/infrastructure-io/topohub/pkg/lock"
-	sshstatusdata "github.com/infrastructure-io/topohub/pkg/sshstatus/data"
-	"github.com/infrastructure-io/topohub/pkg/sshstatus/ssh"
-	"github.com/infrastructure-io/topohub/pkg/tools"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/infrastructure-io/topohub/pkg/clients/pool"
+	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
+	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+	"github.com/infrastructure-io/topohub/pkg/lock"
+	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
-// ------------------------------  update the status.info of the sshstatus
-
-// UpdateSSHStatusInfo updates the SSH status information
 // UpdateSSHStatusInfo updates the SSH status information
 func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.SSHStatus) error {
 	name := oldSSHStatus.Name
+	logger := c.log.With("name", name)
 	// Acquire lock to update SSH status instance
-	c.log.Debugf("lock for updating sshStatus instance %s", name)
+	logger.Debugf("Lock for updating sshStatus")
 	lock := lock.LockManagerInstance.GetLock(name)
 	lock.Lock()
 	defer lock.Unlock()
@@ -38,7 +37,7 @@ func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.S
 	// get hostEndpoint
 	hostEndpoint, err := c.getHostEndpoinBySSHStatus(oldSSHStatus)
 	if err != nil {
-		return fmt.Errorf("Failed to get hostEndpoint for SSHStatus %s: %v", oldSSHStatus.Name, err)
+		return fmt.Errorf("failed to get hostEndpoint with sshStatus %s, err: %v", name, err)
 	}
 
 	// get connection data
@@ -47,49 +46,47 @@ func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.S
 		*hostEndpoint.Spec.SecretNamespace,
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+		return fmt.Errorf("failed to get secret data with HostEndpoint %s, err: %v", hostEndpoint.Name, err)
 	}
-	connInfo := &sshstatusdata.SSHConnectCon{
+
+	var healthy bool
+	cfg := &ssh.SSHSessionConfig{
 		Username:   username,
 		Password:   password,
 		IPAddr:     hostEndpoint.Spec.IPAddr,
 		Port:       int(*hostEndpoint.Spec.Port),
-		Http:       !*hostEndpoint.Spec.HTTPS,
 		SSHKey:     sshKey,
 		SSHKeyAuth: sshKeyAuth,
 	}
-
-	// Create SSH client
-	var healthy bool
-	client, err1 := ssh.NewClient(*connInfo, c.log)
-	if err1 != nil {
-		c.log.Warnf("Failed to create SSH client for SSHStatus %s: %v", name, err1)
-		healthy = false
-	} else {
-		defer client.Close()
-		healthy = client.IsHealthy()
+	session, err := c.sshPool.GetOrCreate(ssh.GenSessionID(cfg), cfg)
+	if err != nil && err != pool.ErrSessionPingFailed {
+		return fmt.Errorf("failed to get SSH session with sshStatus %s, err: %v", name, err)
 	}
-
+	if err == pool.ErrSessionPingFailed {
+		logger.Warnf("Failed to ping SSH session, err: %v", err)
+		healthy = false
+	}
 	// Check health status
 	updated.Status.Healthy = healthy
 	updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 
 	// If healthy, get system information
 	if healthy {
+		client := session.GetClient()
 		infoData, err := client.GetSystemInfo()
 		if err != nil {
-			c.log.Errorf("Failed to get info of SSHStatus %s: %v", name, err)
+			c.log.Errorf("Failed to get info of SSHStatus: %v", err)
 		} else {
 			updated.Status.Info = infoData
 		}
 	}
 
 	// update subnetName from range
-	subnetName, err := tools.GetSubnetNameByIP(connInfo.IPAddr, c.client, c.log)
+	subnetName, err := tools.GetSubnetNameByIP(cfg.IPAddr, c.client, c.log)
 	if err != nil {
-		c.log.Errorf("Failed to update subnet name from range: %v", err)
+		logger.Errorf("Failed to update subnet name from range: %v", err)
 	} else {
-		c.log.Infof("Updated subnetName to %s for SSHStatus %s (IP: %s)", subnetName, name, connInfo.IPAddr)
+		logger.Infof("Updated subnetName to %s for SSHStatus (IP: %s)", subnetName, cfg.IPAddr)
 		updated.Status.Basic.SubnetName = &subnetName
 	}
 
@@ -105,29 +102,29 @@ func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.S
 
 	// If status hasn't changed, don't update
 	if compareSSHStatus(updated.Status, oldSSHStatus.Status, c.log) {
-		c.log.Debugf("SSHStatus %s has no changes, skipping update", name)
+		logger.Debug("SSHStatus has no changes, skipping update")
 		return nil
 	}
 
 	// Update status
-	c.log.Debugf("Updating SSHStatus %s", name)
+	logger.Debug("Updating SSHStatus")
 	if err := c.client.Status().Update(context.Background(), updated); err != nil {
-		if errors.IsConflict(err) {
-			c.log.Debugf("Conflict updating SSHStatus %s, will retry", name)
+		if apierrors.IsConflict(err) {
+			logger.Debug("Conflict updating SSHStatus, will retry")
 			return err
 		}
-		c.log.Errorf("Failed to update SSHStatus %s: %v", name, err)
+		logger.Errorf("Failed to update SSHStatus, err: %v", err)
 		return err
 	}
 
-	c.log.Infof("Successfully updated SSHStatus %s", name)
+	logger.Debug("Successfully updated SSHStatus")
 	return nil
 }
 
 // UpdateSSHStatusInfoWrapper updates the SSH status information for the specified name or all SSH statuses
 func (c *sshStatusController) UpdateSSHStatusInfoWrapper(sshStatus *topohubv1beta1.SSHStatus) error {
 	// get sshStatus list
-	var sshStatusList topohubv1beta1.SSHStatusList = topohubv1beta1.SSHStatusList{}
+	var sshStatusList topohubv1beta1.SSHStatusList
 	modeinfo := ""
 	listOpts := []client.ListOption{}
 	// if status is nil, list all sshStatus
@@ -182,7 +179,7 @@ func (c *sshStatusController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Get sshStatus
 	sshStatus := &topohubv1beta1.SSHStatus{}
 	if err := c.client.Get(ctx, req.NamespacedName, sshStatus); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.Debugf("SSHStatus not found")
 			return ctrl.Result{}, nil
 		}
@@ -225,5 +222,5 @@ func (c *sshStatusController) getHostEndpoinBySSHStatus(sshStatus *topohubv1beta
 		}
 	}
 
-	return nil, fmt.Errorf("Failed to get connection info for SSHStatus %s", sshStatus.Name)
+	return nil, fmt.Errorf("failed to get connection info for SSHStatus %s", sshStatus.Name)
 }

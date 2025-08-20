@@ -146,3 +146,10 @@ func newSSHClient(cfg *SSHSessionConfig) (Client, error) {
 	}
 	return cli, nil
 }
+
+func GenSessionID(cfg *SSHSessionConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s@%s:%d", cfg.Username, cfg.IPAddr, cfg.Port)
+}

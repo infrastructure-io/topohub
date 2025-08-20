@@ -13,6 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
+	"github.com/infrastructure-io/topohub/pkg/clients/pool"
+	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
@@ -35,11 +37,12 @@ type sshStatusController struct {
 	wg         sync.WaitGroup
 	recorder   record.EventRecorder
 	log        *zap.SugaredLogger
+	sshPool    pool.SessionPool[ssh.Client]
 }
 
 // NewSSHStatusController creates a new SSH status controller
 func NewSSHStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager) SSHStatusController {
-	log.Logger.Debugf("Creating new SSHStatus controller")
+	log.Logger.Debug("Creating new SSHStatus controller")
 
 	// Create event recorder
 	eventBroadcaster := record.NewBroadcaster()
@@ -52,10 +55,11 @@ func NewSSHStatusController(kubeClient kubernetes.Interface, config *config.Agen
 		config:     config,
 		stopCh:     make(chan struct{}),
 		recorder:   recorder,
+		sshPool:    ssh.GetSessionPool(),
 		log:        log.Logger.Named("sshstatus"),
 	}
 
-	log.Logger.Debugf("SSHStatus controller created successfully")
+	log.Logger.Debug("SSHStatus controller created successfully")
 	return controller
 }
 
