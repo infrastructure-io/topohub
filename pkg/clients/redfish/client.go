@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type RefishClient interface {
+type RedfishClient interface {
 	Ping() error
 	Power(string) error
 	GetInfo() (map[string]string, error)
@@ -17,7 +17,7 @@ type RefishClient interface {
 }
 
 // Check implantation
-var _ RefishClient = (*redfishClientImpl)(nil)
+var _ RedfishClient = (*redfishClientImpl)(nil)
 
 type redfishClientImpl struct {
 	client *gofish.APIClient

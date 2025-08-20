@@ -13,6 +13,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
+	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/debug"
 	"github.com/infrastructure-io/topohub/pkg/httpserver"
@@ -46,6 +48,10 @@ func main() {
 	}
 	log.Logger.Info("Configuration loaded and validated successfully")
 	log.Logger.Debugf("Configuration details: %+v", agentConfig)
+
+	// Init session pools
+	redfish.InitSessionPool(ctx)
+	ssh.InitSessionPool(ctx)
 
 	// Initialize Kubernetes clients
 	k8scli, _, err := initClients()
