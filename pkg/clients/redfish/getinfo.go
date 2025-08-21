@@ -24,8 +24,42 @@ const (
 	DeviceType_NIC     = "NIC"
 )
 
-func (c *redfishClientImpl) GetInfo() (map[string]string, error) {
+func (c *clientImpl) GetBasicStatus() (powerState string, bmcStatus string, err error) {
+	c.logger.Debug("Getting basic status information")
 
+	// get system info
+	service := c.client.Service
+	systems, err := service.Systems()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get systems: %v", err)
+	}
+
+	if len(systems) == 0 {
+		return "", "", fmt.Errorf("no systems found")
+	}
+
+	// get power state
+	powerState = string(systems[0].PowerState)
+
+	// get bmc status
+	managers, err := service.Managers()
+	if err != nil {
+		return powerState, "Unknown", fmt.Errorf("failed to get managers: %v", err)
+	}
+
+	bmcStatus = "Unknown"
+	if len(managers) > 0 {
+		if managers[0].Status.State == "Enabled" && managers[0].Status.Health == "OK" {
+			bmcStatus = "OK"
+		} else {
+			bmcStatus = fmt.Sprintf("%s/%s", managers[0].Status.State, managers[0].Status.Health)
+		}
+	}
+
+	return powerState, bmcStatus, nil
+}
+
+func (c *clientImpl) GetInfo() (map[string]string, error) {
 	result := map[string]string{}
 
 	// Attached the client to service root
@@ -86,21 +120,22 @@ func (c *redfishClientImpl) GetInfo() (map[string]string, error) {
 	cpus, err := system.Processors()
 	if err != nil {
 		c.logger.Errorf("failed to get processors: %+v", err)
-		return nil, err
+		// Continue without processor details
+		cpus = []*redfish.Processor{}
 	}
 	c.logger.Debugf("cpus amount: %d", len(cpus))
 	for n, cpu := range cpus {
-		//c.logger.Debugf("Cpu[%d]: %+v", n, cpu)
+		// c.logger.Debugf("Cpu[%d]: %+v", n, cpu)
 		setData(result, fmt.Sprintf("Cpu[%d].Manufacturer", n), string(cpu.Manufacturer))
 		setData(result, fmt.Sprintf("Cpu[%d].ProcessorType", n), string(cpu.ProcessorType))
 		setData(result, fmt.Sprintf("Cpu[%d].Health", n), string(cpu.Status.Health))
 		setData(result, fmt.Sprintf("Cpu[%d].State", n), string(cpu.Status.State))
 		// theses fields is dynamic, so we don't set them
-		//setData(result, fmt.Sprintf("Cpu[%d].TotalCores", n), fmt.Sprintf("%d", cpu.TotalCores))
-		//setData(result, fmt.Sprintf("Cpu[%d].TotalThreads", n), fmt.Sprintf("%d", cpu.TotalThreads))
-		//setData(result, fmt.Sprintf("Cpu[%d].MaxSpeedMHz", n), fmt.Sprintf("%.2f", float64(cpu.MaxSpeedMHz)/1000))
-		//setData(result, fmt.Sprintf("Cpu[%d].Architecture", n), string(cpu.ProcessorArchitecture))
-		//setData(result, fmt.Sprintf("Cpu[%d].Model", n), cpu.Model)
+		// setData(result, fmt.Sprintf("Cpu[%d].TotalCores", n), fmt.Sprintf("%d", cpu.TotalCores))
+		// setData(result, fmt.Sprintf("Cpu[%d].TotalThreads", n), fmt.Sprintf("%d", cpu.TotalThreads))
+		// setData(result, fmt.Sprintf("Cpu[%d].MaxSpeedMHz", n), fmt.Sprintf("%.2f", float64(cpu.MaxSpeedMHz)/1000))
+		// setData(result, fmt.Sprintf("Cpu[%d].Architecture", n), string(cpu.ProcessorArchitecture))
+		// setData(result, fmt.Sprintf("Cpu[%d].Model", n), cpu.Model)
 	}
 
 	// memory info
@@ -109,12 +144,13 @@ func (c *redfishClientImpl) GetInfo() (map[string]string, error) {
 	mms, err := system.Memory()
 	if err != nil {
 		c.logger.Errorf("failed to get memory: %+v", err)
-		return nil, err
+		// Continue without memory details
+		mms = []*redfish.Memory{}
 	}
 	setData(result, "MemoryChipsAccount", fmt.Sprintf("%d", len(mms)))
-	//在内存条不变时，有时数组的顺序的变换，导致 后续 redfishstatus 会做无意义的更新，暂时 取消这些信息
+	// 在内存条不变时，有时数组的顺序的变换，导致 后续 redfishstatus 会做无意义的更新，暂时 取消这些信息
 	for n, mm := range mms {
-		//c.logger.Debugf("Memory[%d]: %+v", n, mm)
+		// c.logger.Debugf("Memory[%d]: %+v", n, mm)
 		setData(result, fmt.Sprintf("Memory[%d].Manufacturer", n), string(mm.Manufacturer))
 		setData(result, fmt.Sprintf("Memory[%d].MemoryType", n), string(mm.MemoryType))
 		setData(result, fmt.Sprintf("Memory[%d].MemoryDeviceType", n), string(mm.MemoryDeviceType))
@@ -267,7 +303,7 @@ type ResetActionInfo struct {
 }
 
 // GetSupportedResetTypes 获取支持的ResetTypes类型
-func (c *redfishClientImpl) GetSupportedResetTypes(system *redfish.ComputerSystem) string {
+func (c *clientImpl) GetSupportedResetTypes(system *redfish.ComputerSystem) string {
 	joinStr := ""
 
 	c.logger.Debug("Get reset types from system SupportedResetTypes", "SupportedResetTypes", system.SupportedResetTypes)
@@ -291,7 +327,7 @@ func (c *redfishClientImpl) GetSupportedResetTypes(system *redfish.ComputerSyste
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			c.logger.Warnf("failed to close response body: %v", err)
+			c.logger.Warnf("Failed to close response body: %v", err)
 		}
 	}()
 
@@ -330,7 +366,7 @@ func (c *redfishClientImpl) GetSupportedResetTypes(system *redfish.ComputerSyste
 
 // getStorageInfoWithFallback tries SimpleStorage first, falls back to Storage interface
 // Output format is compatible with SimpleStorage for consistency
-func (c *redfishClientImpl) getStorageInfoWithFallback(system *redfish.ComputerSystem, result map[string]string) error {
+func (c *clientImpl) getStorageInfoWithFallback(system *redfish.ComputerSystem, result map[string]string) error {
 	// Try SimpleStorage first
 	var err error
 	var count int
@@ -355,7 +391,7 @@ func (c *redfishClientImpl) getStorageInfoWithFallback(system *redfish.ComputerS
 }
 
 // getSimpleStorageInfo retrieves storage information using SimpleStorage interface
-func (c *redfishClientImpl) getSimpleStorageInfo(system *redfish.ComputerSystem, result map[string]string) (int, error) {
+func (c *clientImpl) getSimpleStorageInfo(system *redfish.ComputerSystem, result map[string]string) (int, error) {
 	simpleStorages, err := system.SimpleStorages()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get SimpleStorage: %v", err)
@@ -381,7 +417,7 @@ func (c *redfishClientImpl) getSimpleStorageInfo(system *redfish.ComputerSystem,
 
 // getStorageInfoAsSimpleStorage retrieves storage information using Storage interface
 // but keeps the original Storage format as fallback
-func (c *redfishClientImpl) getStorageInfoAsSimpleStorage(system *redfish.ComputerSystem, result map[string]string) (int, error) {
+func (c *clientImpl) getStorageInfoAsSimpleStorage(system *redfish.ComputerSystem, result map[string]string) (int, error) {
 	storages, err := system.Storage()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get Storage: %v", err)

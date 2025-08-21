@@ -47,6 +47,20 @@ func (c *RedfishSessionConfig) VerifyAndSetDefault() error {
 	return nil
 }
 
+func (c *RedfishSessionConfig) URL() string {
+	var scheme string
+	if c.Https {
+		scheme = "https"
+	} else {
+		scheme = "http"
+	}
+	return fmt.Sprintf("%s://%s:%d", scheme, c.IPAddr, c.Port)
+}
+
+func (c *RedfishSessionConfig) SessionID() string {
+	return fmt.Sprintf("%s@%s:%d", c.Username, c.IPAddr, c.Port)
+}
+
 // NewRedfishClientOperations creates a new redfish client operations.
 // Example for create a redfish client session pool.
 //
@@ -61,14 +75,14 @@ func NewRedfishClientOperations(logger *zap.SugaredLogger) *RedfishClientOperati
 }
 
 // Check implantation
-var _ pool.ClientOperations[RedfishClient] = (*RedfishClientOperations)(nil)
+var _ pool.ClientOperations[Client] = (*RedfishClientOperations)(nil)
 
 type RedfishClientOperations struct {
 	cfg *RedfishSessionConfig
 	log *zap.SugaredLogger
 }
 
-func (o *RedfishClientOperations) NewClient(cfg any) (RedfishClient, error) {
+func (o *RedfishClientOperations) NewClient(cfg any) (Client, error) {
 	redfishCfg, err := verifyRedfishSessionConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -81,7 +95,7 @@ func (o *RedfishClientOperations) NewClient(cfg any) (RedfishClient, error) {
 	return cli, nil
 }
 
-func (o *RedfishClientOperations) Ping(client RedfishClient) error {
+func (o *RedfishClientOperations) Ping(client Client) error {
 	return client.Ping()
 }
 
@@ -89,7 +103,7 @@ func (RedfishClientOperations) Compare(old, new any) bool {
 	return reflect.DeepEqual(old, new)
 }
 
-func (o *RedfishClientOperations) Refresh(oldClient RedfishClient, cfg any) (RedfishClient, error) {
+func (o *RedfishClientOperations) Refresh(oldClient Client, cfg any) (Client, error) {
 	newcli, err := o.NewClient(cfg)
 	if err != nil {
 		return nil, err
@@ -98,7 +112,7 @@ func (o *RedfishClientOperations) Refresh(oldClient RedfishClient, cfg any) (Red
 	return newcli, nil
 }
 
-func (RedfishClientOperations) Close(client RedfishClient) error {
+func (RedfishClientOperations) Close(client Client) error {
 	client.Logout()
 	return nil
 }
@@ -118,7 +132,7 @@ func verifyRedfishSessionConfig(cfg any) (*RedfishSessionConfig, error) {
 }
 
 // newRedfishClient creates a new redfish client
-func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (RedfishClient, error) {
+func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (Client, error) {
 	if logger == nil {
 		logger = log.Logger.Named("redfishClient")
 	}
@@ -146,7 +160,7 @@ func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (Red
 	if err != nil {
 		return nil, fmt.Errorf("connect to redfish server failed, err: %+v", err)
 	}
-	return &redfishClientImpl{
+	return &clientImpl{
 		logger: logger,
 		client: client,
 	}, nil

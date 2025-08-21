@@ -58,13 +58,15 @@ func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.S
 		SSHKey:     sshKey,
 		SSHKeyAuth: sshKeyAuth,
 	}
-	session, err := c.sshPool.GetOrCreate(ssh.GenSessionID(cfg), cfg)
+	session, err := c.sshPool.GetOrCreate(cfg.SessionID(), cfg)
 	if err != nil && err != pool.ErrSessionPingFailed {
 		return fmt.Errorf("failed to get SSH session with sshStatus %s, err: %v", name, err)
 	}
 	if err == pool.ErrSessionPingFailed {
 		logger.Warnf("Failed to ping SSH session, err: %v", err)
 		healthy = false
+	} else {
+		healthy = true
 	}
 	// Check health status
 	updated.Status.Healthy = healthy

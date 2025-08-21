@@ -14,14 +14,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/infrastructure-io/topohub/pkg/clients/pool"
+	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
-	"github.com/infrastructure-io/topohub/pkg/redfish"
-	redfishstatusdata "github.com/infrastructure-io/topohub/pkg/redfishstatus/data"
 	"github.com/infrastructure-io/topohub/pkg/tools"
 )
 
-// ------------------------------  update the spec.info of the redfishstatus
+// GenerateEvents generate events for redfishstatus
 func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogEntry, redfishStatusName, lastLogTime string,
 ) (newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg string, totalMsgCount, warningMsgCount, newLogAccount int) {
 	totalMsgCount = 0
@@ -99,7 +99,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 	// get hostEndpoint
 	hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
 	if err != nil {
-		return fmt.Errorf("Failed to get hostEndpoint for RedfishStatus %s: %v", oldRedfishStatus.Name, err)
+		return fmt.Errorf("failed to get hostEndpoint for RedfishStatus %s: %v", oldRedfishStatus.Name, err)
 	}
 
 	// get connection data
@@ -108,22 +108,22 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 		*hostEndpoint.Spec.SecretNamespace,
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+		return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
 	}
-	connInfo := &redfishstatusdata.RedfishConnectCon{
+	sessionCfg := redfish.RedfishSessionConfig{
 		Username: username,
 		Password: password,
 		IPAddr:   hostEndpoint.Spec.IPAddr,
 		Port:     int(*hostEndpoint.Spec.Port),
-		Http:     !*hostEndpoint.Spec.HTTPS,
+		Https:    *hostEndpoint.Spec.HTTPS,
 	}
 
 	// update subnetName from range
-	subnetName, err := tools.GetSubnetNameByIP(connInfo.IPAddr, c.client, c.log)
+	subnetName, err := tools.GetSubnetNameByIP(sessionCfg.IPAddr, c.client, c.log)
 	if err != nil {
 		c.log.Errorf("Failed to update subnet name from range: %v", err)
 	} else {
-		c.log.Infof("Updated subnetName to %s for RedfishStatus %s (IP: %s)", subnetName, name, connInfo.IPAddr)
+		c.log.Infof("Updated subnetName to %s for RedfishStatus %s (IP: %s)", subnetName, name, sessionCfg.IPAddr)
 		updated.Status.Basic.SubnetName = subnetName
 	}
 
@@ -134,31 +134,26 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 
 	// Create redfish client
 	var healthy bool
-	client, err1 := redfish.NewClient(*connInfo, c.log)
-	if err1 != nil {
-		c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
+	session, err := c.redfishPool.GetOrCreate(sessionCfg.SessionID(), sessionCfg)
+	if err != nil && err != pool.ErrSessionPingFailed {
+		return fmt.Errorf("failed to get redfish session for RedfishStatus %s, err: %v", name, err)
+	}
+	if err == pool.ErrSessionPingFailed {
+		c.log.Warnf("Failed to ping redfish session, err: %v", err)
 		healthy = false
 	} else {
 		healthy = true
 	}
 
-	defer func() {
-		if client != nil {
-			client.Logout()
-		}
-	}()
-
-	protocol := "http"
-	if !connInfo.Http {
-		protocol = "https"
-	}
-
-	hasAuth := len(connInfo.Username) > 0 && len(connInfo.Password) > 0
-	c.log.Debugf("try to check redfish with url: %s://%s:%d (auth: %v)", protocol, connInfo.IPAddr, connInfo.Port, hasAuth)
+	hasAuth := len(sessionCfg.Username) > 0 && len(sessionCfg.Password) > 0
+	c.log.Debugf("try to check redfish with url: %s(auth: %v)", sessionCfg.URL(), hasAuth)
 
 	// Update health status
 	updated.Status.Healthy = healthy
+
 	if healthy {
+		client := session.GetClient()
+		// Update info
 		infoData, err := client.GetInfo()
 		if err != nil {
 			c.log.Errorf("Failed to get info of RedfishStatus %s: %v", name, err)
@@ -171,17 +166,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 				updated.Status.Info = make(map[string]string)
 			}
 		}
-	}
-	if !healthy {
-		c.log.Debugf("RedfishStatus %s is not healthy, set info to empty", name)
-		updated.Status.Info = map[string]string{}
-	}
-	if updated.Status.Healthy != oldRedfishStatus.Status.Healthy {
-		c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, oldRedfishStatus.Status.Healthy, healthy)
-	}
-
-	// Update log
-	if healthy {
+		// Update log
 		logEntrys, err := client.GetLog()
 		if err != nil {
 			c.log.Warnf("Failed to get logs of RedfishStatus %s: %v", name, err)
@@ -205,8 +190,14 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 				c.log.Infof("find %d new logs for redfishStatus %s", newLogAccount, name)
 			}
 		}
+	} else { // !healthy
+		c.log.Debugf("RedfishStatus %s is not healthy, set info to empty", name)
+		updated.Status.Info = map[string]string{}
 	}
 
+	if updated.Status.Healthy != oldRedfishStatus.Status.Healthy {
+		c.log.Infof("RedfishStatus %s change from %v to %v , update status", name, oldRedfishStatus.Status.Healthy, healthy)
+	}
 	// Update RedfishStatus
 	if !compareRedfishStatus(updated.Status, oldRedfishStatus.Status, c.log) {
 		c.log.Debugf("status changed, existing: %v, updated: %v", oldRedfishStatus.Status, updated.Status)
@@ -222,8 +213,10 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 // UpdateRedfishStatusInfoWrapper updates redfishstatus spec.info
 func (c *redfishStatusController) UpdateRedfishStatusInfoWrapper(status *topohubv1beta1.RedfishStatus) error {
 	// get redfishStatus list
-	var redfishStatusList topohubv1beta1.RedfishStatusList = topohubv1beta1.RedfishStatusList{}
-	modeinfo := ""
+	var (
+		redfishStatusList topohubv1beta1.RedfishStatusList
+		modeinfo          string
+	)
 	listOpts := []client.ListOption{}
 	// if status is nil, list all redfishStatus
 	if status == nil {
@@ -265,7 +258,7 @@ func (c *redfishStatusController) getHostEndpoint(redfishStatus *topohubv1beta1.
 		}
 	}
 
-	return nil, fmt.Errorf("Failed to get connection info for RedfishStatus %s", redfishStatus.Name)
+	return nil, fmt.Errorf("failed to get connection info for RedfishStatus %s", redfishStatus.Name)
 }
 
 // UpdateRedfishStatusAtInterval start two timer tasks, respectively for high and low frequency updates
@@ -398,7 +391,7 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	// get hostEndpoint
 	hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
 	if err != nil {
-		return fmt.Errorf("Failed to get hostEndpoint for RedfishStatus %s: %v", name, err)
+		return fmt.Errorf("failed to get hostEndpoint for RedfishStatus %s: %v", name, err)
 	}
 
 	// get connection data
@@ -407,37 +400,34 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 		*hostEndpoint.Spec.SecretNamespace,
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+		return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
 	}
-	connInfo := &redfishstatusdata.RedfishConnectCon{
+	sessionCfg := redfish.RedfishSessionConfig{
 		Username: username,
 		Password: password,
 		IPAddr:   hostEndpoint.Spec.IPAddr,
 		Port:     int(*hostEndpoint.Spec.Port),
-		Http:     !*hostEndpoint.Spec.HTTPS,
+		Https:    *hostEndpoint.Spec.HTTPS,
 	}
 
 	// create redfish client
 	var healthy bool
-	client, err1 := redfish.NewClient(*connInfo, c.log)
-	if err1 != nil {
-		c.log.Warnf("Failed to create redfish client for RedfishStatus %s: %v", name, err1)
+	session, err := c.redfishPool.GetOrCreate(sessionCfg.SessionID(), sessionCfg)
+	if err != nil && err != pool.ErrSessionPingFailed {
+		return fmt.Errorf("failed to get redfish session for RedfishStatus %s, err: %v", name, err)
+	}
+	if err == pool.ErrSessionPingFailed {
+		c.log.Warnf("Failed to ping redfish session, err: %v", err)
 		healthy = false
 	} else {
 		healthy = true
 	}
-
-	defer func() {
-		if client != nil {
-			client.Logout()
-		}
-	}()
-
 	// update healthy status
 	updated.Status.Healthy = healthy
 
 	// only update high frequency fields (PowerState and BmcStatus)
 	if healthy {
+		client := session.GetClient()
 		powerState, bmcStatus, err := client.GetBasicStatus()
 		if err != nil {
 			c.log.Warnf("Failed to get basic status for RedfishStatus %s: %v", name, err)

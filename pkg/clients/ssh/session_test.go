@@ -114,6 +114,15 @@ func TestSSHSessionConfigBuildAuthMethod(t *testing.T) {
 	})
 }
 
+func TestSSHSessionConfigSessionID(t *testing.T) {
+	cfg := &SSHSessionConfig{
+		IPAddr:   "127.0.0.1",
+		Port:     22,
+		Username: "root",
+	}
+	assert.Equal(t, "root@127.0.0.1:22", cfg.SessionID())
+}
+
 func TestNewSSHCLientOperations(t *testing.T) {
 	t.Run("default logger", func(t *testing.T) {
 		ops := NewSSHCLientOperations(nil)

@@ -6,9 +6,10 @@ import (
 	"go.uber.org/zap"
 )
 
-type RedfishClient interface {
+type Client interface {
 	Ping() error
 	Power(string) error
+	GetBasicStatus() (powerState string, bmcStatus string, err error)
 	GetInfo() (map[string]string, error)
 	GetLog() ([]*redfish.LogEntry, error)
 	GetSystemsLogEntries() ([]*redfish.LogEntry, error)
@@ -17,20 +18,20 @@ type RedfishClient interface {
 }
 
 // Check implantation
-var _ RedfishClient = (*redfishClientImpl)(nil)
+var _ Client = (*clientImpl)(nil)
 
-type redfishClientImpl struct {
+type clientImpl struct {
 	client *gofish.APIClient
 	logger *zap.SugaredLogger
 }
 
-func (c *redfishClientImpl) Ping() error {
+func (c *clientImpl) Ping() error {
 	_, err := c.client.Service.Systems()
 	return err
 }
 
 // Logout terminates the session with the Redfish service and releases resources
-func (c *redfishClientImpl) Logout() {
+func (c *clientImpl) Logout() {
 	if c != nil && c.client != nil {
 		c.logger.Debug("Logging out from Redfish service")
 		c.client.Logout()

@@ -7,13 +7,13 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
-var redfishSessionPool pool.SessionPool[RedfishClient]
+var redfishSessionPool pool.SessionPool[Client]
 
 func InitSessionPool(ctx context.Context) {
 	redfishSessionPool = pool.NewSessionPool(ctx, NewRedfishClientOperations(nil),
-		pool.WithLogger(log.Logger.Named("sshSessionPool")))
+		pool.WithLogger(log.Logger.Named("redfishSessionPool")))
 }
 
-func GetSessionPool() pool.SessionPool[RedfishClient] {
+func GetSessionPool() pool.SessionPool[Client] {
 	return redfishSessionPool
 }

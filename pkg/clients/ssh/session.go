@@ -57,6 +57,10 @@ func (c *SSHSessionConfig) BuildAuthMethod() (ssh.AuthMethod, error) {
 	return authMethod, nil
 }
 
+func (c *SSHSessionConfig) SessionID() string {
+	return fmt.Sprintf("%s@%s:%d", c.Username, c.IPAddr, c.Port)
+}
+
 // NewSSHCLientOperations creates a new ssh client operations.
 // Example for create a ssh client session pool.
 //
@@ -145,11 +149,4 @@ func newSSHClient(cfg *SSHSessionConfig) (Client, error) {
 		return nil, fmt.Errorf("create ssh client failed: %w", err)
 	}
 	return cli, nil
-}
-
-func GenSessionID(cfg *SSHSessionConfig) string {
-	if cfg == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s@%s:%d", cfg.Username, cfg.IPAddr, cfg.Port)
 }

@@ -11,7 +11,7 @@ import (
 // https://github.com/DMTF/Redfish-Tacklebox/blob/main/scripts/rf_power_reset.py
 // post request to systems
 
-func (c *redfishClientImpl) Power(bootCmd string) error {
+func (c *clientImpl) Power(bootCmd string) error {
 	// Attached the client to service root
 	service := c.client.Service
 	// Query the computer systems
@@ -88,7 +88,7 @@ func (c *redfishClientImpl) Power(bootCmd string) error {
 }
 
 // Lenovo machine Redifish requires an ETag,when the ETag does not match, it may report an error, so add a retry
-func (c *redfishClientImpl) pxeRebootWithRetry(system *redfish.ComputerSystem, bootOverride redfish.Boot, resetTypes string) error {
+func (c *clientImpl) pxeRebootWithRetry(system *redfish.ComputerSystem, bootOverride redfish.Boot, resetTypes string) error {
 	// Maximum retry attempts
 	maxRetries := 3
 	var lastErr error
