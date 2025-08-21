@@ -71,14 +71,49 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return reconcile.Result{}, err
 	}
 
-	if _, ok := secret.Data["username"]; !ok {
+	username, ok := secret.Data["username"]
+	if !ok {
+		logger.Debugf("Secret %s/%s does not contain username field, ignoring", secret.Namespace, secret.Name)
 		return reconcile.Result{}, nil
 	}
-	if _, ok := secret.Data["password"]; !ok {
+	password, ok := secret.Data["password"]
+	if !ok {
+		logger.Debugf("Secret %s/%s does not contain password field, ignoring", secret.Namespace, secret.Name)
 		return reconcile.Result{}, nil
 	}
 
-	logger.Debugf("retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
+	logger.Debugf("Retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
+
+	// 获取所有 HostEndpoint 资源
+	hostEndpoints := &topohubv1beta1.HostEndpointList{}
+	if err := r.client.List(ctx, hostEndpoints); err != nil {
+		logger.Errorf("Failed to list HostEndpoints: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	// 筛选出使用变更 Secret 的 HostEndpoint
+	affectedCount := 0
+	for _, hostEndpoint := range hostEndpoints.Items {
+		// 检查 HostEndpoint 是否使用了这个 Secret
+		if hostEndpoint.Spec.SecretName != nil && hostEndpoint.Spec.SecretNamespace != nil &&
+			*hostEndpoint.Spec.SecretName == secret.Name && *hostEndpoint.Spec.SecretNamespace == secret.Namespace {
+
+			// 调用 redfishStatusController.UpdateSecret 更新连接缓存
+			logger.Infof("Updating connection cache for HostEndpoint %s using Secret %s/%s",
+				hostEndpoint.Name, secret.Namespace, secret.Name)
+
+			r.redfishStatusController.UpdateSecret(
+				secret.Name,
+				secret.Namespace,
+				string(username),
+				string(password),
+			)
+			affectedCount++
+		}
+	}
+
+	logger.Infof("Updated connection cache for %d HostEndpoints using Secret %s/%s",
+		affectedCount, secret.Namespace, secret.Name)
 
 	return reconcile.Result{}, nil
 }

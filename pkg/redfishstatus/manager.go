@@ -1,6 +1,7 @@
 package redfishstatus
 
 import (
+	"context"
 	"sync"
 
 	"github.com/panjf2000/ants/v2"
@@ -113,4 +114,41 @@ func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (c *redfishStatusController) UpdateSecret(secretName, secretNamespace, username, password string) {
+	c.log.Infof("Updating connection cache for Secret %s/%s", secretNamespace, secretName)
+
+	// 获取所有 RedfishStatus 资源
+	var redfishStatusList topohubv1beta1.RedfishStatusList
+	if err := c.client.List(context.Background(), &redfishStatusList); err != nil {
+		c.log.Errorf("Failed to list RedfishStatus resources: %v", err)
+		return
+	}
+
+	// 遍历所有 RedfishStatus，找到与指定 Secret 关联的资源
+	for _, redfishStatus := range redfishStatusList.Items {
+		// 获取关联的 HostEndpoint
+		hostEndpoint, err := c.getHostEndpoint(&redfishStatus)
+		if err != nil {
+			c.log.Debugf("Failed to get HostEndpoint for RedfishStatus %s: %v", redfishStatus.Name, err)
+			continue
+		}
+
+		// 检查 HostEndpoint 是否使用了这个 Secret
+		if hostEndpoint.Spec.SecretName != nil && hostEndpoint.Spec.SecretNamespace != nil &&
+			*hostEndpoint.Spec.SecretName == secretName && *hostEndpoint.Spec.SecretNamespace == secretNamespace {
+
+			c.log.Infof("Found RedfishStatus %s using Secret %s/%s, refreshing connection",
+				redfishStatus.Name, secretNamespace, secretName)
+
+			// 更新 RedfishStatus 状态以触发重新连接
+			// 注意：这里我们不直接操作连接缓存，而是通过触发状态更新来间接刷新连接
+			// 这样可以复用现有的状态更新逻辑，确保一致性
+			go func(name string) {
+				if err := c.updateBasicStatus(&redfishStatus); err != nil {
+					c.log.Warnf("Failed to refresh connection for RedfishStatus %s: %v", name, err)
+				} else {
+					c.log.Infof("Successfully refreshed connection for RedfishStatus %s", name)
+				}
+			}(redfishStatus.Name)
+		}
+	}
 }
