@@ -74,6 +74,7 @@ func (c *sessionPoolImpl[T]) getSession(sessionID string, cfg any) (Session[T], 
 	c.RLock()
 	defer c.RUnlock()
 
+	c.log.Debugf("get session %s", sessionID)
 	session, ok := c.cache[sessionID]
 	if !ok || session == nil {
 		return nil, nil
@@ -105,6 +106,7 @@ func (c *sessionPoolImpl[T]) createSession(sessionID string, cfg any) (Session[T
 	c.Lock()
 	defer c.Unlock()
 
+	c.log.Debugf("create session %s", sessionID)
 	// Double check
 	if session, ok := c.cache[sessionID]; ok {
 		if err := session.Ping(); err != nil {

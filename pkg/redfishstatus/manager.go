@@ -5,7 +5,6 @@ import (
 
 	"github.com/panjf2000/ants/v2"
 	"go.uber.org/zap"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -14,6 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
+	"github.com/infrastructure-io/topohub/pkg/clients/pool"
+	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
 	"github.com/infrastructure-io/topohub/pkg/config"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
@@ -33,15 +34,15 @@ type redfishStatusController struct {
 	// config holds the agent configuration, which is used to
 	// determine the cluster agent name and the path to the feature
 	// configuration directory.
-	config     *config.AgentConfig
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
-	recorder   record.EventRecorder
-	addChan    chan dhcpserver.DhcpClientInfo
-	deleteChan chan dhcpserver.DhcpClientInfo
-	antsPool   *ants.Pool
-
-	log *zap.SugaredLogger
+	config      *config.AgentConfig
+	stopCh      chan struct{}
+	wg          sync.WaitGroup
+	recorder    record.EventRecorder
+	addChan     chan dhcpserver.DhcpClientInfo
+	deleteChan  chan dhcpserver.DhcpClientInfo
+	antsPool    *ants.Pool
+	redfishPool pool.SessionPool[redfish.Client]
+	log         *zap.SugaredLogger
 }
 
 func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager, addChan, deleteChan chan dhcpserver.DhcpClientInfo) RedfishStatusController {
@@ -59,15 +60,16 @@ func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.
 	}
 
 	controller := &redfishStatusController{
-		client:     mgr.GetClient(),
-		kubeClient: kubeClient,
-		config:     config,
-		addChan:    addChan,
-		deleteChan: deleteChan,
-		stopCh:     make(chan struct{}),
-		recorder:   recorder,
-		antsPool:   antsPool,
-		log:        log.Logger.Named("redfishstatus"),
+		client:      mgr.GetClient(),
+		kubeClient:  kubeClient,
+		config:      config,
+		addChan:     addChan,
+		deleteChan:  deleteChan,
+		stopCh:      make(chan struct{}),
+		recorder:    recorder,
+		antsPool:    antsPool,
+		redfishPool: redfish.GetSessionPool(),
+		log:         log.Logger.Named("redfishstatus"),
 	}
 
 	log.Logger.Debugf("RedfishStatus controller created successfully")

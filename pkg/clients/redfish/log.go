@@ -8,7 +8,7 @@ import (
 )
 
 // redfish url: /redfish/v1/Systems/Self/LogServices
-func (c *redfishClientImpl) GetLog() ([]*redfish.LogEntry, error) {
+func (c *clientImpl) GetLog() ([]*redfish.LogEntry, error) {
 	result := []*redfish.LogEntry{}
 
 	// Attached the client to service root
@@ -66,8 +66,7 @@ func (c *redfishClientImpl) GetLog() ([]*redfish.LogEntry, error) {
 }
 
 // redfish url: /redfish/v1/Managers/Self/LogServices
-func (c *redfishClientImpl) GetManagerLog() ([]*redfish.LogEntry, error) {
-
+func (c *clientImpl) GetManagerLog() ([]*redfish.LogEntry, error) {
 	result := []*redfish.LogEntry{}
 
 	// Attached the client to service root
@@ -116,7 +115,7 @@ func (c *redfishClientImpl) GetManagerLog() ([]*redfish.LogEntry, error) {
 }
 
 // GetSystemsLogEntries 获取系统日志条目
-func (c *redfishClientImpl) GetSystemsLogEntries() ([]*redfish.LogEntry, error) {
+func (c *clientImpl) GetSystemsLogEntries() ([]*redfish.LogEntry, error) {
 	result := []*redfish.LogEntry{}
 
 	// Attached the client to service root
@@ -163,6 +162,6 @@ func (c *redfishClientImpl) GetSystemsLogEntries() ([]*redfish.LogEntry, error) 
 }
 
 // GetManagersLogEntries 获取管理器日志条目
-func (c *redfishClientImpl) GetManagersLogEntries() ([]*redfish.LogEntry, error) {
+func (c *clientImpl) GetManagersLogEntries() ([]*redfish.LogEntry, error) {
 	return c.GetManagerLog()
 }

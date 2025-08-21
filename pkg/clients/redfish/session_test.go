@@ -101,6 +101,47 @@ func TestRedfishSessionConfigVerifyAndSetDefault(t *testing.T) {
 	}
 }
 
+func TestRedfishSessionConfigURL(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  *RedfishSessionConfig
+		want string
+	}{
+		{
+			name: "http",
+			cfg: &RedfishSessionConfig{
+				IPAddr: "127.0.0.1",
+				Https:  false,
+				Port:   80,
+			},
+			want: "http://127.0.0.1:80",
+		},
+		{
+			name: "https",
+			cfg: &RedfishSessionConfig{
+				IPAddr: "127.0.0.1",
+				Https:  true,
+				Port:   443,
+			},
+			want: "https://127.0.0.1:443",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.want, c.cfg.URL())
+		})
+	}
+}
+
+func TestSessionID(t *testing.T) {
+	cfg := RedfishSessionConfig{
+		IPAddr:   "127.0.0.1",
+		Username: "root",
+		Port:     80,
+	}
+	assert.Equal(t, "root@127.0.0.1:80", cfg.SessionID())
+}
+
 func TestNewRedfishClientOperations(t *testing.T) {
 	t.Run("default logger", func(t *testing.T) {
 		ops := NewRedfishClientOperations(nil)
