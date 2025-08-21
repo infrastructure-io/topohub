@@ -37,6 +37,12 @@ gofmt:
 	gofumpt -extra -w cmd $(FORMAT_PKG_SUBS)
 
 
+.PHONY: update-mocks
+update-mocks:
+	go install tool
+	go tool mockgen -package=kube -destination=pkg/mocks/kube/controller_runtime_manager.go sigs.k8s.io/controller-runtime/pkg/manager Manager
+
+
 # Helm chart
 #================== chart
 ROOT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))

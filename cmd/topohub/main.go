@@ -7,20 +7,17 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/infrastructure-io/topohub/cmd/topohub/cmmanager"
 	"github.com/infrastructure-io/topohub/cmd/topohub/options"
+	"github.com/infrastructure-io/topohub/pkg/clients/kube"
 	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
 	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
 	"github.com/infrastructure-io/topohub/pkg/config"
 	"github.com/infrastructure-io/topohub/pkg/debug"
 	"github.com/infrastructure-io/topohub/pkg/httpserver"
-	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 )
 
@@ -56,8 +53,7 @@ func main() {
 	ssh.InitSessionPool(ctx)
 
 	// Initialize Kubernetes clients
-	k8scli, _, err := initClients()
-	if err != nil {
+	if err := kube.InitClients(); err != nil {
 		log.Logger.Errorf("Failed to initialize clients, err: %v", err)
 		os.Exit(1)
 	}
@@ -68,7 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	stopFns, err := cmmanager.RegisterControllers(mgr, k8scli, agentConfig)
+	stopFns, err := cmmanager.RegisterControllers(mgr, kube.GetKubeClient(), agentConfig)
 	if err != nil {
 		log.Logger.Error(err)
 		os.Exit(1)
@@ -112,33 +108,6 @@ func enableDebugs(opts *options.TopohubFlags) {
 	debug.RunPProf(opts.PprofAddress, opts.PprofPort)
 	// start pyroscope server
 	debug.RunPyroscope(opts.PyroscopeAddress, opts.PyroscopeTag)
-}
-
-// initClients initializes Kubernetes clients
-func initClients() (kubernetes.Interface, crdclientset.TopohubV1beta1Interface, error) {
-	var config *rest.Config
-	var err error
-
-	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
-		config, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	runtimeClient, err := crdclientset.NewForConfig(config)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return clientset, runtimeClient, nil
 }
 
 // start http server for pxe and ztp

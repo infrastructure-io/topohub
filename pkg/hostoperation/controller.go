@@ -91,7 +91,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 
-		sessionCfg := redfish.RedfishSessionConfig{
+		sessionCfg := &redfish.RedfishSessionConfig{
 			Username: username,
 			Password: password,
 			IPAddr:   hostEndpoint.Spec.IPAddr,

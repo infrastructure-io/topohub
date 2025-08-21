@@ -1,37 +1,14 @@
 package sshstatus
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )
-
-// getSecretData retrieves username and password from Secret
-func (c *sshStatusController) getSecretData(secretName, secretNamespace string) (string, string, string, bool, error) {
-	c.log.Debugf("Attempting to get secret data for %s/%s", secretNamespace, secretName)
-
-	c.log.Debugf("Fetching secret from Kubernetes API for %s/%s", secretNamespace, secretName)
-	// Get authentication information from Secret
-	secret, err := c.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-	if err != nil {
-		c.log.Errorf("Failed to get secret %s/%s: %v", secretNamespace, secretName, err)
-		return "", "", "", false, err
-	}
-
-	username := string(secret.Data["username"])
-	password := string(secret.Data["password"])
-	sshKey := string(secret.Data["ssh-privatekey"])
-	sshKeyAuth := sshKey != ""
-
-	c.log.Debugf("Successfully retrieved secret data for %s/%s", secretNamespace, secretName)
-	return username, password, sshKey, sshKeyAuth, nil
-}
 
 // compareSSHStatus checks if two SSHStatus are equal, ignoring pointer issues
 func compareSSHStatus(a, b *topohubv1beta1.SSHStatusStatus, logger *zap.SugaredLogger) bool {

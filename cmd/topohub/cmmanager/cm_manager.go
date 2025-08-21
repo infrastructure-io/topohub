@@ -117,10 +117,7 @@ func RegisterControllers(mgr manager.Manager, k8scli kubernetes.Interface, agent
 	}
 
 	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus
-	hostEndpointCtrl, err := hostendpoint.NewHostEndpointReconciler(mgr, k8scli, agentConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create hostendpoint controller, err: %v", err)
-	}
+	hostEndpointCtrl := hostendpoint.NewHostEndpointReconciler(mgr)
 	if err := hostEndpointCtrl.SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("unable to create hostendpoint controller, err: %v", err)
 	}

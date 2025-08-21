@@ -1,33 +1,13 @@
 package redfishstatus
 
 import (
-	"context"
 	"reflect"
 	"strings"
 
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"go.uber.org/zap"
 )
-
-// getSecretData 从 Secret 中获取用户名和密码
-func (c *redfishStatusController) getSecretData(secretName, secretNamespace string) (string, string, error) {
-	c.log.Debugf("Attempting to get secret data for %s/%s", secretNamespace, secretName)
-
-	c.log.Debugf("Fetching secret from Kubernetes API for %s/%s", secretNamespace, secretName)
-	// 如果不同，从 Secret 中获取认证信息
-	secret, err := c.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-	if err != nil {
-		c.log.Errorf("Failed to get secret %s/%s: %v", secretNamespace, secretName, err)
-		return "", "", err
-	}
-
-	username := string(secret.Data["username"])
-	password := string(secret.Data["password"])
-	c.log.Debugf("Successfully retrieved secret data for %s/%s", secretNamespace, secretName)
-	return username, password, nil
-}
 
 func formatRedfishStatusName(ip string) string {
 	return strings.ReplaceAll(ip, ".", "-")

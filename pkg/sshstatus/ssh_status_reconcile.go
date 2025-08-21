@@ -11,6 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/infrastructure-io/topohub/pkg/clients/kube"
 	"github.com/infrastructure-io/topohub/pkg/clients/pool"
 	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -41,22 +42,20 @@ func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.S
 	}
 
 	// get connection data
-	username, password, sshKey, sshKeyAuth, err := c.getSecretData(
-		*hostEndpoint.Spec.SecretName,
-		*hostEndpoint.Spec.SecretNamespace,
-	)
+	auth, err := kube.GetAuthenticationSecret(context.Background(), c.cacheReader,
+		*hostEndpoint.Spec.SecretName, *hostEndpoint.Spec.SecretNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to get secret data with HostEndpoint %s, err: %v", hostEndpoint.Name, err)
 	}
 
 	var healthy bool
 	cfg := &ssh.SSHSessionConfig{
-		Username:   username,
-		Password:   password,
+		Username:   auth.Username,
+		Password:   auth.Password,
 		IPAddr:     hostEndpoint.Spec.IPAddr,
 		Port:       int(*hostEndpoint.Spec.Port),
-		SSHKey:     sshKey,
-		SSHKeyAuth: sshKeyAuth,
+		SSHKey:     auth.SSHKey,
+		SSHKeyAuth: auth.SSHKey != "",
 	}
 	session, err := c.sshPool.GetOrCreate(cfg.SessionID(), cfg)
 	if err != nil && err != pool.ErrSessionPingFailed {
