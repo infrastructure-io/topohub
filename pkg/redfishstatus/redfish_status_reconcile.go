@@ -5,6 +5,7 @@ package redfishstatus
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	gofishredfish "github.com/stmcginnis/gofish/redfish"
@@ -328,6 +329,7 @@ func (c *redfishStatusController) updateLowFrequencyFields() {
 }
 
 // updateBasicStatusForAll update RedfishStatus basic status fields (PowerState, BmcStatus and healthy)
+// using the shared ants goroutine pool
 func (c *redfishStatusController) updateBasicStatusForAll() error {
 	// get RedfishStatus list
 	var redfishStatusList topohubv1beta1.RedfishStatusList
@@ -337,13 +339,43 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 		return err
 	}
 
-	// update each RedfishStatus basic status fields (PowerState, BmcStatus and healthy)
-	for _, redfishStatus := range redfishStatusList.Items {
-		c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
-		if err := c.updateBasicStatus(&redfishStatus); err != nil {
-			c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
+	// Create a wait group to wait for all goroutines to finish
+	var wg sync.WaitGroup
+
+	// Use the shared ants pool
+	if c.antsPool == nil {
+		return fmt.Errorf("shared ants pool is not available")
+	}
+
+	p := c.antsPool
+
+	// Update each RedfishStatus basic status fields (PowerState, BmcStatus and healthy) concurrently
+	for i := range redfishStatusList.Items {
+		// Important: Create a new variable in the loop to avoid closure problems
+		redfishStatus := redfishStatusList.Items[i]
+		wg.Add(1)
+
+		// Submit task to ants pool
+		err := p.Submit(func() {
+			defer wg.Done()
+			c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
+			if err := c.updateBasicStatus(&redfishStatus); err != nil {
+				c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
+			}
+		})
+
+		if err != nil {
+			c.log.Errorf("Failed to submit task for RedfishStatus %s: %v", redfishStatus.Name, err)
+			wg.Done() // Reduce counter if submission failed
 		}
 	}
+
+	// Wait for all tasks to complete
+	wg.Wait()
+
+	// Report pool statistics
+	c.log.Infof("RedfishStatus update completed. Pool stats: running=%d, free=%d, capacity=%d",
+		p.Running(), p.Free(), p.Cap())
 	return nil
 }
 

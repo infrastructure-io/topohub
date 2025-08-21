@@ -3,6 +3,7 @@ package redfishstatus
 import (
 	"sync"
 
+	"github.com/panjf2000/ants/v2"
 	"go.uber.org/zap"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ type redfishStatusController struct {
 	recorder   record.EventRecorder
 	addChan    chan dhcpserver.DhcpClientInfo
 	deleteChan chan dhcpserver.DhcpClientInfo
+	antsPool   *ants.Pool
 
 	log *zap.SugaredLogger
 }
@@ -50,6 +52,12 @@ func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(mgr.GetScheme(), corev1.EventSource{Component: "bmc-controller"})
 
+	// Create ants goroutine pool with capacity of 100 workers
+	antsPool, err := ants.NewPool(100)
+	if err != nil {
+		log.Logger.Errorf("Failed to create goroutine pool: %v", err)
+	}
+
 	controller := &redfishStatusController{
 		client:     mgr.GetClient(),
 		kubeClient: kubeClient,
@@ -58,6 +66,7 @@ func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.
 		deleteChan: deleteChan,
 		stopCh:     make(chan struct{}),
 		recorder:   recorder,
+		antsPool:   antsPool,
 		log:        log.Logger.Named("redfishstatus"),
 	}
 
@@ -69,6 +78,14 @@ func (c *redfishStatusController) Stop() {
 	c.log.Info("Stopping RedfishStatus controller")
 	close(c.stopCh)
 	c.wg.Wait()
+
+	// Release the ants pool if it exists
+	if c.antsPool != nil {
+		c.log.Info("Releasing ants goroutine pool")
+		c.antsPool.Release()
+		c.antsPool = nil
+	}
+
 	c.log.Info("RedfishStatus controller stopped successfully")
 }
 
