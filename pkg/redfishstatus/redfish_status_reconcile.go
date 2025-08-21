@@ -374,7 +374,7 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 	wg.Wait()
 
 	// Report pool statistics
-	c.log.Infof("RedfishStatus update completed. Pool stats: running=%d, free=%d, capacity=%d",
+	c.log.Debugf("RedfishStatus update completed. Pool stats: running=%d, free=%d, capacity=%d",
 		p.Running(), p.Free(), p.Cap())
 	return nil
 }
