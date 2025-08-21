@@ -108,7 +108,7 @@ func RegisterControllers(mgr manager.Manager, k8scli kubernetes.Interface, agent
 	stopFns = append(stopFns, redfishStatusCtrl.Stop)
 
 	// Initialize secret controller
-	secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
+	secretCtrl, err := secret.NewSecretReconciler(mgr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret controller, err: %v", err)
 	}

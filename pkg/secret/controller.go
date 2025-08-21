@@ -5,32 +5,33 @@ import (
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/infrastructure-io/topohub/pkg/config"
+	"github.com/infrastructure-io/topohub/pkg/clients/kube"
+	"github.com/infrastructure-io/topohub/pkg/hostendpoint/handler"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
-	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
 )
 
 type SecretReconciler struct {
-	client                  client.Client
-	config                  *config.AgentConfig
-	redfishStatusController redfishstatus.RedfishStatusController
-	log                     *zap.SugaredLogger
+	client   client.Client
+	log      *zap.SugaredLogger
+	handlers map[string]handler.HostEndpointHandler // handlers for different endpoint types
 }
 
-// NewHostEndpointReconciler creates a new HostEndpoint reconciler
-func NewSecretReconciler(mgr ctrl.Manager, config *config.AgentConfig, redfishStatusController redfishstatus.RedfishStatusController) (*SecretReconciler, error) {
+// NewSecretReconciler creates a new Secret reconciler
+func NewSecretReconciler(mgr ctrl.Manager) (*SecretReconciler, error) {
+	// Get global handler registry
+	handlers := handler.GetHandlerRegistry(mgr.GetClient(), mgr.GetCache())
+
 	return &SecretReconciler{
-		client:                  mgr.GetClient(),
-		config:                  config,
-		redfishStatusController: redfishStatusController,
-		log:                     log.Logger.Named("secretReconciler"),
+		client:   mgr.GetClient(),
+		log:      log.Logger.Named("secretReconciler"),
+		handlers: handlers,
 	}, nil
 }
 
@@ -55,7 +56,7 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// Reconcile handles the reconciliation of HostEndpoint objects
+// Reconcile handles the reconciliation of Secret objects
 func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := r.log.With("secret", req.Name)
 
@@ -63,12 +64,12 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	secret := &corev1.Secret{}
 	if err := r.client.Get(ctx, req.NamespacedName, secret); err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			logger.Debugf("Secret not found, ignoring")
 			return reconcile.Result{}, nil
 		}
 		logger.Error(err, "Failed to get Secret")
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	username, ok := secret.Data["username"]
@@ -84,36 +85,51 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	logger.Debugf("Retrieved new secret data for %s/%s", secret.Namespace, secret.Name)
 
-	// 获取所有 HostEndpoint 资源
+	// get all HostEndpoint resources
 	hostEndpoints := &topohubv1beta1.HostEndpointList{}
 	if err := r.client.List(ctx, hostEndpoints); err != nil {
-		logger.Errorf("Failed to list HostEndpoints: %v", err)
-		return reconcile.Result{}, err
+		logger.Errorf("failed to list HostEndpoints: %v", err)
+		return reconcile.Result{}, nil
 	}
 
-	// 筛选出使用变更 Secret 的 HostEndpoint
-	affectedCount := 0
-	for _, hostEndpoint := range hostEndpoints.Items {
-		// 检查 HostEndpoint 是否使用了这个 Secret
+	// filter out HostEndpoint that uses this secret and process them
+	for i := range hostEndpoints.Items {
+		hostEndpoint := hostEndpoints.Items[i]
+
+		// check if HostEndpoint uses this secret
 		if hostEndpoint.Spec.SecretName != nil && hostEndpoint.Spec.SecretNamespace != nil &&
 			*hostEndpoint.Spec.SecretName == secret.Name && *hostEndpoint.Spec.SecretNamespace == secret.Namespace {
 
-			// 调用 redfishStatusController.UpdateSecret 更新连接缓存
-			logger.Infof("Updating connection cache for HostEndpoint %s using Secret %s/%s",
-				hostEndpoint.Name, secret.Namespace, secret.Name)
+			// refresh session pool cache based on HostEndpoint type
+			logger.Infof("refreshing session for HostEndpoint %s (type: %s) using Secret %s/%s",
+				hostEndpoint.Name, hostEndpoint.Spec.Type, secret.Namespace, secret.Name)
 
-			r.redfishStatusController.UpdateSecret(
-				secret.Name,
-				secret.Namespace,
-				string(username),
-				string(password),
-			)
-			affectedCount++
+			// Create authentication secret from the data
+			auth := &kube.AuthenticationSecret{
+				Username: string(username),
+				Password: string(password),
+			}
+
+			// Get the appropriate handler for this endpoint type
+			if hostEndpoint.Spec.Type == nil {
+				logger.Errorf("HostEndpoint %s has no type specified", hostEndpoint.Name)
+				continue
+			}
+
+			h := r.handlers[*hostEndpoint.Spec.Type]
+			if h == nil {
+				logger.Errorf("no handler found for HostEndpoint type %s", *hostEndpoint.Spec.Type)
+				continue
+			}
+
+			// Use the handler to refresh the session (now in serial)
+			if err := h.RefreshSession(context.Background(), &hostEndpoint, auth, logger); err != nil {
+				logger.Errorf("failed to refresh session for HostEndpoint %s: %v", hostEndpoint.Name, err)
+			}
 		}
 	}
 
-	logger.Infof("Updated connection cache for %d HostEndpoints using Secret %s/%s",
-		affectedCount, secret.Namespace, secret.Name)
+	logger.Infof("updated connection cache for Secret %s/%s", secret.Namespace, secret.Name)
 
 	return reconcile.Result{}, nil
 }
