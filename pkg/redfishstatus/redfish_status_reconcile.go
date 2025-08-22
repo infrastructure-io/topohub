@@ -134,11 +134,8 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 	// Create redfish client
 	var healthy bool
 	session, err := c.redfishPool.GetOrCreate(sessionCfg.SessionID(), sessionCfg)
-	if err != nil && err != pool.ErrSessionPingFailed {
-		return fmt.Errorf("failed to get redfish session for RedfishStatus %s, err: %v", name, err)
-	}
-	if err == pool.ErrSessionPingFailed {
-		c.log.Warnf("Failed to ping redfish session, err: %v", err)
+	if err != nil {
+		c.log.Warnf("Failed to get redfish session, err: %v", err)
 		healthy = false
 	} else {
 		healthy = true
