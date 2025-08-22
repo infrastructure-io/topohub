@@ -30,14 +30,15 @@ type SSHStatusController interface {
 
 // sshStatusController implements the SSHStatusController interface
 type sshStatusController struct {
-	client     client.Client
-	kubeClient kubernetes.Interface
-	config     *config.AgentConfig
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
-	recorder   record.EventRecorder
-	log        *zap.SugaredLogger
-	sshPool    pool.SessionPool[ssh.Client]
+	client      client.Client
+	cacheReader client.Reader
+	kubeClient  kubernetes.Interface
+	config      *config.AgentConfig
+	stopCh      chan struct{}
+	wg          sync.WaitGroup
+	recorder    record.EventRecorder
+	log         *zap.SugaredLogger
+	sshPool     pool.SessionPool[ssh.Client]
 }
 
 // NewSSHStatusController creates a new SSH status controller
@@ -50,13 +51,14 @@ func NewSSHStatusController(kubeClient kubernetes.Interface, config *config.Agen
 	recorder := eventBroadcaster.NewRecorder(mgr.GetScheme(), corev1.EventSource{Component: "ssh-controller"})
 
 	controller := &sshStatusController{
-		client:     mgr.GetClient(),
-		kubeClient: kubeClient,
-		config:     config,
-		stopCh:     make(chan struct{}),
-		recorder:   recorder,
-		sshPool:    ssh.GetSessionPool(),
-		log:        log.Logger.Named("sshstatus"),
+		client:      mgr.GetClient(),
+		cacheReader: mgr.GetCache(),
+		kubeClient:  kubeClient,
+		config:      config,
+		stopCh:      make(chan struct{}),
+		recorder:    recorder,
+		sshPool:     ssh.GetSessionPool(),
+		log:         log.Logger.Named("sshstatus"),
 	}
 
 	log.Logger.Debug("SSHStatus controller created successfully")

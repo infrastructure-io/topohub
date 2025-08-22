@@ -29,8 +29,9 @@ type RedfishStatusController interface {
 }
 
 type redfishStatusController struct {
-	client     client.Client
-	kubeClient kubernetes.Interface
+	client      client.Client
+	cacheReader client.Reader
+	kubeClient  kubernetes.Interface
 	// config holds the agent configuration, which is used to
 	// determine the cluster agent name and the path to the feature
 	// configuration directory.
@@ -61,6 +62,7 @@ func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.
 
 	controller := &redfishStatusController{
 		client:      mgr.GetClient(),
+		cacheReader: mgr.GetCache(),
 		kubeClient:  kubeClient,
 		config:      config,
 		addChan:     addChan,

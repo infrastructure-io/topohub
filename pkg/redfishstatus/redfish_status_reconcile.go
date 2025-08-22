@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/infrastructure-io/topohub/pkg/clients/kube"
 	"github.com/infrastructure-io/topohub/pkg/clients/pool"
 	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
@@ -103,16 +104,14 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 	}
 
 	// get connection data
-	username, password, err := c.getSecretData(
-		*hostEndpoint.Spec.SecretName,
-		*hostEndpoint.Spec.SecretNamespace,
-	)
+	auth, err := kube.GetAuthenticationSecret(context.Background(), c.cacheReader,
+		*hostEndpoint.Spec.SecretName, *hostEndpoint.Spec.SecretNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
 	}
-	sessionCfg := redfish.RedfishSessionConfig{
-		Username: username,
-		Password: password,
+	sessionCfg := &redfish.RedfishSessionConfig{
+		Username: auth.Username,
+		Password: auth.Password,
 		IPAddr:   hostEndpoint.Spec.IPAddr,
 		Port:     int(*hostEndpoint.Spec.Port),
 		Https:    *hostEndpoint.Spec.HTTPS,
@@ -395,16 +394,14 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	}
 
 	// get connection data
-	username, password, err := c.getSecretData(
-		*hostEndpoint.Spec.SecretName,
-		*hostEndpoint.Spec.SecretNamespace,
-	)
+	auth, err := kube.GetAuthenticationSecret(context.Background(), c.cacheReader,
+		*hostEndpoint.Spec.SecretName, *hostEndpoint.Spec.SecretNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
 	}
-	sessionCfg := redfish.RedfishSessionConfig{
-		Username: username,
-		Password: password,
+	sessionCfg := &redfish.RedfishSessionConfig{
+		Username: auth.Username,
+		Password: auth.Password,
 		IPAddr:   hostEndpoint.Spec.IPAddr,
 		Port:     int(*hostEndpoint.Spec.Port),
 		Https:    *hostEndpoint.Spec.HTTPS,
