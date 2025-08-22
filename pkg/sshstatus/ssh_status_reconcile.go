@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/infrastructure-io/topohub/pkg/clients/kube"
-	"github.com/infrastructure-io/topohub/pkg/clients/pool"
 	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
@@ -58,15 +57,13 @@ func (c *sshStatusController) UpdateSSHStatusInfo(oldSSHStatus *topohubv1beta1.S
 		SSHKeyAuth: auth.SSHKey != "",
 	}
 	session, err := c.sshPool.GetOrCreate(cfg.SessionID(), cfg)
-	if err != nil && err != pool.ErrSessionPingFailed {
-		return fmt.Errorf("failed to get SSH session with sshStatus %s, err: %v", name, err)
-	}
-	if err == pool.ErrSessionPingFailed {
-		logger.Warnf("Failed to ping SSH session, err: %v", err)
+	if err != nil {
+		logger.Warnf("Failed to get SSH session, err: %v", err)
 		healthy = false
 	} else {
 		healthy = true
 	}
+
 	// Check health status
 	updated.Status.Healthy = healthy
 	updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
