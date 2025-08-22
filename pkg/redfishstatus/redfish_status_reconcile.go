@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/infrastructure-io/topohub/pkg/clients/kube"
-	"github.com/infrastructure-io/topohub/pkg/clients/pool"
 	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/lock"
@@ -407,11 +406,8 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	// create redfish client
 	var healthy bool
 	session, err := c.redfishPool.GetOrCreate(sessionCfg.SessionID(), sessionCfg)
-	if err != nil && err != pool.ErrSessionPingFailed {
-		return fmt.Errorf("failed to get redfish session for RedfishStatus %s, err: %v", name, err)
-	}
-	if err == pool.ErrSessionPingFailed {
-		c.log.Warnf("Failed to ping redfish session, err: %v", err)
+	if err != nil {
+		c.log.Warnf("Failed to get redfish session, err: %v", err)
 		healthy = false
 	} else {
 		healthy = true
