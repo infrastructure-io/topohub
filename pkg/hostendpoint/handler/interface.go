@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"sync"
 
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -11,6 +12,12 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/clients/redfish"
 	"github.com/infrastructure-io/topohub/pkg/clients/ssh"
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
+)
+
+var (
+	// Global handler registry instance
+	globalRegistry     map[string]HostEndpointHandler
+	globalRegistryOnce sync.Once
 )
 
 type HostEndpointHandler interface {
@@ -41,4 +48,13 @@ func RegisterHostEndpointHandlers(
 			sessionPool: redfish.GetSessionPool(),
 		},
 	}
+}
+
+// GetHandlerRegistry returns the global handler registry instance.
+func GetHandlerRegistry(cli client.Client, cacheReader cache.Cache) map[string]HostEndpointHandler {
+	globalRegistryOnce.Do(func() {
+		globalRegistry = RegisterHostEndpointHandlers(cli, cacheReader)
+	})
+
+	return globalRegistry
 }

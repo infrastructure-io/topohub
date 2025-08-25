@@ -26,7 +26,7 @@ type HostEndpointReconciler struct {
 func NewHostEndpointReconciler(mgr ctrl.Manager) *HostEndpointReconciler {
 	return &HostEndpointReconciler{
 		client:   mgr.GetClient(),
-		handlers: handler.RegisterHostEndpointHandlers(mgr.GetClient(), mgr.GetCache()),
+		handlers: handler.GetHandlerRegistry(mgr.GetClient(), mgr.GetCache()),
 		log:      log.Logger.Named("hostendpointReconcile"),
 	}
 }
