@@ -24,11 +24,11 @@ type DhcpServer interface {
 	// Stop stops the DHCP server
 	Stop() error
 
-	// UpdateService updates the subnet configuration
-	UpdateService(subnet topohubv1beta1.Subnet) error
-
 	// UpdateBindingIpEvents updates the binding IP events
 	UpdateBindingIpEvents(added, deleted []bindingipdata.BindingIPInfo) error
+
+	// SendRestartSignal sends a restart signal to the dnsmasq process
+	SendRestartSignal(subnet topohubv1beta1.Subnet)
 }
 
 type dhcpServer struct {
@@ -58,10 +58,11 @@ type dhcpServer struct {
 
 	// update the status of crd
 	statusUpdateCh chan struct{}
-	log            *zap.SugaredLogger
 
-	// restart the dhcp server
-	restartCh chan struct{}
+	log *zap.SugaredLogger
+
+	// restart the dhcp server, true means need restart, false means just reload
+	restartCh chan bool
 
 	// file path
 	configTemplatePath       string
@@ -91,7 +92,7 @@ func NewDhcpServer(
 		deletedBindingIp:                  make(chan bindingipdata.BindingIPInfo, 1000),
 		stopCh:                            make(chan struct{}),
 		statusUpdateCh:                    make(chan struct{}),
-		restartCh:                         make(chan struct{}),
+		restartCh:                         make(chan bool),
 		log:                               log.Logger.Named("dhcpServer/" + subnet.Name),
 		currentLeaseClients:               make(map[string]*DhcpClientInfo),
 		currentManualBindingClients:       make(map[string]*DhcpClientInfo),
@@ -149,6 +150,7 @@ func (s *dhcpServer) Stop() error {
 	return nil
 }
 
+// UpdateBindingIpEvents updates binding ip events
 func (s *dhcpServer) UpdateBindingIpEvents(added, deleted []bindingipdata.BindingIPInfo) error {
 	for _, ainfo := range added {
 		s.addedBindingIp <- ainfo
@@ -159,4 +161,15 @@ func (s *dhcpServer) UpdateBindingIpEvents(added, deleted []bindingipdata.Bindin
 	}
 
 	return nil
+}
+
+// SendRestartSignal sends a restart signal to the dnsmasq process
+func (s *dhcpServer) SendRestartSignal(subnet topohubv1beta1.Subnet) {
+	s.lockData.Lock()
+	// update subnet
+	s.subnet = &subnet
+	s.lockData.Unlock()
+
+	// restart dhcp server
+	s.restartCh <- true
 }
