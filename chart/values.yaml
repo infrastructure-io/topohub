@@ -137,14 +137,14 @@ nodeSelector: {}
 # Specify a specific node by name
 nodeName: ""
 
-nodeAffinity:
-  requiredDuringSchedulingIgnoredDuringExecution:
-    nodeSelectorTerms:
-    - matchExpressions:
-      - key: infrastructure.io/deploy
-        operator: In
-        values:
-        - "true"
+# nodeAffinity:
+#   requiredDuringSchedulingIgnoredDuringExecution:
+#     nodeSelectorTerms:
+#     - matchExpressions:
+#       - key: infrastructure.io/deploy
+#         operator: In
+#         values:
+#         - "true"
 
 ## @param topohub.extraArgs the additional arguments of topohub container
 extraArgs: []
