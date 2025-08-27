@@ -157,11 +157,8 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 
 		} else {
 			logger.Infof("updated DHCP server for subnet %s", subnet.Name)
-			if err := server.UpdateService(*subnet); err != nil {
-				msg := fmt.Sprintf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
-				logger.Errorf(msg)
-				return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
-			}
+			// directly send restart signal
+			server.SendRestartSignal(*subnet)
 			s.cache.Set(subnet)
 		}
 	} else {

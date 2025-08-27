@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 )
 
 // startDnsmasq starts the dnsmasq process
@@ -26,11 +25,11 @@ func (s *dhcpServer) startDnsmasq() error {
 	}
 	s.log.Infof("dnsmasq config file %s", s.configPath)
 
-	// 创建 context 用于进程管理
+	// create context for process management
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cmdCancel = cancel
 
-	// 启动 dnsmasq
+	// start dnsmasq
 	cmd := exec.Command("dnsmasq", "-C", s.configPath, "-d")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -51,10 +50,10 @@ func (s *dhcpServer) startDnsmasq() error {
 		}
 	}()
 
-	// 等待进程启动
+	// wait for process to start
 	time.Sleep(time.Second)
 
-	// 检查进程是否正常运行
+	// check if the process is running
 	if cmd.Process == nil {
 		return fmt.Errorf("dnsmasq process failed to start")
 	}
@@ -65,17 +64,37 @@ func (s *dhcpServer) startDnsmasq() error {
 	return nil
 }
 
-// UpdateService updates the subnet configuration and restarts the DHCP server
-func (s *dhcpServer) UpdateService(subnet topohubv1beta1.Subnet) error {
-	s.lockData.Lock()
-	// 更新 subnet
-	s.subnet = &subnet
-	s.lockData.Unlock()
+// UpdateBindingIpEvents方法已移回manager.go
 
-	// 重启 DHCP 服务
-	s.restartCh <- struct{}{}
+// isDnsmasqProcessDead checks if the dnsmasq process is dead
+func (s *dhcpServer) isDnsmasqProcessDead() bool {
+	// check if the process exists
+	isDead := s.cmd == nil || s.cmd.Process == nil
 
-	return nil
+	// if the process exists, try to send signal 0 to check the process status
+	if !isDead {
+		if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
+			s.log.Debugf("Process exists but signal check failed: %v", err)
+			return true
+		}
+	}
+
+	return isDead
+}
+
+// stopDnsmasqProcess stops the dnsmasq process
+func (s *dhcpServer) stopDnsmasqProcess() {
+	if s.cmd != nil && s.cmd.Process != nil {
+		s.log.Infof("Stopping existing dnsmasq process")
+		if err := s.cmd.Process.Kill(); err != nil {
+			s.log.Warnf("Failed to kill dnsmasq process: %v", err)
+		}
+
+		// cancel the context
+		if s.cmdCancel != nil {
+			s.cmdCancel()
+		}
+	}
 }
 
 // monitor monitors the lease file and updates status
@@ -104,7 +123,7 @@ func (s *dhcpServer) monitor() {
 	subnetName := s.subnet.Name
 	s.lockData.RUnlock()
 
-	// 开始监控
+	// start to monitor
 	for {
 		needRestart := false
 		needReload := false
@@ -190,29 +209,29 @@ func (s *dhcpServer) monitor() {
 			needReload = true
 
 		// reconcile notify subnet spec changes
-		case <-s.restartCh:
+		case force := <-s.restartCh:
 			needRenewConfig = true
-			needReload = true
-			s.log.Infof("dhcp server reload after the spec of subnet is updated")
+			if force {
+				s.log.Infof("dhcp server restart after the spec of subnet is updated")
+				needRestart = true
+			} else {
+				s.log.Infof("dhcp server reload after the spec of subnet is updated")
+				needReload = true
+			}
 
 		// check the process
 		case <-tickerProcess.C:
-			isDead := s.cmd == nil || s.cmd.Process == nil
-			if !isDead {
-				if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
-					s.log.Errorf("DHCP server process check failed: %v", err)
-					needRenewConfig = true
-					needRestart = true
-				} else {
-					s.log.Debugf("dhcp server for %s is running", subnetName)
-				}
-			} else {
-				needRenewConfig = true
+			// check if the process is running
+			if s.isDnsmasqProcessDead() {
+				s.log.Infof("DHCP server process not running, starting")
 				needRestart = true
-				s.log.Infof("dhcp server for %s is dead, restart it", subnetName)
+				needRenewConfig = true
+			} else {
+				s.log.Debugf("dhcp server for %s is running", subnetName)
 			}
 		}
 
+		// renew the config
 		if needRenewConfig {
 			if err := s.generateDnsmasqConfig(); err != nil {
 				s.log.Errorf("Failed to update dnsmasq config: %v", err)
@@ -220,25 +239,47 @@ func (s *dhcpServer) monitor() {
 			}
 		}
 
-		if needReload {
-			s.log.Infof("reload dhcp server")
-			// 重新加载 dnsmasq 配置
-			if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
-				s.log.Errorf("failed to reload dnsmasq: %v", err)
-				continue
-			}
-			s.log.Infof("Reloaded dnsmasq config: %s", s.configPath)
-			// update the status of subnet
-			s.statusUpdateCh <- struct{}{}
+		// check the process
+		isDead := s.isDnsmasqProcessDead()
 
-		} else if needRestart {
+		// if the process is dead, restart it
+		if isDead && needReload {
+			s.log.Infof("DHCP server process not running, restarting instead of reloading")
+			needRestart = true
+			needReload = false
+		}
+
+		// handle restart logic
+		if needRestart {
 			s.log.Infof("restarting dhcp server")
-			// in the startDnsmasq, it finish 's.statusUpdateCh <- struct{}{}'
+
+			// stop the existing process (if exists)
+			if !isDead {
+				s.stopDnsmasqProcess()
+			}
+
+			// start the new process
 			if err := s.startDnsmasq(); err != nil {
 				s.log.Errorf("Failed to restart dnsmasq: %v", err)
 			}
-			// in the startDnsmasq, it finish 's.statusUpdateCh <- struct{}{}'
-			// s.statusUpdateCh <- struct{}{}
+
+			// handle restart logic
+		} else if needReload {
+			s.log.Infof("reload dhcp server")
+			// reload the config
+			if err := s.cmd.Process.Signal(syscall.SIGHUP); err != nil {
+				s.log.Errorf("failed to reload dnsmasq: %v, will try to restart the process", err)
+				// stop the existing process (if exists)
+				s.stopDnsmasqProcess()
+				// start the new process
+				if err := s.startDnsmasq(); err != nil {
+					s.log.Errorf("Failed to restart dnsmasq after reload failure: %v", err)
+				}
+			} else {
+				s.log.Infof("Reloaded dnsmasq config: %s", s.configPath)
+				// update the status of subnet
+				s.statusUpdateCh <- struct{}{}
+			}
 		}
 	}
 }
