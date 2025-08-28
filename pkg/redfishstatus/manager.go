@@ -44,6 +44,8 @@ type redfishStatusController struct {
 	antsPool    *ants.Pool
 	redfishPool pool.SessionPool[redfish.Client]
 	log         *zap.SugaredLogger
+	// infoObjPool used to cache the map object that needs to map redfish information
+	infoObjPool sync.Pool
 }
 
 func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.AgentConfig, mgr ctrl.Manager, addChan, deleteChan chan dhcpserver.DhcpClientInfo) RedfishStatusController {
@@ -72,6 +74,11 @@ func NewRedfishStatusController(kubeClient kubernetes.Interface, config *config.
 		antsPool:    antsPool,
 		redfishPool: redfish.GetSessionPool(),
 		log:         log.Logger.Named("redfishstatus"),
+		infoObjPool: sync.Pool{
+			New: func() any {
+				return make(map[string]string)
+			},
+		},
 	}
 
 	log.Logger.Debugf("RedfishStatus controller created successfully")

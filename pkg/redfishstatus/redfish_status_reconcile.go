@@ -84,12 +84,6 @@ func (c *redfishStatusController) GenerateEvents(logEntrys []*gofishredfish.LogE
 func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topohubv1beta1.RedfishStatus) error {
 	name := oldRedfishStatus.Name
 
-	// lock for updateing redfishStatus instance
-	c.log.Debugf("lock for updateing redfishStatus instance %s", name)
-	lock := lock.LockManagerInstance.GetLock(name)
-	lock.Lock()
-	defer lock.Unlock()
-
 	// create a copy of redfishStatus
 	if oldRedfishStatus.Status == nil {
 		oldRedfishStatus.Status = &topohubv1beta1.RedfishStatusStatus{}
@@ -140,11 +134,25 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 		healthy = true
 	}
 
+	// lock for updateing redfishStatus instance
+	c.log.Debugf("lock for updateing redfishStatus instance %s", name)
+	lock := lock.LockManagerInstance.GetLock(name)
+	lock.Lock()
+	defer lock.Unlock()
+
 	hasAuth := len(sessionCfg.Username) > 0 && len(sessionCfg.Password) > 0
 	c.log.Debugf("try to check redfish with url: %s(auth: %v)", sessionCfg.URL(), hasAuth)
 
 	// Update health status
 	updated.Status.Healthy = healthy
+
+	var newInfo map[string]string
+	defer func() {
+		if newInfo != nil {
+			clear(newInfo)
+			c.infoObjPool.Put(newInfo)
+		}
+	}()
 
 	if healthy {
 		client := session.GetClient()
@@ -158,7 +166,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 				updated.Status.Info = infoData
 			} else {
 				c.log.Warnf("GetInfo returned nil for RedfishStatus %s", name)
-				updated.Status.Info = make(map[string]string)
+				updated.Status.Info = c.infoObjPool.Get().(map[string]string)
 			}
 		}
 		// Update log
@@ -185,9 +193,6 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 				c.log.Infof("find %d new logs for redfishStatus %s", newLogAccount, name)
 			}
 		}
-	} else { // !healthy
-		c.log.Debugf("RedfishStatus %s is not healthy, set info to empty", name)
-		updated.Status.Info = map[string]string{}
 	}
 
 	if updated.Status.Healthy != oldRedfishStatus.Status.Healthy {
@@ -371,12 +376,6 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1beta1.RedfishStatus) error {
 	name := oldRedfishStatus.Name
 
-	// lock resource to avoid concurrent update
-	c.log.Debugf("Lock for updating basic status of RedfishStatus %s", name)
-	lock := lock.LockManagerInstance.GetLock(name)
-	lock.Lock()
-	defer lock.Unlock()
-
 	// create a copy
 	if oldRedfishStatus.Status == nil {
 		oldRedfishStatus.Status = &topohubv1beta1.RedfishStatusStatus{}
@@ -412,9 +411,23 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	} else {
 		healthy = true
 	}
+
+	// lock resource to avoid concurrent update
+	c.log.Debugf("Lock for updating basic status of RedfishStatus %s", name)
+	lock := lock.LockManagerInstance.GetLock(name)
+	lock.Lock()
+	defer lock.Unlock()
+
 	// update healthy status
 	updated.Status.Healthy = healthy
 
+	var newInfo map[string]string
+	defer func() {
+		if newInfo != nil {
+			clear(newInfo)
+			c.infoObjPool.Put(newInfo)
+		}
+	}()
 	// only update high frequency fields (PowerState and BmcStatus)
 	if healthy {
 		client := session.GetClient()
@@ -424,7 +437,8 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 		} else {
 			// update PowerState
 			if updated.Status.Info == nil {
-				updated.Status.Info = make(map[string]string)
+				newInfo = c.infoObjPool.Get().(map[string]string)
+				updated.Status.Info = newInfo
 			}
 			updated.Status.Info["PowerState"] = powerState
 
