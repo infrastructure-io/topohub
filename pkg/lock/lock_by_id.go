@@ -1,27 +1,21 @@
 package lock
 
+import "sync"
+
 // LockManager manages locks for different IDs
-type LockManager struct {
-	mu    RWMutex
-	locks map[string]*Mutex
+type lockManager struct {
+	locks sync.Map
 }
 
-// Exported instance of LockManager
-var LockManagerInstance = &LockManager{
-	locks: make(map[string]*Mutex), // Initialize the map
-}
+// LockManagerInstance an instance of LockManager
+var LockManagerInstance = lockManager{locks: sync.Map{}}
 
 // GetLock retrieves a lock for the given ID, creating one if it doesn't exist
-func (lm *LockManager) GetLock(name string) *Mutex {
-	lm.mu.RLock()
-	defer lm.mu.RUnlock()
-
-	if lock, ok := lm.locks[name]; ok {
-		return lock
+func (lm *lockManager) GetLock(name string) *Mutex {
+	getted, _ := lm.locks.LoadOrStore(name, &Mutex{})
+	res, ok := getted.(*Mutex)
+	if !ok {
+		panic("lockManager GetLock failed")
 	}
-
-	// Create a new lock
-	newLock := &Mutex{}
-	lm.locks[name] = newLock
-	return newLock
+	return res
 }
