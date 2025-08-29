@@ -48,13 +48,25 @@ func NewFilteredBindingIpInformer(client versioned.Interface, resyncPeriod time.
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TopohubV1beta1().BindingIps().List(context.TODO(), options)
+				return client.TopohubV1beta1().BindingIps().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TopohubV1beta1().BindingIps().Watch(context.TODO(), options)
+				return client.TopohubV1beta1().BindingIps().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TopohubV1beta1().BindingIps().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TopohubV1beta1().BindingIps().Watch(ctx, options)
 			},
 		},
 		&apistopohubinfrastructureiov1beta1.BindingIp{},

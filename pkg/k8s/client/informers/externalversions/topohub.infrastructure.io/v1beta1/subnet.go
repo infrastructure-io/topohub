@@ -48,13 +48,25 @@ func NewFilteredSubnetInformer(client versioned.Interface, resyncPeriod time.Dur
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TopohubV1beta1().Subnets().List(context.TODO(), options)
+				return client.TopohubV1beta1().Subnets().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TopohubV1beta1().Subnets().Watch(context.TODO(), options)
+				return client.TopohubV1beta1().Subnets().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TopohubV1beta1().Subnets().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TopohubV1beta1().Subnets().Watch(ctx, options)
 			},
 		},
 		&apistopohubinfrastructureiov1beta1.Subnet{},

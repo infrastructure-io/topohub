@@ -48,13 +48,25 @@ func NewFilteredHostEndpointInformer(client versioned.Interface, resyncPeriod ti
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TopohubV1beta1().HostEndpoints().List(context.TODO(), options)
+				return client.TopohubV1beta1().HostEndpoints().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TopohubV1beta1().HostEndpoints().Watch(context.TODO(), options)
+				return client.TopohubV1beta1().HostEndpoints().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TopohubV1beta1().HostEndpoints().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TopohubV1beta1().HostEndpoints().Watch(ctx, options)
 			},
 		},
 		&apistopohubinfrastructureiov1beta1.HostEndpoint{},
