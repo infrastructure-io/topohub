@@ -215,10 +215,10 @@ func (r *HostOperationController) performIPMIPXEBoot(ipAddr, username, password 
 	// set PXE boot via IPMI
 	r.log.Infof("Setting PXE boot via IPMI for %s", ipAddr)
 
-	// build set pxe boot command
-	setPxeCmd := exec.Command("ipmitool", "-I", "lanplus", "-H", ipAddr, "-U", username, "-P", password, "chassis", "bootdev", "pxe")
+	// build set pxe boot command with options=efiboot to ensure proper PXE boot
+	setPxeCmd := exec.Command("ipmitool", "-I", "lanplus", "-H", ipAddr, "-U", username, "-P", password, "chassis", "bootdev", "pxe", "options=efiboot")
 	// print command (hide password)
-	r.log.Infof("Executing command: ipmitool -I lanplus -H %s -U %s -P %s chassis bootdev pxe", ipAddr, username, password)
+	r.log.Infof("Executing command: ipmitool -I lanplus -H %s -U %s -P %s chassis bootdev pxe options=efiboot", ipAddr, username, password)
 
 	// execute command
 	output, err := setPxeCmd.CombinedOutput()
