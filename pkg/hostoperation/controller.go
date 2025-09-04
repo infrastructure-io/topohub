@@ -55,29 +55,59 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// get the RedfishStatus
-	redfishStatus := &topohubv1beta1.RedfishStatus{}
-	if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.RedfishStatusName}, redfishStatus); err != nil {
-		logger.Errorf("Failed to get RedfishStatus %s: %v", hostOp.Spec.RedfishStatusName, err)
-		return ctrl.Result{}, err
+	var isSSHOperation bool
+	if hostOp.Spec.HostType == "SSH" {
+		isSSHOperation = true
+		logger.Debugf("Operation type is SSH for %s", hostOp.Spec.StatusName)
+	} else if hostOp.Spec.HostType == "Redfish" {
+		isSSHOperation = false
+		logger.Debugf("Operation type is Redfish for %s", hostOp.Spec.StatusName)
+	} else {
+		logger.Errorf("Invalid operation type: %s", hostOp.Spec.HostType)
+		return ctrl.Result{}, fmt.Errorf("invalid operation type: %s", hostOp.Spec.HostType)
 	}
 
 	// check if the host operation is pending
 	if hostOp.Status.Status == "" || hostOp.Status.Status == topohubv1beta1.HostOperationStatusPending {
-		logger.Infof("Processing HostOperation %s : %+v", hostOp.Name, hostOp.Spec)
+		logger.Infof("Processing HostOperation %s : action=%s, statusName=%s, type=%s", hostOp.Name, hostOp.Spec.Action, hostOp.Spec.StatusName, hostOp.Spec.HostType)
 
 		// update status
 		hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
 		hostOp.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 
-		// get HostEndpoint
-		hostEndpoint, connErr := r.getHostEndpoint(redfishStatus)
-		if connErr != nil {
+		// get host endpoint
+		var hostEndpoint *topohubv1beta1.HostEndpoint
+		var err error
+
+		if isSSHOperation {
+			// get SSHStatus
+			sshStatus := &topohubv1beta1.SSHStatus{}
+			if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.StatusName}, sshStatus); err != nil {
+				logger.Errorf("Failed to get SSHStatus %s: %v", hostOp.Spec.StatusName, err)
+				return ctrl.Result{}, err
+			}
+
+			// get host endpoint from SSHStatus
+			hostEndpoint, err = r.getHostEndpointFromSSHStatus(sshStatus)
+		} else {
+			// get RedfishStatus
+			redfishStatus := &topohubv1beta1.RedfishStatus{}
+			if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.StatusName}, redfishStatus); err != nil {
+				logger.Errorf("Failed to get RedfishStatus %s: %v", hostOp.Spec.StatusName, err)
+				return ctrl.Result{}, err
+			}
+
+			// get host endpoint from RedfishStatus
+			hostEndpoint, err = r.getHostEndpoint(redfishStatus)
+		}
+
+		if err != nil {
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
-			logger.Warnf("Failed to get connection info for %s: %v, retry later", hostOp.Spec.RedfishStatusName, connErr)
+			logger.Warnf("Failed to get connection info for %s: %v, retry later", hostOp.Spec.StatusName, err)
 			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 		}
-		logger.Debugf("get connect config %s: %+v", hostOp.Spec.RedfishStatusName, hostEndpoint)
+
+		logger.Debugf("get connect config %s: %+v", hostOp.Spec.StatusName, hostEndpoint)
 		hostOp.Status.ClusterName = *hostEndpoint.Spec.ClusterName
 		hostOp.Status.IpAddr = hostEndpoint.Spec.IPAddr
 
@@ -91,67 +121,28 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 
-		sessionCfg := &redfish.RedfishSessionConfig{
-			Username: username,
-			Password: password,
-			IPAddr:   hostEndpoint.Spec.IPAddr,
-			Port:     int(*hostEndpoint.Spec.Port),
-			Https:    *hostEndpoint.Spec.HTTPS,
-		}
-		session, err := r.redfishPool.GetOrCreate(sessionCfg.SessionID(), sessionCfg)
-		if err != nil {
-			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.RedfishStatusName, err)
-			hostOp.Status.Status = topohubv1beta1.HostOperationStatusFailed
-			hostOp.Status.Message = err.Error()
+		// perform operation
+		logger.Infof("Processing %s operation for %s", hostOp.Spec.HostType, hostEndpoint.Name)
+
+		if isSSHOperation {
+			// perform SSH operation
+			err = r.performSSHOperation(hostEndpoint, hostOp.Spec.Action, username, password, &hostOp)
 		} else {
-			c := session.GetClient()
-			switch hostOp.Spec.Action {
-			case topohubv1beta1.BootCmdOn:
-				err = c.Power(hostOp.Spec.Action)
-			case topohubv1beta1.BootCmdForceOn:
-				err = c.Power(hostOp.Spec.Action)
-			case topohubv1beta1.BootCmdForceOff:
-				err = c.Power(hostOp.Spec.Action)
-			case topohubv1beta1.BootCmdGracefulShutdown:
-				err = c.Power(hostOp.Spec.Action)
-			case topohubv1beta1.BootCmdForceRestart:
-				err = c.Power(hostOp.Spec.Action)
-			case topohubv1beta1.BootCmdGracefulRestart:
-				err = c.Power(hostOp.Spec.Action)
-			case topohubv1beta1.BootCmdResetPxeOnce:
-				// check pxe boot method
-				if strings.ToLower(hostEndpoint.Spec.PxeBootType) == topohubv1beta1.PxeBootTypeIPMI {
-					// use IPMI command to set PXE boot
-					logger.Infof("Using IPMI to set PXE boot for %s", hostEndpoint.Spec.IPAddr)
-					err = r.performIPMIPXEBoot(sessionCfg.IPAddr, sessionCfg.Username, sessionCfg.Password)
-					if err == nil {
-						hostOp.Status.Message = fmt.Sprintf("Successfully performed PXE boot via IPMI for %s", hostEndpoint.Spec.IPAddr)
-					}
-				} else {
-					// use default Redfish client
-					logger.Infof("Using Redfish to set PXE boot for %s", hostEndpoint.Spec.IPAddr)
-					err = c.Power(hostOp.Spec.Action)
-					if err == nil {
-						hostOp.Status.Message = fmt.Sprintf("Successfully performed PXE boot via Redfish method for %s", hostEndpoint.Spec.IPAddr)
-						logger.Info(hostOp.Status.Message)
-					}
-				}
-			default:
-				err = fmt.Errorf("invalid action %s", hostOp.Spec.Action)
-			}
+			// perform Redfish operation
+			err = r.performRedfishOperation(hostEndpoint, hostOp.Spec.Action, username, password, &hostOp)
 		}
 
 		hostOp.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
 		if err != nil {
-			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.RedfishStatusName, err)
+			logger.Errorf("Failed to operate %s: %v", hostOp.Spec.StatusName, err)
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusFailed
 			hostOp.Status.Message = err.Error()
 		} else {
-			logger.Infof("Succeeded to operate %s", hostOp.Spec.RedfishStatusName)
+			logger.Infof("Performing %s operation on %s (%s)", hostOp.Spec.Action, hostOp.Spec.StatusName, hostOp.Spec.HostType)
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusSuccess
 		}
 
-		// 更新
+		// update HostOperation status
 		if err := r.Status().Update(ctx, &hostOp); err != nil {
 			logger.Errorf("Action has been done, but failed to update HostOperation status: %v", err)
 			return ctrl.Result{}, fmt.Errorf("failed to update HostOperation status: %v", err)
@@ -174,25 +165,32 @@ func (r *HostOperationController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *HostOperationController) getHostEndpoint(redfishStatus *topohubv1beta1.RedfishStatus) (*topohubv1beta1.HostEndpoint, error) {
-	// all RedfishStatus should have ownerReferences
-	if len(redfishStatus.OwnerReferences) > 0 {
-		for _, ownerRef := range redfishStatus.OwnerReferences {
-			if ownerRef.Kind == topohubv1beta1.KindHostEndpoint {
-				r.log.Infof("Found HostEndpoint owner reference: %s", ownerRef.Name)
-				// get HostEndpoint
-				hostEndpoint := &topohubv1beta1.HostEndpoint{}
-				if err := r.Get(context.TODO(), client.ObjectKey{Name: ownerRef.Name}, hostEndpoint); err != nil {
-					r.log.Errorf("Failed to get HostEndpoint %s: %v", ownerRef.Name, err)
-					return nil, err
-				}
-				return hostEndpoint, nil
-			}
-		}
+	// Use RedfishStatus name as HostEndpoint name
+	hostEndpointName := redfishStatus.Name
+
+	// get the HostEndpoint
+	hostEndpoint := &topohubv1beta1.HostEndpoint{}
+	if err := r.Get(context.TODO(), client.ObjectKey{Name: hostEndpointName}, hostEndpoint); err != nil {
+		return nil, fmt.Errorf("failed to get hostendpoint %s: %v", hostEndpointName, err)
 	}
-	return nil, fmt.Errorf("failed to get HostEndpoint for RedfishStatus %s", redfishStatus.Name)
+
+	return hostEndpoint, nil
 }
 
-// getSecretData 从 Secret 中获取用户名和密码
+// getHostEndpointFromSSHStatus 从SSHStatus获取关联的HostEndpoint
+func (r *HostOperationController) getHostEndpointFromSSHStatus(sshStatus *topohubv1beta1.SSHStatus) (*topohubv1beta1.HostEndpoint, error) {
+	// Use SSHStatus name as HostEndpoint name
+	hostEndpointName := sshStatus.Name
+
+	// get the HostEndpoint
+	hostEndpoint := &topohubv1beta1.HostEndpoint{}
+	if err := r.Get(context.TODO(), client.ObjectKey{Name: hostEndpointName}, hostEndpoint); err != nil {
+		return nil, fmt.Errorf("failed to get hostendpoint %s: %v", hostEndpointName, err)
+	}
+
+	return hostEndpoint, nil
+}
+
 func (r *HostOperationController) getSecretData(secretName, secretNamespace string) (string, string, error) {
 	r.log.Debugf("Attempting to get secret data for %s/%s", secretNamespace, secretName)
 

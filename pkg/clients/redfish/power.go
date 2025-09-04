@@ -38,21 +38,16 @@ func (c *clientImpl) Power(bootCmd string) error {
 		c.logger.Debugf("system %s, supported reset types: %+v", system.Name, resetTypes)
 
 		switch bootCmd {
-		case topohubv1beta1.BootCmdOn:
-			fallthrough
-		case topohubv1beta1.BootCmdForceOn:
-			fallthrough
-		case topohubv1beta1.BootCmdForceOff:
-			fallthrough
-		case topohubv1beta1.BootCmdGracefulShutdown:
-			fallthrough
-		case topohubv1beta1.BootCmdForceRestart:
-			fallthrough
-		case topohubv1beta1.BootCmdGracefulRestart:
+		case topohubv1beta1.RedfishCmdOn,
+			topohubv1beta1.RedfishCmdForceOn,
+			topohubv1beta1.RedfishCmdForceOff,
+			topohubv1beta1.RedfishCmdGracefulShutdown,
+			topohubv1beta1.RedfishCmdForceRestart,
+			topohubv1beta1.RedfishCmdGracefulRestart:
 			c.logger.Infof("operation %s for System: %+v \n", bootCmd, system.Name)
 			err = system.Reset(redfish.ResetType(bootCmd))
 
-		case topohubv1beta1.BootCmdResetPxeOnce:
+		case topohubv1beta1.RedfishCmdPxeReboot:
 			// check if the system supports GracefulRestart or ForceRestart
 			if !strings.Contains(resetTypes, string(redfish.GracefulRestartResetType)) && !strings.Contains(resetTypes, string(redfish.ForceRestartResetType)) {
 				return fmt.Errorf("neither GracefulRestart nor ForceRestart is supported by system %s, supported types: %v", system.Name, resetTypes)

@@ -3,11 +3,9 @@ package hostoperation
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"go.uber.org/zap"
-
-	//"time"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -16,6 +14,28 @@ import (
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// global variables define valid operation types and actions
+var (
+	// Redfish valid actions list
+	redfishValidActions = []string{
+		topohubv1beta1.RedfishCmdOn,
+		topohubv1beta1.RedfishCmdForceOn,
+		topohubv1beta1.RedfishCmdForceOff,
+		topohubv1beta1.RedfishCmdGracefulShutdown,
+		topohubv1beta1.RedfishCmdForceRestart,
+		topohubv1beta1.RedfishCmdGracefulRestart,
+		topohubv1beta1.RedfishCmdPxeReboot,
+	}
+
+	// SSH valid actions list
+	sshValidActions = []string{
+		topohubv1beta1.SSHCmdShutdown,
+		topohubv1beta1.SSHCmdRestart,
+	}
+)
+
+
 
 type HostOperationWebhook struct {
 	Client client.Client
@@ -32,8 +52,6 @@ func (h *HostOperationWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		WithDefaulter(h).
 		Complete()
 }
-
-// +kubebuilder:webhook:path=/mutate-topohub-infrastructure-io-v1beta1-hostoperation,mutating=true,failurePolicy=fail,sideEffects=None,groups=topohub.infrastructure.io,resources=hostoperations,verbs=create;update,versions=v1beta1,name=mhostoperation.kb.io,admissionReviewVersions=v1
 
 func (h *HostOperationWebhook) Default(ctx context.Context, obj runtime.Object) error {
 	hostOp, ok := obj.(*topohubv1beta1.HostOperation)
@@ -61,16 +79,21 @@ func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.O
 
 	h.log.Debugf("Processing ValidateCreate webhook for HostOperation %s", hostOp.Name)
 
-	// 验证 RedfishStatusName 对应的 RedfishStatus 是否存在且健康
-	var redfishStatus topohubv1beta1.RedfishStatus
-	if err := h.Client.Get(ctx, client.ObjectKey{Name: hostOp.Spec.RedfishStatusName}, &redfishStatus); err != nil {
-		err = fmt.Errorf("RedfishStatus %s not found: %v", hostOp.Spec.RedfishStatusName, err)
-		h.log.Error(err.Error())
-		return nil, err
+	var err error
+	switch hostOp.Spec.HostType {
+	case "Redfish":
+		if !slices.Contains(redfishValidActions, hostOp.Spec.Action) {
+			err = fmt.Errorf("invalid action %s for Redfish operation type", hostOp.Spec.Action)
+		}
+	case "SSH":
+		if !slices.Contains(sshValidActions, hostOp.Spec.Action) {
+			err = fmt.Errorf("invalid action %s for SSH operation type", hostOp.Spec.Action)
+		}
+	default:
+		err = fmt.Errorf("invalid type %s, must be either 'Redfish' or 'SSH'", hostOp.Spec.HostType)
 	}
 
-	if !redfishStatus.Status.Healthy {
-		err := fmt.Errorf("RedfishStatus %s is not healthy, so it is not allowed to create hostOperation %s", hostOp.Spec.RedfishStatusName, hostOp.Name)
+	if err != nil {
 		h.log.Error(err.Error())
 		return nil, err
 	}
