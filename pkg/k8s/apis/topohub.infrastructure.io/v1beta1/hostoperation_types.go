@@ -12,22 +12,27 @@ const (
 )
 
 const (
-	// operation action
-	// power
+	// Redfish operation actions
 	// "On"
-	BootCmdOn = string(redfish.OnResetType)
+	RedfishCmdOn = string(redfish.OnResetType)
 	// "ForceOn"
-	BootCmdForceOn = string(redfish.ForceOnResetType)
+	RedfishCmdForceOn = string(redfish.ForceOnResetType)
 	// "ForceOff"
-	BootCmdForceOff = string(redfish.ForceOffResetType)
+	RedfishCmdForceOff = string(redfish.ForceOffResetType)
 	// "GracefulShutdown"
-	BootCmdGracefulShutdown = string(redfish.GracefulShutdownResetType)
+	RedfishCmdGracefulShutdown = string(redfish.GracefulShutdownResetType)
 	// "ForceRestart"
-	BootCmdForceRestart = string(redfish.ForceRestartResetType)
+	RedfishCmdForceRestart = string(redfish.ForceRestartResetType)
 	// "GracefulRestart"
-	BootCmdGracefulRestart = string(redfish.GracefulRestartResetType)
+	RedfishCmdGracefulRestart = string(redfish.GracefulRestartResetType)
 	// "PxeReboot"
-	BootCmdResetPxeOnce string = "PxeReboot"
+	RedfishCmdPxeReboot = "PxeReboot"
+
+	// SSH operation actions
+	// Graceful shutdown
+	SSHCmdShutdown = "Shutdown"
+	// Restart
+	SSHCmdRestart = "Restart"
 )
 
 // +genclient
@@ -49,12 +54,16 @@ type HostOperation struct {
 }
 
 type HostOperationSpec struct {
-	// +kubebuilder:validation:Enum=ForceOn;On;ForceOff;GracefulShutdown;ForceRestart;GracefulRestart;PxeReboot
+	// +kubebuilder:validation:Enum=On;ForceOn;ForceOff;GracefulShutdown;ForceRestart;GracefulRestart;PxeReboot;Shutdown;Restart
 	// +kubebuilder:validation:Required
 	Action string `json:"action"`
 
 	// +kubebuilder:validation:Required
-	RedfishStatusName string `json:"redfishStatusName"`
+	StatusName string `json:"statusName"`
+
+	// +kubebuilder:validation:Enum=Redfish;SSH
+	// +kubebuilder:validation:Required
+	HostType string `json:"hostType"`
 }
 
 type HostOperationStatus struct {
