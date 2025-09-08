@@ -175,46 +175,47 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 func (s *subnetManager) SetupWithManager(mgr ctrl.Manager) error {
 	s.client = mgr.GetClient()
 
+	// TODO: 注释掉可能导致内存泄漏的 goroutine
 	// start all dhcp server when we are the leader
-	go func() {
-		// <-mgr.Elected()
-		// s.log.Info("Elected as leader, begin to start all controllers")
+	// go func() {
+	// 	// <-mgr.Elected()
+	// 	// s.log.Info("Elected as leader, begin to start all controllers")
 
-		// 获取所有的 Subnet 实例并启动 DHCP 服务器
-		var subnetList topohubv1beta1.SubnetList
-		if err := mgr.GetClient().List(context.Background(), &subnetList); err != nil {
-			s.log.Errorf("Failed to list subnets: %v", err)
-			return
-		}
+	// 	// 获取所有的 Subnet 实例并启动 DHCP 服务器
+	// 	var subnetList topohubv1beta1.SubnetList
+	// 	if err := mgr.GetClient().List(context.Background(), &subnetList); err != nil {
+	// 		s.log.Errorf("Failed to list subnets: %v", err)
+	// 		return
+	// 	}
 
-		s.dataLock.Lock()
-		// 初始化并启动 DHCP 服务器
-		for _, subnet := range subnetList.Items {
-			if subnet.DeletionTimestamp != nil {
-				continue
-			}
+	// 	s.dataLock.Lock()
+	// 	// 初始化并启动 DHCP 服务器
+	// 	for _, subnet := range subnetList.Items {
+	// 		if subnet.DeletionTimestamp != nil {
+	// 			continue
+	// 		}
 
-			// 检查是否已经存在对应的 DHCP 服务器
-			if _, exists := s.dhcpServerList[subnet.Name]; !exists {
-				// 创建新的 DHCP 服务器实例
-				dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClientForRedfishStatus, s.deletedDhcpClientForRedfishStatus)
+	// 		// 检查是否已经存在对应的 DHCP 服务器
+	// 		if _, exists := s.dhcpServerList[subnet.Name]; !exists {
+	// 			// 创建新的 DHCP 服务器实例
+	// 			dhcpServer := dhcpserver.NewDhcpServer(s.config, &subnet, s.client, s.addedDhcpClientForRedfishStatus, s.deletedDhcpClientForRedfishStatus)
 
-				// 启动 DHCP 服务器
-				if err := dhcpServer.Run(); err != nil {
-					s.log.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
-				} else {
-					s.log.Infof("Started DHCP server for subnet %s", subnet.Name)
-					s.dhcpServerList[subnet.Name] = dhcpServer
-				}
-			}
-		}
-		s.dataLock.Unlock()
+	// 			// 启动 DHCP 服务器
+	// 			if err := dhcpServer.Run(); err != nil {
+	// 				s.log.Errorf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
+	// 			} else {
+	// 				s.log.Infof("Started DHCP server for subnet %s", subnet.Name)
+	// 				s.dhcpServerList[subnet.Name] = dhcpServer
+	// 			}
+	// 		}
+	// 	}
+	// 	s.dataLock.Unlock()
 
-		// after all server is started , start to process binding ip event
-		time.Sleep(2 * time.Second)
-		go s.processBindingIpEvents()
+	// 	// after all server is started , start to process binding ip event
+	// 	time.Sleep(2 * time.Second)
+	// 	go s.processBindingIpEvents()
 
-	}()
+	// }()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&topohubv1beta1.Subnet{}).
@@ -259,10 +260,11 @@ func (s *subnetManager) processBindingIpEvents() {
 			s.dataLock.RUnlock()
 			if !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
-				go func() {
-					time.Sleep(30 * time.Second)
-					s.addedBindingIp <- event
-				}()
+				// TODO: 注释掉可能导致 goroutine 泄漏的代码
+				// go func() {
+				// 	time.Sleep(30 * time.Second)
+				// 	s.addedBindingIp <- event
+				// }()
 			} else {
 				s.log.Infof("process binding ip adding events for subnet %s: %+v", event.Subnet, event)
 				if err := c.UpdateBindingIpEvents([]bindingipdata.BindingIPInfo{event}, nil); err != nil {
@@ -281,10 +283,11 @@ func (s *subnetManager) processBindingIpEvents() {
 			s.dataLock.RUnlock()
 			if !exists {
 				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
-				go func() {
-					time.Sleep(30 * time.Second)
-					s.deletedBindingIp <- event
-				}()
+				// TODO: 注释掉可能导致 goroutine 泄漏的代码
+				// go func() {
+				// 	time.Sleep(30 * time.Second)
+				// 	s.deletedBindingIp <- event
+				// }()
 			} else {
 				s.log.Infof("process binding ip deleting events for subnet %s: %+v", event.Subnet, event)
 				if err := c.UpdateBindingIpEvents(nil, []bindingipdata.BindingIPInfo{event}); err != nil {

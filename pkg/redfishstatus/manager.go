@@ -76,14 +76,15 @@ func (c *redfishStatusController) Stop() {
 // SetupWithManager 设置 controller-runtime manager
 func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 	c.log.Info("Starting RedfishStatus controller")
-	go func() {
-		// <-mgr.Elected()
-		// c.log.Info("Elected as leader, begin to start all controllers")
-		// 启动 DHCP 事件处理
-		go c.processDHCPEvents()
-		// 启动 redfishstatus spec.info 的	周期更新
-		go c.UpdateRedfishStatusAtInterval()
-	}()
+	// TODO: 注释掉可能导致内存泄漏的 goroutine
+	// go func() {
+	// 	// <-mgr.Elected()
+	// 	// c.log.Info("Elected as leader, begin to start all controllers")
+	// 	// 启动 DHCP 事件处理
+	// 	go c.processDHCPEvents()
+	// 	// 启动 redfishstatus spec.info 的	周期更新
+	// 	go c.UpdateRedfishStatusAtInterval()
+	// }()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&topohubv1beta1.RedfishStatus{}).

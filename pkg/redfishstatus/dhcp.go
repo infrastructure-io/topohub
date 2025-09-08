@@ -40,10 +40,11 @@ func (c *redfishStatusController) processDHCPEvents() {
 				if shouldRetry(err) {
 					c.log.Debugf("Retrying DHCP add event for IP %s after %v due to: %v",
 						event.IP, retryDelay, err)
-					go func(e dhcpserver.DhcpClientInfo) {
-						time.Sleep(retryDelay)
-						c.addChan <- e
-					}(event)
+					// TODO: 注释掉可能导致 goroutine 泄漏的代码
+					// go func(e dhcpserver.DhcpClientInfo) {
+					// 	time.Sleep(retryDelay)
+					// 	c.addChan <- e
+					// }(event)
 				}
 			}
 		case event := <-c.deleteChan:
@@ -51,10 +52,11 @@ func (c *redfishStatusController) processDHCPEvents() {
 				if shouldRetry(err) {
 					c.log.Debugf("Retrying DHCP delete event for IP %s after %v due to: %v",
 						event.IP, retryDelay, err)
-					go func(e dhcpserver.DhcpClientInfo) {
-						time.Sleep(retryDelay)
-						c.deleteChan <- e
-					}(event)
+					// TODO: 注释掉可能导致 goroutine 泄漏的代码
+					// go func(e dhcpserver.DhcpClientInfo) {
+					// 	time.Sleep(retryDelay)
+					// 	c.deleteChan <- e
+					// }(event)
 				}
 			}
 		}
