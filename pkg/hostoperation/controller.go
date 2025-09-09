@@ -56,10 +56,10 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	var isSSHOperation bool
-	if hostOp.Spec.HostType == "SSH" {
+	if hostOp.Spec.HostType == "ssh" {
 		isSSHOperation = true
 		logger.Debugf("Operation type is SSH for %s", hostOp.Spec.StatusName)
-	} else if hostOp.Spec.HostType == "Redfish" {
+	} else if hostOp.Spec.HostType == "redfish" {
 		isSSHOperation = false
 		logger.Debugf("Operation type is Redfish for %s", hostOp.Spec.StatusName)
 	} else {

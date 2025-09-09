@@ -44,7 +44,7 @@ func TestHostOperationWebhook_ValidateCreate(t *testing.T) {
 					Name: "test-redfish-op",
 				},
 				Spec: topohubv1beta1.HostOperationSpec{
-					HostType:   "Redfish",
+					HostType:   "redfish",
 					Action:     topohubv1beta1.RedfishCmdOn,
 					StatusName: "test-status",
 				},
@@ -58,7 +58,7 @@ func TestHostOperationWebhook_ValidateCreate(t *testing.T) {
 					Name: "test-ssh-op",
 				},
 				Spec: topohubv1beta1.HostOperationSpec{
-					HostType:   "SSH",
+					HostType:   "ssh",
 					Action:     topohubv1beta1.SSHCmdRestart,
 					StatusName: "test-status",
 				},
@@ -78,7 +78,7 @@ func TestHostOperationWebhook_ValidateCreate(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "invalid type Invalid, must be either 'Redfish' or 'SSH'",
+			errorMsg:    "invalid type Invalid, must be either 'redfish' or 'ssh'",
 		},
 		{
 			name: "invalid redfish action",
@@ -87,13 +87,13 @@ func TestHostOperationWebhook_ValidateCreate(t *testing.T) {
 					Name: "test-invalid-redfish-action",
 				},
 				Spec: topohubv1beta1.HostOperationSpec{
-					HostType:   "Redfish",
+					HostType:   "redfish",
 					Action:     "InvalidAction",
 					StatusName: "test-status",
 				},
 			},
 			expectError: true,
-			errorMsg:    "invalid action InvalidAction for Redfish operation type",
+			errorMsg:    "invalid action InvalidAction for redfish operation type",
 		},
 		{
 			name: "invalid ssh action",
@@ -102,13 +102,13 @@ func TestHostOperationWebhook_ValidateCreate(t *testing.T) {
 					Name: "test-invalid-ssh-action",
 				},
 				Spec: topohubv1beta1.HostOperationSpec{
-					HostType:   "SSH",
+					HostType:   "ssh",
 					Action:     "InvalidAction",
 					StatusName: "test-status",
 				},
 			},
 			expectError: true,
-			errorMsg:    "invalid action InvalidAction for SSH operation type",
+			errorMsg:    "invalid action InvalidAction for ssh operation type",
 		},
 	}
 

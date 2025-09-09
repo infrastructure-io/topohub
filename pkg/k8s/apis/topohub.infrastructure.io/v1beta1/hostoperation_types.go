@@ -61,7 +61,7 @@ type HostOperationSpec struct {
 	// +kubebuilder:validation:Required
 	StatusName string `json:"statusName"`
 
-	// +kubebuilder:validation:Enum=Redfish;SSH
+	// +kubebuilder:validation:Enum=redfish;ssh
 	// +kubebuilder:validation:Required
 	HostType string `json:"hostType"`
 }
