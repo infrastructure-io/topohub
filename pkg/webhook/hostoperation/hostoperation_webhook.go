@@ -81,16 +81,16 @@ func (h *HostOperationWebhook) ValidateCreate(ctx context.Context, obj runtime.O
 
 	var err error
 	switch hostOp.Spec.HostType {
-	case "Redfish":
+	case "redfish":
 		if !slices.Contains(redfishValidActions, hostOp.Spec.Action) {
-			err = fmt.Errorf("invalid action %s for Redfish operation type", hostOp.Spec.Action)
+			err = fmt.Errorf("invalid action %s for redfish operation type", hostOp.Spec.Action)
 		}
-	case "SSH":
+	case "ssh":
 		if !slices.Contains(sshValidActions, hostOp.Spec.Action) {
-			err = fmt.Errorf("invalid action %s for SSH operation type", hostOp.Spec.Action)
+			err = fmt.Errorf("invalid action %s for ssh operation type", hostOp.Spec.Action)
 		}
 	default:
-		err = fmt.Errorf("invalid type %s, must be either 'Redfish' or 'SSH'", hostOp.Spec.HostType)
+		err = fmt.Errorf("invalid type %s, must be either 'redfish' or 'ssh'", hostOp.Spec.HostType)
 	}
 
 	if err != nil {

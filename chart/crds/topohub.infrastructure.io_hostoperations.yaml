@@ -64,8 +64,8 @@ spec:
                 type: string
               hostType:
                 enum:
-                - Redfish
-                - SSH
+                - redfish
+                - ssh
                 type: string
               statusName:
                 type: string
