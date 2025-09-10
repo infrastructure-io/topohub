@@ -344,15 +344,15 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 
 	// Update each RedfishStatus basic status fields (PowerState, BmcStatus and healthy) concurrently
 	for i := range redfishStatusList.Items {
-		// Important: Create a new variable in the loop to avoid closure problems
-		redfishStatus := redfishStatusList.Items[i]
+		// Create a copy of the RedfishStatus to avoid variable capture issues
+		redfishStatus := redfishStatusList.Items[i].DeepCopy()
 		wg.Add(1)
 
 		// Submit task to ants pool
 		err := p.Submit(func() {
 			defer wg.Done()
 			c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
-			if err := c.updateBasicStatus(&redfishStatus); err != nil {
+			if err := c.updateBasicStatus(redfishStatus); err != nil {
 				c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
 			}
 		})
