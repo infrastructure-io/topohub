@@ -141,7 +141,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 	defer lock.Unlock()
 
 	hasAuth := len(sessionCfg.Username) > 0 && len(sessionCfg.Password) > 0
-	c.log.Debugf("try to check redfish with url: %s(auth: %v)", sessionCfg.URL(), hasAuth)
+	c.log.Debugf("try to check redfish with url: %s(auth: %v), redfishStatus: %s", sessionCfg.URL(), hasAuth, name)
 
 	// Update health status
 	updated.Status.Healthy = healthy
@@ -156,8 +156,10 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 
 	if healthy {
 		client := session.GetClient()
+		c.log.Debugf("try to get info for RedfishStatus %s", name)
 		// Update info
 		infoData, err := client.GetInfo()
+		c.log.Debugf("GetInfo success for RedfishStatus %s", name)
 		if err != nil {
 			c.log.Errorf("Failed to get info of RedfishStatus %s: %v", name, err)
 			healthy = false
@@ -170,29 +172,31 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 			}
 		}
 		// Update log
-		logEntrys, err := client.GetLog()
-		if err != nil {
-			c.log.Warnf("Failed to get logs of RedfishStatus %s: %v", name, err)
-		} else {
-			lastLogTime := ""
-			if updated.Status.Log.LastestLog != nil {
-				lastLogTime = updated.Status.Log.LastestLog.Time
-			}
-			newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg, totalMsgCount, warningMsgCount, newLogAccount := c.GenerateEvents(logEntrys, name, lastLogTime)
-			if newLastestTime != "" {
-				updated.Status.Log.TotalLogAccount = int32(totalMsgCount)
-				updated.Status.Log.WarningLogAccount = int32(warningMsgCount)
-				updated.Status.Log.LastestLog = &topohubv1beta1.LogEntry{
-					Time:    newLastestTime,
-					Message: newLastestMsg,
-				}
-				updated.Status.Log.LastestWarningLog = &topohubv1beta1.LogEntry{
-					Time:    newLastestWarningTime,
-					Message: newLastestWarningMsg,
-				}
-				c.log.Infof("find %d new logs for redfishStatus %s", newLogAccount, name)
-			}
-		}
+		// c.log.Debugf("try to get log for RedfishStatus %s", name)
+		// logEntrys, err := client.GetLog()
+		// c.log.Debugf("GetLog success for RedfishStatus %s", name)
+		// if err != nil {
+		// 	c.log.Warnf("Failed to get logs of RedfishStatus %s: %v", name, err)
+		// } else {
+		// 	lastLogTime := ""
+		// 	if updated.Status.Log.LastestLog != nil {
+		// 		lastLogTime = updated.Status.Log.LastestLog.Time
+		// 	}
+		// 	newLastestTime, newLastestMsg, newLastestWarningTime, newLastestWarningMsg, totalMsgCount, warningMsgCount, newLogAccount := c.GenerateEvents(logEntrys, name, lastLogTime)
+		// 	if newLastestTime != "" {
+		// 		updated.Status.Log.TotalLogAccount = int32(totalMsgCount)
+		// 		updated.Status.Log.WarningLogAccount = int32(warningMsgCount)
+		// 		updated.Status.Log.LastestLog = &topohubv1beta1.LogEntry{
+		// 			Time:    newLastestTime,
+		// 			Message: newLastestMsg,
+		// 		}
+		// 		updated.Status.Log.LastestWarningLog = &topohubv1beta1.LogEntry{
+		// 			Time:    newLastestWarningTime,
+		// 			Message: newLastestWarningMsg,
+		// 		}
+		// 		c.log.Infof("find %d new logs for redfishStatus %s", newLogAccount, name)
+		// 	}
+		// }
 	}
 
 	if updated.Status.Healthy != oldRedfishStatus.Status.Healthy {
