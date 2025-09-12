@@ -117,20 +117,40 @@ func (s *dhcpServer) updateSubnetWithRetry() error {
 				if updated.Status.Conditions == nil {
 					updated.Status.Conditions = []metav1.Condition{}
 				}
-				updated.Status.Conditions = append(updated.Status.Conditions, metav1.Condition{
+
+				// Create the condition object once
+				condition := metav1.Condition{
 					Type:               "DhcpServer",
 					Reason:             "hostChange",
 					Message:            "dhcp server is hosted by node " + s.config.NodeName,
 					Status:             "True",
 					LastTransitionTime: metav1.Now(),
-				})
+				}
+
+				// check if the condition already exists and update it
+				var found bool
+				for i, cond := range updated.Status.Conditions {
+					if cond.Type == "DhcpServer" {
+						s.log.Infof("updating existing DhcpServer condition for subnet %s", s.subnet.Name)
+						updated.Status.Conditions[i] = condition
+						found = true
+						break
+					}
+				}
+
+				// if not found, add new condition
+				if !found {
+					// add new condition
+					s.log.Infof("adding new DhcpServer condition for subnet %s", s.subnet.Name)
+					updated.Status.Conditions = append(updated.Status.Conditions, condition)
+				}
 			}
 
 			if reflect.DeepEqual(current.Status, updated.Status) {
 				return nil
 			}
 
-			// 更新 crd 实例
+			// update crd instance
 			if err := s.client.Status().Update(context.Background(), updated); err != nil {
 				s.log.Errorf("Failed to update subnet %s status: %v", s.subnet.Name, err)
 				return err
