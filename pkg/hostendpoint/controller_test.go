@@ -87,7 +87,7 @@ func TestHostEndpointReconcilerReconcile(t *testing.T) {
 		mgr.EXPECT().GetClient().Return(fakeHostEndpointClient()).AnyTimes()
 		mgr.EXPECT().GetCache().Return(nil).AnyTimes()
 
-		reconciler := NewHostEndpointReconciler(mgr)
+		reconciler := NewHostEndpointReconciler(mgr, nil, nil)
 		res, err := reconciler.Reconcile(ctx, req)
 		require.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
@@ -109,7 +109,7 @@ func TestHostEndpointReconcilerReconcile(t *testing.T) {
 		})).AnyTimes()
 		mgr.EXPECT().GetCache().Return(nil).AnyTimes()
 
-		reconciler := NewHostEndpointReconciler(mgr)
+		reconciler := NewHostEndpointReconciler(mgr, nil, nil)
 		res, err := reconciler.Reconcile(ctx, req)
 		require.NoError(t, err)
 		assert.True(t, sshHandleCalled)
@@ -132,7 +132,7 @@ func TestHostEndpointReconcilerReconcile(t *testing.T) {
 		})).AnyTimes()
 		mgr.EXPECT().GetCache().Return(nil).AnyTimes()
 
-		reconciler := NewHostEndpointReconciler(mgr)
+		reconciler := NewHostEndpointReconciler(mgr, nil, nil)
 		res, err := reconciler.Reconcile(ctx, req)
 		require.NoError(t, err)
 		assert.True(t, redfishHandleCalled)
@@ -162,7 +162,7 @@ func TestHostEndpointReconcilerReconcile(t *testing.T) {
 			patches.ApplyMethodReturn((*handler.RedfishHostEndpointHandler)(nil), "CreateStatusIfNotExist",
 				false, errors.New("test create status error"))
 
-			reconciler := NewHostEndpointReconciler(mgr)
+			reconciler := NewHostEndpointReconciler(mgr, nil, nil)
 			res, err := reconciler.Reconcile(ctx, req)
 			require.NoError(t, err)
 			assert.Equal(t, 2*time.Second, res.RequeueAfter)
@@ -176,7 +176,7 @@ func TestHostEndpointReconcilerReconcile(t *testing.T) {
 			patches.ApplyMethodReturn((*handler.RedfishHostEndpointHandler)(nil), "CreateStatusIfNotExist",
 				false, apierrors.NewConflict(gr, name, errors.New("test error")))
 
-			reconciler := NewHostEndpointReconciler(mgr)
+			reconciler := NewHostEndpointReconciler(mgr, nil, nil)
 			res, err := reconciler.Reconcile(ctx, req)
 			require.NoError(t, err)
 			assert.Equal(t, reconcile.Result{}, res)
