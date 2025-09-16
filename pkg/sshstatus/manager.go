@@ -26,6 +26,8 @@ type SSHStatusController interface {
 	SetupWithManager(ctrl.Manager) error
 	// Update authentication information for SSH hosts
 	UpdateSecret(string, string, string, string)
+	// UpdateSSHStatusInfo updates the SSH status information
+	UpdateSSHStatusInfo(*topohubv1beta1.SSHStatus) error
 }
 
 // sshStatusController implements the SSHStatusController interface

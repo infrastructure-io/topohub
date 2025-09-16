@@ -24,8 +24,10 @@ import (
 type RedfishStatusController interface {
 	Stop()
 	SetupWithManager(ctrl.Manager) error
-	// 更新 bmc 主机的 认证信息
+	// update bmc host's authentication information
 	UpdateSecret(string, string, string, string)
+	// update RedfishStatus info field
+	UpdateRedfishStatusInfo(*topohubv1beta1.RedfishStatus) error
 }
 
 type redfishStatusController struct {

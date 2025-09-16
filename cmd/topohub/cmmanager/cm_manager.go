@@ -115,13 +115,6 @@ func RegisterControllers(mgr manager.Manager, k8scli kubernetes.Interface, agent
 	if err := secretCtrl.SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("unable to create secret controller, err: %v", err)
 	}
-
-	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus
-	hostEndpointCtrl := hostendpoint.NewHostEndpointReconciler(mgr)
-	if err := hostEndpointCtrl.SetupWithManager(mgr); err != nil {
-		return nil, fmt.Errorf("unable to create hostendpoint controller, err: %v", err)
-	}
-
 	// Initialize hostoperation controller
 	hostOperationCtrl, err := hostoperation.NewHostOperationController(mgr, agentConfig)
 	if err != nil {
@@ -138,6 +131,12 @@ func RegisterControllers(mgr manager.Manager, k8scli kubernetes.Interface, agent
 		return nil, fmt.Errorf("unable to create sshstatus controller, err: %v", err)
 	}
 	stopFns = append(stopFns, sshStatusCtrl.Stop)
+
+	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus/sshstatus
+	hostEndpointCtrl := hostendpoint.NewHostEndpointReconciler(mgr, redfishStatusCtrl, sshStatusCtrl)
+	if err := hostEndpointCtrl.SetupWithManager(mgr); err != nil {
+		return nil, fmt.Errorf("unable to create hostendpoint controller, err: %v", err)
+	}
 
 	// Initialize bindingIP controller
 	bindingIPCtrl := bindingip.NewBindingIPController(mgr, agentConfig, addBindingIpChan, deleteBindingIpChan)
