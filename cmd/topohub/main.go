@@ -26,6 +26,7 @@ import (
 	crdclientset "github.com/infrastructure-io/topohub/pkg/k8s/client/clientset/versioned/typed/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
+	"github.com/infrastructure-io/topohub/pkg/secret"
 	"github.com/infrastructure-io/topohub/pkg/sshstatus"
 	"github.com/infrastructure-io/topohub/pkg/subnet"
 	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
@@ -170,15 +171,15 @@ func main() {
 	}
 
 	// Initialize secret controller
-	// secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
-	// if err != nil {
-	// 	log.Logger.Errorf("Failed to create secret controller: %v", err)
-	// 	os.Exit(1)
-	// }
-	// if err = secretCtrl.SetupWithManager(mgr); err != nil {
-	// 	log.Logger.Errorf("Unable to create secret controller: %v", err)
-	// 	os.Exit(1)
-	// }
+	secretCtrl, err := secret.NewSecretReconciler(mgr, agentConfig, redfishStatusCtrl)
+	if err != nil {
+		log.Logger.Errorf("Failed to create secret controller: %v", err)
+		os.Exit(1)
+	}
+	if err = secretCtrl.SetupWithManager(mgr); err != nil {
+		log.Logger.Errorf("Unable to create secret controller: %v", err)
+		os.Exit(1)
+	}
 
 	// Initialize hostendpoint controller, it will watch the hostendpoint and update the redfishstatus
 	hostEndpointCtrl, err := hostendpoint.NewHostEndpointReconciler(mgr, k8sClient, agentConfig)
