@@ -12,7 +12,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
+
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -51,7 +51,7 @@ func init() {
 
 func main() {
 	// Parse command line flags
-	probePort := flag.String("health-probe-port", "8081", "The address the probe endpoint binds to.")
+
 	// webhookPort := flag.String("webhook-port", "8082", "The address the probe endpoint binds to.")
 	metricsPort := flag.String("metrics-port", "8083", "The address the metric endpoint binds to.")
 	pyroscopeAddress := flag.String("pyroscope-address", "", "The server address where the pyroscope data is pushed.")
@@ -103,7 +103,7 @@ func main() {
 		Metrics: metricsserver.Options{
 			BindAddress: ":" + *metricsPort,
 		},
-		HealthProbeBindAddress: ":" + *probePort,
+
 		// WebhookServer: webhook.NewServer(webhook.Options{
 		// 	Port: webhookPortInt,
 		// 	//CertDir: agentConfig.WebhookCertDir,
@@ -231,15 +231,7 @@ func main() {
 		log.Logger.Info("Http server is disabled for pxe and ztp")
 	}
 
-	// Add health check
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		log.Logger.Errorf("Unable to set up health check: %v", err)
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		log.Logger.Errorf("Unable to set up ready check: %v", err)
-		os.Exit(1)
-	}
+
 
 	// Create context that can be canceled
 	ctx, cancel := context.WithCancel(context.Background())
