@@ -54,7 +54,7 @@ func NewControllerManager(opts *options.TopohubFlags) (manager.Manager, error) {
 		Metrics: metricsserver.Options{
 			BindAddress: ":" + opts.MetricsPort,
 		},
-		HealthProbeBindAddress: ":" + opts.ProbePort,
+		// 健康检查探针已移除
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port: webhookPortInt,
 			// CertDir: agentConfig.WebhookCertDir,

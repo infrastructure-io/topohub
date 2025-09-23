@@ -43,7 +43,7 @@ Topohub is a set of Kubernetes components for managing infrastructure, including
 | topohub.storage.hostPath.path             | string | `"/var/lib/topohub"` | Path on the host for HostPath storage                  |
 | topohub.logLevel                         | string | `"info"`      | Log level configuration                                            |
 | topohub.metricsPort                      | int    | `8083`        | Port for the metrics server                                        |
-| topohub.healthProbePort                  | int    | `8081`        | Port for health probes                                             |
+
 | topohub.webhook.webhookPort              | int    | `8082`        | Port for the webhook server                                        |
 | topohub.webhook.timeoutSeconds            | int    | `5`           | Timeout for webhook calls in seconds                              |
 | topohub.webhook.failurePolicy             | string | `"Fail"`      | Failure policy for webhook                                         |

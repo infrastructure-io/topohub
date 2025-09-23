@@ -12,7 +12,7 @@ ENV GOPROXY=https://goproxy.io
 RUN make build-topohub
 
 # Final stage
-FROM ubuntu:24.10
+FROM ubuntu:24.04
 
 ARG GIT_COMMIT_VERSION
 ENV ENV_GIT_COMMIT_VERSION=${GIT_COMMIT_VERSION}
