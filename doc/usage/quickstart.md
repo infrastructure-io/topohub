@@ -31,7 +31,7 @@ Topohub 是一套管理基础设施的 Kubernetes 组件，包括主机、交换
 kubectl label node <node-name> infrastructure.io/deploy=true
 ```
 
-> 注意：Topohub 组件以 hostnetwork 模式运行在主机上，默认 Topohub 组件会占用端口 80、8080、8081、8082，请确保这些端口可用
+> 注意：Topohub 组件以 hostnetwork 模式运行在主机上，默认 Topohub 组件会占用端口 80、8080、8082，请确保这些端口可用
 
 2. 使用 helm 安装 Topohub
 

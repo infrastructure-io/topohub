@@ -81,7 +81,7 @@ func main() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
-	// Graceful shutdown and health Check
+	// Graceful shutdown
 	for {
 		select {
 		case <-ticker.C:
