@@ -102,20 +102,24 @@ func NewDhcpServer(config *config.AgentConfig, subnet *topohubv1beta1.Subnet, cl
 func (s *dhcpServer) Run() error {
 	s.log.Infof("run whole dhcp server service")
 
-	// 清理可能存在的旧接口
+	// Clean up any existing interfaces
 	if err := s.cleanupAllInterface(); err != nil {
 		s.log.Warnf("Failed to cleanup old interface: %v", err)
 	}
 
-	// 启动 CRD 更新协程
+	// Start CRD update goroutine
 	go s.statusUpdateWorker()
 
-	// 启动 DHCP 服务
+	// Start DHCP service first
 	if err := s.startDnsmasq(); err != nil {
+		// Explicitly call Stop to clean up resources
+		if stopErr := s.Stop(); stopErr != nil {
+			s.log.Errorf("Failed to stop DHCP server during cleanup: %v", stopErr)
+		}
 		return fmt.Errorf("failed to start DHCP server: %v", err)
 	}
 
-	// 启动状态监控
+	// Start status monitoring
 	go s.monitor()
 
 	s.log.Infof("finished setting up dhcp server")

@@ -83,8 +83,8 @@ func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason
 	if err := s.client.Status().Update(context.TODO(), updated); err != nil {
 		logger.Errorf("failed to update status: %v", err)
 		return reconcile.Result{
-			RequeueAfter: time.Second * 2,
-		}, err
+			RequeueAfter: time.Second * 5,
+		}, nil
 	}
 	s.log.Infof("succeeded to update subnet status for %s: %v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
 
@@ -134,7 +134,9 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			if err != nil {
 				msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
 				logger.Errorf(msg)
-				return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				return reconcile.Result{}, nil
+
 			} else {
 				logger.Infof("Started DHCP server for subnet %s", subnet.Name)
 				// Update the cache with the latest version
@@ -161,7 +163,8 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			if err := server.UpdateService(*subnet); err != nil {
 				msg := fmt.Sprintf("Failed to update DHCP service for subnet %s: %v", subnet.Name, err)
 				logger.Errorf(msg)
-				return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				return reconcile.Result{}, nil
 			}
 			s.cache.Set(subnet)
 		}
