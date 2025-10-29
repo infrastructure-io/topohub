@@ -24,7 +24,6 @@ import (
 	topohubv1beta1 "github.com/infrastructure-io/topohub/pkg/k8s/apis/topohub.infrastructure.io/v1beta1"
 	"github.com/infrastructure-io/topohub/pkg/log"
 	"github.com/infrastructure-io/topohub/pkg/redfishstatus"
-	"github.com/infrastructure-io/topohub/pkg/secret"
 	"github.com/infrastructure-io/topohub/pkg/sshstatus"
 	"github.com/infrastructure-io/topohub/pkg/subnet"
 	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
@@ -107,13 +106,13 @@ func RegisterControllers(mgr manager.Manager, k8scli kubernetes.Interface, agent
 	stopFns = append(stopFns, redfishStatusCtrl.Stop)
 
 	// Initialize secret controller
-	secretCtrl, err := secret.NewSecretReconciler(mgr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create secret controller, err: %v", err)
-	}
-	if err := secretCtrl.SetupWithManager(mgr); err != nil {
-		return nil, fmt.Errorf("unable to create secret controller, err: %v", err)
-	}
+	// secretCtrl, err := secret.NewSecretReconciler(mgr)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create secret controller, err: %v", err)
+	// }
+	// if err := secretCtrl.SetupWithManager(mgr); err != nil {
+	// 	return nil, fmt.Errorf("unable to create secret controller, err: %v", err)
+	// }
 	// Initialize hostoperation controller
 	hostOperationCtrl, err := hostoperation.NewHostOperationController(mgr, agentConfig)
 	if err != nil {
