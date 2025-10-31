@@ -80,8 +80,8 @@ func (c *sshStatusController) SetupWithManager(mgr ctrl.Manager) error {
 	go func() {
 		<-mgr.Elected()
 		c.log.Info("Elected as leader, begin to start SSH status controller")
-		// Start periodic SSH status updates
-		go c.UpdateSSHStatusAtInterval()
+		// 注释掉定时任务，避免不断重试
+		// go c.UpdateSSHStatusAtInterval()
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
