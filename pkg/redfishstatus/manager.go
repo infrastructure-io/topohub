@@ -108,9 +108,9 @@ func (c *redfishStatusController) SetupWithManager(mgr ctrl.Manager) error {
 		<-mgr.Elected()
 		c.log.Info("Elected as leader, begin to start all controllers")
 		// 启动 DHCP 事件处理
-		// go c.processDHCPEvents()
+		go c.processDHCPEvents()
 		// 启动 redfishstatus spec.info 的	周期更新
-		//go c.UpdateRedfishStatusAtInterval()
+		go c.UpdateRedfishStatusAtInterval()
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
