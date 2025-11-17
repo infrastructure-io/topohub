@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -60,6 +61,11 @@ func NewControllerManager(opts *options.TopohubFlags) (manager.Manager, error) {
 		}),
 		// Leader Election disabled for single pod deployment
 		LeaderElection: false,
+		// Strip ManagedFields from all cached objects to reduce memory usage
+		// This prevents ManagedFields from accumulating in the informer cache
+		Cache: cache.Options{
+			DefaultTransform: cache.TransformStripManagedFields(),
+		},
 	})
 }
 
