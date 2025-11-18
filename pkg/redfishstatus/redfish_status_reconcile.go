@@ -5,6 +5,8 @@ package redfishstatus
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -369,6 +371,12 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 
 	// Wait for all tasks to complete
 	wg.Wait()
+
+	// Force GC and return memory to OS after batch operations
+	c.log.Info("Batch update completed, forcing GC and releasing memory to OS")
+	runtime.GC()
+	debug.FreeOSMemory()
+	c.log.Info("Memory released to OS successfully")
 
 	// Report pool statistics
 	c.log.Debugf("RedfishStatus update completed. Pool stats: running=%d, free=%d, capacity=%d",

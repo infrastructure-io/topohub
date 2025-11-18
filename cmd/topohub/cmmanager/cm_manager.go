@@ -6,12 +6,16 @@ import (
 	"os"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -65,6 +69,18 @@ func NewControllerManager(opts *options.TopohubFlags) (manager.Manager, error) {
 		// This prevents ManagedFields from accumulating in the informer cache
 		Cache: cache.Options{
 			DefaultTransform: cache.TransformStripManagedFields(),
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {
+					Label: func() labels.Selector {
+						selector := labels.NewSelector()
+						req, err := labels.NewRequirement("topohub.io/secret-credential", selection.Exists, nil)
+						if err != nil {
+							return selector
+						}
+						return selector.Add(*req)
+					}(),
+				},
+			},
 		},
 	})
 }
