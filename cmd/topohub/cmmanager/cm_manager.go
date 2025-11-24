@@ -35,7 +35,6 @@ import (
 	bindingipwebhook "github.com/infrastructure-io/topohub/pkg/webhook/bindingip"
 	hostendpointwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostendpoint"
 	hostoperationwebhook "github.com/infrastructure-io/topohub/pkg/webhook/hostoperation"
-	redfishstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/redfishstatus"
 	sshstatuswebhook "github.com/infrastructure-io/topohub/pkg/webhook/sshstatus"
 	subnetwebhook "github.com/infrastructure-io/topohub/pkg/webhook/subnet"
 )
@@ -103,10 +102,10 @@ func RegisterControllers(mgr manager.Manager, k8scli kubernetes.Interface, agent
 	if err := (&bindingipwebhook.BindingIPWebhook{}).SetupWebhookWithManager(mgr, *agentConfig); err != nil {
 		return nil, fmt.Errorf("unable to create webhook %s, err: %v", "BindingIp", err)
 	}
-	// Setup RedfishStatus webhook
-	if err := redfishstatuswebhook.SetupWebhookWithManager(mgr); err != nil {
-		return nil, fmt.Errorf("unable to setup redfishstatus webhook. err: %v", err)
-	}
+	// Setup RedfishStatus webhook (disabled for memory debugging)
+	// if err := redfishstatuswebhook.SetupWebhookWithManager(mgr); err != nil {
+	// 	return nil, fmt.Errorf("unable to setup redfishstatus webhook. err: %v", err)
+	// }
 	// Setup SSHStatus webhook
 	if err := (&sshstatuswebhook.SSHStatusWebhook{}).SetupWebhookWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("unable to create webhook %s, err: %v", "SSHStatus", err)

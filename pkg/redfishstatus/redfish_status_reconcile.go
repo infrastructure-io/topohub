@@ -206,12 +206,12 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 	}
 	// Update RedfishStatus
 	if !compareRedfishStatus(updated.Status, oldRedfishStatus.Status, c.log) {
-		c.log.Debugf("status changed, existing: %v, updated: %v", oldRedfishStatus.Status, updated.Status)
-		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			return err
-		}
-		c.log.Infof("Successfully updated redfishStatus %s status", name)
+		c.log.Debugf("status changed, existing: %v, updated: %v (Status().Update is disabled for debugging)", oldRedfishStatus.Status, updated.Status)
+		// updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
+		// if err := c.client.Status().Update(context.Background(), updated); err != nil {
+		// 	return err
+		// }
+		// c.log.Infof("Successfully updated redfishStatus %s status", name)
 	}
 	return nil
 }
@@ -469,12 +469,12 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 
 	// compare and update status
 	if !compareBasicStatus(updated.Status, oldRedfishStatus.Status) {
-		c.log.Debugf("Basic status changed for RedfishStatus %s", name)
-		updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		if err := c.client.Status().Update(context.Background(), updated); err != nil {
-			return err
-		}
-		c.log.Infof("Successfully updated basic status for RedfishStatus %s", name)
+		c.log.Debugf("Basic status changed for RedfishStatus %s (Status().Update is disabled for debugging)", name)
+		// updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
+		// if err := c.client.Status().Update(context.Background(), updated); err != nil {
+		// 	return err
+		// }
+		// c.log.Infof("Successfully updated basic status for RedfishStatus %s", name)
 	}
 
 	return nil
