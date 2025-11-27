@@ -64,7 +64,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		logger.Debugf("Operation type is Redfish for %s", hostOp.Spec.StatusName)
 	} else {
 		logger.Errorf("Invalid operation type: %s", hostOp.Spec.HostType)
-		return ctrl.Result{}, fmt.Errorf("invalid operation type: %s", hostOp.Spec.HostType)
+		return ctrl.Result{}, nil
 	}
 
 	// check if the host operation is pending
@@ -84,7 +84,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 			sshStatus := &topohubv1beta1.SSHStatus{}
 			if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.StatusName}, sshStatus); err != nil {
 				logger.Errorf("Failed to get SSHStatus %s: %v", hostOp.Spec.StatusName, err)
-				return ctrl.Result{}, err
+				return ctrl.Result{}, nil
 			}
 
 			// get host endpoint from SSHStatus
@@ -94,7 +94,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 			redfishStatus := &topohubv1beta1.RedfishStatus{}
 			if err := r.Get(ctx, client.ObjectKey{Name: hostOp.Spec.StatusName}, redfishStatus); err != nil {
 				logger.Errorf("Failed to get RedfishStatus %s: %v", hostOp.Spec.StatusName, err)
-				return ctrl.Result{}, err
+				return ctrl.Result{}, nil
 			}
 
 			// get host endpoint from RedfishStatus
@@ -104,7 +104,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		if err != nil {
 			hostOp.Status.Status = topohubv1beta1.HostOperationStatusPending
 			logger.Warnf("Failed to get connection info for %s: %v, retry later", hostOp.Spec.StatusName, err)
-			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
+			return ctrl.Result{}, nil
 		}
 
 		logger.Debugf("get connect config %s: %+v", hostOp.Spec.StatusName, hostEndpoint)
@@ -118,7 +118,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		)
 		if err != nil {
 			r.log.Errorf("Failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 
 		// perform operation
@@ -145,7 +145,7 @@ func (r *HostOperationController) Reconcile(ctx context.Context, req ctrl.Reques
 		// update HostOperation status
 		if err := r.Status().Update(ctx, &hostOp); err != nil {
 			logger.Errorf("Action has been done, but failed to update HostOperation status: %v", err)
-			return ctrl.Result{}, fmt.Errorf("failed to update HostOperation status: %v", err)
+			return ctrl.Result{}, nil
 		}
 		logger.Debugf("Successfully updated HostOperation %s status", hostOp.Name)
 

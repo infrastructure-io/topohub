@@ -81,9 +81,7 @@ func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason
 
 	if err := s.client.Status().Update(context.TODO(), updated); err != nil {
 		logger.Errorf("failed to update status: %v", err)
-		return reconcile.Result{
-			RequeueAfter: time.Second * 5,
-		}, nil
+		return reconcile.Result{}, nil
 	}
 	s.log.Infof("succeeded to update subnet status for %s: %v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
 
