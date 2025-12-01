@@ -1,6 +1,6 @@
 module github.com/infrastructure-io/topohub
 
-go 1.24.4
+go 1.25.4
 
 require (
 	github.com/agiledragon/gomonkey/v2 v2.13.0
