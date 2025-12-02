@@ -323,7 +323,6 @@ func (c *clientImpl) GetSupportedResetTypes(system *redfish.ComputerSystem) stri
 	resp, err := c.client.Get(resetInfoPath)
 	if err != nil {
 		c.logger.Errorf("Failed to get ResetActionInfo: %v", err)
-		return ""
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
