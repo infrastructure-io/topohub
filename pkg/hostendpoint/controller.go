@@ -2,7 +2,6 @@ package hostendpoint
 
 import (
 	"context"
-	"time"
 
 	"go.uber.org/zap"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +48,7 @@ func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Re
 			return reconcile.Result{}, nil
 		}
 		logger.Error(err, "Failed to get HostEndpoint")
-		return reconcile.Result{RequeueAfter: time.Second * 1}, nil
+		return reconcile.Result{}, nil
 	}
 
 	// determine endpoint type
@@ -78,7 +77,7 @@ func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Re
 	if err != nil {
 		logger.Errorf("Failed to create RedfishStatus, err: %v", err)
 		if !apierrors.IsConflict(err) {
-			return reconcile.Result{RequeueAfter: time.Second * 2}, nil
+			return reconcile.Result{}, nil
 		}
 	}
 
@@ -86,7 +85,7 @@ func (r *HostEndpointReconciler) Reconcile(ctx context.Context, req reconcile.Re
 		logger.Info("RedfishStatus newly created, no need to update info")
 		return reconcile.Result{}, nil
 	}
-	
+
 	logger.Info("Updating Status info")
 	r.updateStatus(ctx, hostEndpoint.Name, isSSH, logger)
 
@@ -105,7 +104,7 @@ func (r *HostEndpointReconciler) updateStatus(ctx context.Context, name string, 
 			logger.Errorf("Failed to get SSHStatus for update: %v", err)
 			return
 		}
-		
+
 		// call update method
 		if err := r.sshStatusCtrl.UpdateSSHStatusInfo(&sshStatus); err != nil {
 			logger.Errorf("Failed to update SSHStatus info: %v", err)
@@ -122,7 +121,7 @@ func (r *HostEndpointReconciler) updateStatus(ctx context.Context, name string, 
 			logger.Errorf("Failed to get RedfishStatus for update: %v", err)
 			return
 		}
-		
+
 		// call update method
 		if err := r.redfishStatusCtrl.UpdateRedfishStatusInfo(&redfishStatus); err != nil {
 			logger.Errorf("Failed to update RedfishStatus info: %v", err)

@@ -2,11 +2,9 @@ package bindingip
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"reflect"
 	"strings"
-	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -115,20 +113,20 @@ func (c *bindingIPController) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := c.updateBindingIPStatus(bindingIP, logger); err != nil {
 		if errors.IsConflict(err) {
 			logger.Debugf("conflict occurred while updating BindingIP status, will retry")
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{}, nil
 		}
 		logger.Errorf("failed to update BindingIP status: %v", err)
-		return ctrl.Result{}, fmt.Errorf("failed to update BindingIP status: %v", err)
+		return ctrl.Result{}, nil
 	}
 
 	// 处理 BindingIP 在 dhcp server 中的 绑定
 	if err := c.processBindingIP(bindingIP, logger); err != nil {
 		logger.Errorf("failed to process BindingIP: %v", err)
-		return ctrl.Result{}, fmt.Errorf("failed to process BindingIP: %v", err)
+		return ctrl.Result{}, nil
 	}
 
 	// requeue every minute, to check the status of the BindingIP
-	return ctrl.Result{RequeueAfter: time.Minute}, nil
+	return ctrl.Result{}, nil
 }
 
 // update the status of the BindingIP

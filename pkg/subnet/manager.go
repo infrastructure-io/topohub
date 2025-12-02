@@ -66,7 +66,7 @@ func NewSubnetReconciler(config config.AgentConfig, kubeClient kubernetes.Interf
 }
 
 // update the status
-func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason, errorMsg string, logger *zap.SugaredLogger) (reconcile.Result, error) {
+func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason, errorMsg string, logger *zap.SugaredLogger) error {
 	updated := subnet.DeepCopy()
 	if updated.Status.Conditions == nil {
 		updated.Status.Conditions = []metav1.Condition{}
@@ -81,13 +81,10 @@ func (s *subnetManager) UpdateSubnetStatus(subnet *topohubv1beta1.Subnet, reason
 
 	if err := s.client.Status().Update(context.TODO(), updated); err != nil {
 		logger.Errorf("failed to update status: %v", err)
-		return reconcile.Result{
-			RequeueAfter: time.Second * 5,
-		}, nil
+		return err
 	}
 	s.log.Infof("succeeded to update subnet status for %s: %v", updated.ObjectMeta.Name, updated.Status.DhcpStatus)
-
-	return reconcile.Result{}, nil
+	return nil
 }
 
 // Reconcile handles the reconciliation of Subnet objects
@@ -117,7 +114,7 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			return reconcile.Result{}, nil
 		}
 		logger.Errorf("Failed to get Subnet %s: %v", req.Name, err)
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	if s.cache.HasSpecChanged(subnet) {
@@ -133,7 +130,12 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 			if err != nil {
 				msg := fmt.Sprintf("Failed to start DHCP server for subnet %s: %v", subnet.Name, err)
 				logger.Errorf(msg)
-				return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				// call UpdateSubnetStatus and explicitly ignore its return values
+				err = s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+				if err != nil {
+					logger.Errorf("Failed to update subnet status: %v", err)
+				}
+				return reconcile.Result{}, nil
 			} else {
 				logger.Infof("Started DHCP server for subnet %s", subnet.Name)
 				// Update the cache with the latest version
@@ -151,7 +153,12 @@ func (s *subnetManager) Reconcile(ctx context.Context, req reconcile.Request) (r
 				if err := t.UpdateBindingIpEvents(bindingIPInfoList, nil); err != nil {
 					msg := fmt.Sprintf("Failed to update binding ip events for subnet %s: %v", subnet.Name, err)
 					logger.Errorf(msg)
-					return s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+					// call UpdateSubnetStatus and explicitly ignore its return values
+					err = s.UpdateSubnetStatus(subnet, "Failed", msg, logger)
+					if err != nil {
+						logger.Errorf("Binding IP update failed, Failed to update subnet status: %v", err)
+					}
+					return reconcile.Result{}, nil
 				}
 			}
 
