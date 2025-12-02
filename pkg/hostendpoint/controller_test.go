@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	gomonkey "github.com/agiledragon/gomonkey/v2"
 	"github.com/stretchr/testify/assert"
@@ -165,7 +164,7 @@ func TestHostEndpointReconcilerReconcile(t *testing.T) {
 			reconciler := NewHostEndpointReconciler(mgr, nil, nil)
 			res, err := reconciler.Reconcile(ctx, req)
 			require.NoError(t, err)
-			assert.Equal(t, 2*time.Second, res.RequeueAfter)
+			assert.Equal(t, reconcile.Result{}, res)
 		})
 
 		t.Run("create status failed and no requeue when creating status conflicts", func(t *testing.T) {
