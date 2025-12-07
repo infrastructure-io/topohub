@@ -221,7 +221,7 @@ func (c *redfishStatusController) UpdateRedfishStatusInfoWrapper(status *topohub
 	// get redfishStatus list
 	var (
 		redfishStatusList topohubv1beta1.RedfishStatusList
-		modeinfo          string
+		// modeinfo          string
 	)
 	listOpts := []client.ListOption{}
 	// if status is nil, list all redfishStatus
@@ -235,13 +235,13 @@ func (c *redfishStatusController) UpdateRedfishStatusInfoWrapper(status *topohub
 	}
 
 	// update each redfishStatus
-	for _, redfishStatus := range redfishStatusList.Items {
-		c.log.Debugf("Updating status of RedfishStatus %s", redfishStatus.Name)
-		if err := c.UpdateRedfishStatusInfo(&redfishStatus); err != nil {
-			c.log.Errorf("Failed to update status of RedfishStatus %s%s: %v",
-				redfishStatus.Name, modeinfo, err)
-		}
-	}
+	// for _, redfishStatus := range redfishStatusList.Items {
+	// 	c.log.Debugf("Updating status of RedfishStatus %s", redfishStatus.Name)
+	// 	if err := c.UpdateRedfishStatusInfo(&redfishStatus); err != nil {
+	// 		c.log.Errorf("Failed to update status of RedfishStatus %s%s: %v",
+	// 			redfishStatus.Name, modeinfo, err)
+	// 	}
+	// }
 	return nil
 }
 
