@@ -358,9 +358,9 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 		err := p.Submit(func() {
 			defer wg.Done()
 			c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
-			if err := c.updateBasicStatus(&redfishStatus); err != nil {
-				c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
-			}
+			// if err := c.updateBasicStatus(&redfishStatus); err != nil {
+			// 	c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
+			// }
 		})
 
 		if err != nil {
