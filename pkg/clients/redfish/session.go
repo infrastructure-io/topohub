@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/stmcginnis/gofish"
@@ -151,7 +152,7 @@ func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (Cli
 		Insecure:         true,
 		ReuseConnections: true,
 		HTTPClient: &http.Client{
-			Transport: customTransport(),
+			Transport: getSharedTransport(),
 		},
 	}
 	logger = logger.With(zap.String("endpoint", config.Endpoint))
@@ -166,34 +167,42 @@ func newRedfishClient(cfg *RedfishSessionConfig, logger *zap.SugaredLogger) (Cli
 	}, nil
 }
 
-// customTransport returns a custom http transport
-func customTransport() *http.Transport {
-	defaultTransport := http.DefaultTransport.(*http.Transport)
-	return &http.Transport{
-		Proxy: defaultTransport.Proxy,
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return net.DialTimeout(network, addr, 5*time.Second)
-		},
-		MaxIdleConns:          defaultTransport.MaxIdleConns,
-		MaxIdleConnsPerHost:   defaultTransport.MaxIdleConnsPerHost, // max idle connections per host
-		IdleConnTimeout:       defaultTransport.IdleConnTimeout,     // idle connection timeout
-		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
-		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion: tls.VersionTLS10,
-			// Configure TLS to handle servers with weak DH keys
-			CipherSuites: []uint16{
-				// Specify cipher suites that don't use DH key exchange
-				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-				tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+var (
+	sharedTransport     *http.Transport
+	sharedTransportOnce sync.Once
+)
+
+// getSharedTransport returns a shared http transport
+func getSharedTransport() *http.Transport {
+	sharedTransportOnce.Do(func() {
+		defaultTransport := http.DefaultTransport.(*http.Transport)
+		sharedTransport = &http.Transport{
+			Proxy: defaultTransport.Proxy,
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.DialTimeout(network, addr, 5*time.Second)
 			},
-		},
-	}
+			MaxIdleConns:          10000, // Increase global pool size to handle many hosts
+			MaxIdleConnsPerHost:   5,     // Slight increase for concurrency per host
+			IdleConnTimeout:       90 * time.Second,
+			ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+			TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+				MinVersion:         tls.VersionTLS10,
+				// Configure TLS to handle servers with weak DH keys
+				CipherSuites: []uint16{
+					// Specify cipher suites that don't use DH key exchange
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+					tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+				},
+			},
+		}
+	})
+	return sharedTransport
 }
