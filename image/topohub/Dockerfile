@@ -8,8 +8,11 @@ COPY . .
 # Set GOPROXY for better download speed in China
 ENV GOPROXY=https://goproxy.io
 
+ARG TARGETARCH
+ARG DISABLE_RACE
+
 # Build the agent binary using the project's Makefile
-RUN make build-topohub
+RUN make build-topohub GOARCH=$TARGETARCH DISABLE_RACE=$DISABLE_RACE
 
 # Final stage
 FROM ubuntu:24.04
