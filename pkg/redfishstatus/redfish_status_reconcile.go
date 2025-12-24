@@ -89,7 +89,9 @@ func (c *redfishStatusController) UpdateRedfishStatusInfo(oldRedfishStatus *topo
 		oldRedfishStatus.Status = &topohubv1beta1.RedfishStatusStatus{}
 	}
 	updated := oldRedfishStatus.DeepCopy()
-
+	if updated.Status.Info == nil {
+		updated.Status.Info = make(map[string]string)
+	}
 	// get hostEndpoint
 	hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
 	if err != nil {
