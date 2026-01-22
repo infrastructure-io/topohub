@@ -358,9 +358,9 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 		err := p.Submit(func() {
 			defer wg.Done()
 			c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
-			// if err := c.updateBasicStatus(&redfishStatus); err != nil {
-			// 	c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
-			// }
+			if err := c.updateBasicStatus(&redfishStatus); err != nil {
+				c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
+			}
 		})
 
 		if err != nil {
@@ -423,6 +423,8 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	} else {
 		healthy = true
 	}
+	// keep a reference to avoid unused var after commenting suspicious block
+	_ = session
 
 	// lock resource to avoid concurrent update
 	c.log.Debugf("Lock for updating basic status of RedfishStatus %s", name)
@@ -441,31 +443,31 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 		}
 	}()
 	// only update high frequency fields (PowerState and BmcStatus)
-	if healthy {
-		client := session.GetClient()
-		powerState, bmcStatus, err := client.GetBasicStatus()
-		if err != nil {
-			c.log.Warnf("Failed to get basic status for RedfishStatus %s: %v", name, err)
-		} else {
-			// update PowerState
-			if updated.Status.Info == nil {
-				newInfo = c.infoObjPool.Get().(map[string]string)
-				updated.Status.Info = newInfo
-			}
-			updated.Status.Info["PowerState"] = powerState
-
-			// update BmcStatus
-			oldBmcStatus := ""
-			if oldRedfishStatus.Status.Info != nil {
-				oldBmcStatus = oldRedfishStatus.Status.Info["BmcStatus"]
-			}
-			if oldBmcStatus != bmcStatus {
-				c.log.Infof("BmcStatus changed from %s to %s for RedfishStatus %s",
-					oldBmcStatus, bmcStatus, name)
-				updated.Status.Info["BmcStatus"] = bmcStatus
-			}
-		}
-	}
+	// if healthy {
+	// 	client := session.GetClient()
+	// 	powerState, bmcStatus, err := client.GetBasicStatus()
+	// 	if err != nil {
+	// 		c.log.Warnf("Failed to get basic status for RedfishStatus %s: %v", name, err)
+	// 	} else {
+	// 		// update PowerState
+	// 		if updated.Status.Info == nil {
+	// 			newInfo = c.infoObjPool.Get().(map[string]string)
+	// 			updated.Status.Info = newInfo
+	// 		}
+	// 		updated.Status.Info["PowerState"] = powerState
+	//
+	// 		// update BmcStatus
+	// 		oldBmcStatus := ""
+	// 		if oldRedfishStatus.Status.Info != nil {
+	// 			oldBmcStatus = oldRedfishStatus.Status.Info["BmcStatus"]
+	// 		}
+	// 		if oldBmcStatus != bmcStatus {
+	// 			c.log.Infof("BmcStatus changed from %s to %s for RedfishStatus %s",
+	// 				oldBmcStatus, bmcStatus, name)
+	// 			updated.Status.Info["BmcStatus"] = bmcStatus
+	// 		}
+	// 	}
+	// }
 
 	// compare and update status
 	if !compareBasicStatus(updated.Status, oldRedfishStatus.Status) {
