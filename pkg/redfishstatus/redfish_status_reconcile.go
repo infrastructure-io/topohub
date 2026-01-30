@@ -5,9 +5,6 @@ package redfishstatus
 import (
 	"context"
 	"fmt"
-	"runtime"
-	"runtime/debug"
-	"sync"
 	"time"
 
 	gofishredfish "github.com/stmcginnis/gofish/redfish"
@@ -338,49 +335,12 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 		return err
 	}
 
-	// Create a wait group to wait for all goroutines to finish
-	var wg sync.WaitGroup
-
-	// Use the shared ants pool
-	if c.antsPool == nil {
-		return fmt.Errorf("shared ants pool is not available")
-	}
-
-	p := c.antsPool
-
-	// Update each RedfishStatus basic status fields (PowerState, BmcStatus and healthy) concurrently
-	for i := range redfishStatusList.Items {
-		// Important: Create a new variable in the loop to avoid closure problems
-		redfishStatus := redfishStatusList.Items[i]
-		wg.Add(1)
-
-		// Submit task to ants pool
-		err := p.Submit(func() {
-			defer wg.Done()
-			c.log.Debugf("Updating basic status fields of RedfishStatus %s", redfishStatus.Name)
-			if err := c.updateBasicStatus(&redfishStatus); err != nil {
-				c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
-			}
-		})
-
-		if err != nil {
-			c.log.Errorf("Failed to submit task for RedfishStatus %s: %v", redfishStatus.Name, err)
-			wg.Done() // Reduce counter if submission failed
-		}
-	}
-
-	// Wait for all tasks to complete
-	wg.Wait()
-
-	// Force GC and return memory to OS after batch operations
-	c.log.Info("Batch update completed, forcing GC and releasing memory to OS")
-	runtime.GC()
-	debug.FreeOSMemory()
-	c.log.Info("Memory released to OS successfully")
-
-	// Report pool statistics
-	c.log.Debugf("RedfishStatus update completed. Pool stats: running=%d, free=%d, capacity=%d",
-		p.Running(), p.Free(), p.Cap())
+	// Step 2 of memory-leak debugging: disable concurrent fan-out and real updates.
+	// We only record the current number of RedfishStatus objects and return.
+	// This helps us distinguish whether the leak is related to the ants pool or
+	// to per-item update logic.
+	count := len(redfishStatusList.Items)
+	c.log.Infof("[debug] Skip updateBasicStatusForAll, RedfishStatus count=%d", count)
 	return nil
 }
 
