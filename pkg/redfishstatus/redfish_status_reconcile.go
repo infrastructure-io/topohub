@@ -335,12 +335,21 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 		return err
 	}
 
-	// Step 2 of memory-leak debugging: disable concurrent fan-out and real updates.
-	// We only record the current number of RedfishStatus objects and return.
-	// This helps us distinguish whether the leak is related to the ants pool or
-	// to per-item update logic.
+	// Step 3 of memory-leak debugging: re-enable per-item updateBasicStatus calls
+	// but without using the shared ants goroutine pool and without Status().Update.
+	// This helps us distinguish whether the leak is in per-item logic (redfishPool,
+	// infoObjPool, locks, etc.) or in the previous concurrent fan-out implementation.
+
 	count := len(redfishStatusList.Items)
-	c.log.Infof("[debug] Skip updateBasicStatusForAll, RedfishStatus count=%d", count)
+	c.log.Infof("[debug] Running updateBasicStatusForAll sequentially, RedfishStatus count=%d", count)
+
+	for i := range redfishStatusList.Items {
+		redfishStatus := redfishStatusList.Items[i]
+		if err := c.updateBasicStatus(&redfishStatus); err != nil {
+			c.log.Errorf("Failed to update basic status of RedfishStatus %s: %v", redfishStatus.Name, err)
+		}
+	}
+
 	return nil
 }
 
