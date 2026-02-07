@@ -384,16 +384,17 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	}
 
 	// create redfish client
+	// Step 4 of memory-leak debugging: disable redfishPool.GetOrCreate to
+	// narrow down whether the leak is related to the session pool or other
+	// parts of updateBasicStatus. We keep the per-item loop, locking and
+	// status update logic, but do not create or reuse any real redfish
+	// client sessions here.
+	// Keep a reference to sessionCfg to avoid unused-variable compile errors in
+	// this debug build. The actual redfish client creation is intentionally
+	// disabled to narrow down memory-leak sources.
+	_ = sessionCfg
 	var healthy bool
-	session, err := c.redfishPool.GetOrCreate(sessionCfg.SessionID(), sessionCfg)
-	if err != nil {
-		c.log.Warnf("Failed to get redfish session, err: %v", err)
-		healthy = false
-	} else {
-		healthy = true
-	}
-	// keep a reference to avoid unused var after commenting suspicious block
-	_ = session
+	healthy = false
 
 	// lock resource to avoid concurrent update
 	c.log.Debugf("Lock for updating basic status of RedfishStatus %s", name)
