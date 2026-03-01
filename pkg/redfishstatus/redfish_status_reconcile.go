@@ -363,25 +363,27 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	}
 	updated := oldRedfishStatus.DeepCopy()
 
+	// Step 5 of memory-leak debugging: disable K8s resources retrieval (HostEndpoint & Secret)
+	// to check if the leak comes from controller-runtime client/cache interactions.
 	// get hostEndpoint
-	hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
-	if err != nil {
-		return fmt.Errorf("failed to get hostEndpoint for RedfishStatus %s: %v", name, err)
-	}
+	// hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get hostEndpoint for RedfishStatus %s: %v", name, err)
+	// }
 
 	// get connection data
-	auth, err := kube.GetAuthenticationSecret(context.Background(), c.cacheReader,
-		*hostEndpoint.Spec.SecretName, *hostEndpoint.Spec.SecretNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
-	}
-	sessionCfg := &redfish.RedfishSessionConfig{
-		Username: auth.Username,
-		Password: auth.Password,
-		IPAddr:   hostEndpoint.Spec.IPAddr,
-		Port:     int(*hostEndpoint.Spec.Port),
-		Https:    *hostEndpoint.Spec.HTTPS,
-	}
+	// auth, err := kube.GetAuthenticationSecret(context.Background(), c.cacheReader,
+	// 	*hostEndpoint.Spec.SecretName, *hostEndpoint.Spec.SecretNamespace)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
+	// }
+	// sessionCfg := &redfish.RedfishSessionConfig{
+	// 	Username: auth.Username,
+	// 	Password: auth.Password,
+	// 	IPAddr:   hostEndpoint.Spec.IPAddr,
+	// 	Port:     int(*hostEndpoint.Spec.Port),
+	// 	Https:    *hostEndpoint.Spec.HTTPS,
+	// }
 
 	// create redfish client
 	// Step 4 of memory-leak debugging: disable redfishPool.GetOrCreate to
@@ -392,7 +394,7 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	// Keep a reference to sessionCfg to avoid unused-variable compile errors in
 	// this debug build. The actual redfish client creation is intentionally
 	// disabled to narrow down memory-leak sources.
-	_ = sessionCfg
+	// _ = sessionCfg
 	var healthy bool
 	healthy = false
 
