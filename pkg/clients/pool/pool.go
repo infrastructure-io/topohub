@@ -22,6 +22,9 @@ type SessionPool[T any] interface {
 
 	// Refresh refresh the session config.
 	Refresh(sessionID string, cfg any) (Session[T], error)
+
+	// Size returns the number of cached sessions.
+	Size() int
 }
 
 // NewSessionFunc define the function to create a new session.
@@ -148,6 +151,12 @@ func (c *sessionPoolImpl[T]) Refresh(sessionID string, cfg any) (Session[T], err
 	}
 	session.UpdateLastActiveTime(time.Now())
 	return session, nil
+}
+
+func (c *sessionPoolImpl[T]) Size() int {
+	c.RLock()
+	defer c.RUnlock()
+	return len(c.cache)
 }
 
 func (c *sessionPoolImpl[T]) gc(ctx context.Context) {

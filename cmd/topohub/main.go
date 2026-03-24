@@ -73,6 +73,10 @@ func main() {
 	cmmanager.StartControllers(ctx, mgr)
 	startHttpServer(agentConfig)
 
+	// Start memory leak diagnostics (periodic heap dumps + data structure logging)
+	diagStopCh := make(chan struct{})
+	debug.RunMemLeakDiag(diagStopCh)
+
 	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
@@ -88,7 +92,9 @@ func main() {
 			log.Logger.Debug("Topohub still running...")
 		case sig := <-sigChan:
 			log.Logger.Infof("Received signal %v, shutting down...", sig)
-			// TODO: Stop DHCP server to remove ip if it was started
+
+			// Stop memory leak diagnostics (triggers final heap dump)
+			close(diagStopCh)
 
 			// Call stop functions that needs to stop the controller
 			for _, stopFn := range stopFns {

@@ -237,54 +237,91 @@ func (s *subnetManager) GetBindingIpEvents() (chan bindingipdata.BindingIPInfo, 
 	return s.addedBindingIp, s.deletedBindingIp
 }
 
+const maxBindingIpRetries = 10
+
 func (s *subnetManager) processBindingIpEvents() {
 	// handle bindingIP crd events, and configure it in the dhcp server
 	s.log.Infof("begin to process binding ip events")
+
+	addRetryCh := make(chan bindingIpRetryEvent, 1000)
+	delRetryCh := make(chan bindingIpRetryEvent, 1000)
+
 	for {
 		select {
 		case event := <-s.addedBindingIp:
-			if len(event.Subnet) == 0 {
-				s.log.Errorf("subnet is empty, skip to process binding ip events: %+v", event)
-				continue
-			}
-			s.log.Debugf("receive adding binding ip event: %+v", event)
-			s.dataLock.RLock()
-			c, exists := s.dhcpServerList[event.Subnet]
-			s.dataLock.RUnlock()
-			if !exists {
-				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
-				go func() {
-					time.Sleep(30 * time.Second)
-					s.addedBindingIp <- event
-				}()
-			} else {
-				s.log.Infof("process binding ip adding events for subnet %s: %+v", event.Subnet, event)
-				if err := c.UpdateBindingIpEvents([]bindingipdata.BindingIPInfo{event}, nil); err != nil {
-					s.log.Errorf("failed to add dhcp binding: %v", err)
-				}
-			}
-
+			s.handleBindingIpAdd(event, 0, addRetryCh)
+		case re := <-addRetryCh:
+			s.handleBindingIpAdd(re.data, re.retries, addRetryCh)
 		case event := <-s.deletedBindingIp:
-			if len(event.Subnet) == 0 {
-				s.log.Errorf("subnet is empty, skip to process binding ip events: %+v", event)
-				continue
+			s.handleBindingIpDel(event, 0, delRetryCh)
+		case re := <-delRetryCh:
+			s.handleBindingIpDel(re.data, re.retries, delRetryCh)
+		}
+	}
+}
+
+type bindingIpRetryEvent struct {
+	data    bindingipdata.BindingIPInfo
+	retries int
+}
+
+func (s *subnetManager) handleBindingIpAdd(event bindingipdata.BindingIPInfo, retries int, retryCh chan<- bindingIpRetryEvent) {
+	if len(event.Subnet) == 0 {
+		s.log.Errorf("subnet is empty, skip to process binding ip events: %+v", event)
+		return
+	}
+	s.log.Debugf("receive adding binding ip event: %+v (retry=%d)", event, retries)
+	s.dataLock.RLock()
+	c, exists := s.dhcpServerList[event.Subnet]
+	s.dataLock.RUnlock()
+	if !exists {
+		if retries >= maxBindingIpRetries {
+			s.log.Errorf("subnet %s is not running after %d retries, dropping binding ip event: %+v", event.Subnet, retries, event)
+			return
+		}
+		s.log.Warnf("subnet %s is not running, will retry binding ip event (retry=%d/%d): %+v", event.Subnet, retries+1, maxBindingIpRetries, event)
+		// Use a timer instead of spawning a goroutine to avoid goroutine storms
+		time.AfterFunc(30*time.Second, func() {
+			select {
+			case retryCh <- bindingIpRetryEvent{data: event, retries: retries + 1}:
+			default:
+				s.log.Errorf("retry channel full, dropping binding ip add event: %+v", event)
 			}
-			s.log.Debugf("receive deleting binding ip event: %+v", event)
-			s.dataLock.RLock()
-			c, exists := s.dhcpServerList[event.Subnet]
-			s.dataLock.RUnlock()
-			if !exists {
-				s.log.Errorf("subnet %s is not running, skip to process binding ip events: %+v", event.Subnet, event)
-				go func() {
-					time.Sleep(30 * time.Second)
-					s.deletedBindingIp <- event
-				}()
-			} else {
-				s.log.Infof("process binding ip deleting events for subnet %s: %+v", event.Subnet, event)
-				if err := c.UpdateBindingIpEvents(nil, []bindingipdata.BindingIPInfo{event}); err != nil {
-					s.log.Errorf("failed to delete dhcp binding: %v", err)
-				}
+		})
+	} else {
+		s.log.Infof("process binding ip adding events for subnet %s: %+v", event.Subnet, event)
+		if err := c.UpdateBindingIpEvents([]bindingipdata.BindingIPInfo{event}, nil); err != nil {
+			s.log.Errorf("failed to add dhcp binding: %v", err)
+		}
+	}
+}
+
+func (s *subnetManager) handleBindingIpDel(event bindingipdata.BindingIPInfo, retries int, retryCh chan<- bindingIpRetryEvent) {
+	if len(event.Subnet) == 0 {
+		s.log.Errorf("subnet is empty, skip to process binding ip events: %+v", event)
+		return
+	}
+	s.log.Debugf("receive deleting binding ip event: %+v (retry=%d)", event, retries)
+	s.dataLock.RLock()
+	c, exists := s.dhcpServerList[event.Subnet]
+	s.dataLock.RUnlock()
+	if !exists {
+		if retries >= maxBindingIpRetries {
+			s.log.Errorf("subnet %s is not running after %d retries, dropping binding ip event: %+v", event.Subnet, retries, event)
+			return
+		}
+		s.log.Warnf("subnet %s is not running, will retry binding ip event (retry=%d/%d): %+v", event.Subnet, retries+1, maxBindingIpRetries, event)
+		time.AfterFunc(30*time.Second, func() {
+			select {
+			case retryCh <- bindingIpRetryEvent{data: event, retries: retries + 1}:
+			default:
+				s.log.Errorf("retry channel full, dropping binding ip delete event: %+v", event)
 			}
+		})
+	} else {
+		s.log.Infof("process binding ip deleting events for subnet %s: %+v", event.Subnet, event)
+		if err := c.UpdateBindingIpEvents(nil, []bindingipdata.BindingIPInfo{event}); err != nil {
+			s.log.Errorf("failed to delete dhcp binding: %v", err)
 		}
 	}
 }
