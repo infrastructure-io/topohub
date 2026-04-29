@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"runtime/pprof"
 	"sort"
 	"time"
@@ -25,7 +24,7 @@ const (
 	heapDumpInterval = 6 * time.Hour
 
 	// diagLogInterval controls how often data-structure sizes are logged.
-	diagLogInterval = 5 * time.Minute
+	diagLogInterval = 30 * time.Minute
 )
 
 // RunMemLeakDiag starts two background goroutines:
@@ -122,9 +121,6 @@ func diagLogLoop(stopCh <-chan struct{}) {
 }
 
 func logDiag() {
-	// Force return unused memory to OS to prevent RSS from growing indefinitely
-	debug.FreeOSMemory()
-
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 

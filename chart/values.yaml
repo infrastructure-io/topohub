@@ -86,6 +86,10 @@ logLevel: "info"
 # Port for metrics server
 metricsPort: 8083
 
+# Go memory limit (GOMEMLIMIT env var)
+# Set to 70-80% of container memory limit to enable more aggressive GC
+goMemLimit: "200MiB"
+
 # Debug configuration
 debug:
   # Pyroscope configuration for profiling

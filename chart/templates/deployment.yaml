@@ -88,6 +88,8 @@ spec:
           value: /var/lib/feature
         - name: DHCP_CONFIG_TEMPLATE_PATH
           value: /var/lib/dhcp
+        - name: GOMEMLIMIT
+          value: {{ .Values.goMemLimit | default "200MiB" | quote }}
         ports:
         - name: webhook
           containerPort: {{ .Values.webhook.webhookPort }}

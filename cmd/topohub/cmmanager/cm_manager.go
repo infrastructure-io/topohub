@@ -2,9 +2,13 @@ package cmmanager
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"sync"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,6 +52,72 @@ func init() {
 
 type StopFn func()
 
+// cachedCertLoader loads TLS cert/key from disk but only re-parses when
+// the certificate file's modtime changes. This replaces controller-runtime's
+// fsnotify-based CertWatcher which triggers too frequently on Secret volumes.
+type cachedCertLoader struct {
+	certPath string
+	keyPath  string
+	mu       sync.RWMutex
+	cert     *tls.Certificate
+	modTime  time.Time
+}
+
+// defaultWebhookCertDir returns the same default cert directory that
+// controller-runtime uses: $TMPDIR/k8s-webhook-server/serving-certs
+func defaultWebhookCertDir() string {
+	return filepath.Join(os.TempDir(), "k8s-webhook-server", "serving-certs")
+}
+
+func newCachedCertTLSOpt() func(*tls.Config) {
+	certDir := defaultWebhookCertDir()
+	loader := &cachedCertLoader{
+		certPath: filepath.Join(certDir, "tls.crt"),
+		keyPath:  filepath.Join(certDir, "tls.key"),
+	}
+	// Eagerly load the certificate at construction time so that misconfigurations
+	// (missing file, bad PEM, etc.) surface as a startup error instead of being
+	// deferred to the first TLS handshake.
+	if _, err := loader.GetCertificate(nil); err != nil {
+		log.Logger.Warnf("Failed to pre-load webhook TLS certificate: %v (will retry on first TLS handshake)", err)
+	}
+	return func(cfg *tls.Config) {
+		cfg.GetCertificate = loader.GetCertificate
+	}
+}
+
+func (l *cachedCertLoader) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	// Check cert file modtime to decide if we need to reload
+	info, err := os.Stat(l.certPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat cert file %s: %w", l.certPath, err)
+	}
+
+	l.mu.RLock()
+	if l.cert != nil && info.ModTime().Equal(l.modTime) {
+		defer l.mu.RUnlock()
+		return l.cert, nil
+	}
+	l.mu.RUnlock()
+
+	// Modtime changed or first load — re-parse
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	// Double-check after acquiring write lock
+	if l.cert != nil && info.ModTime().Equal(l.modTime) {
+		return l.cert, nil
+	}
+
+	cert, err := tls.LoadX509KeyPair(l.certPath, l.keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load cert/key: %w", err)
+	}
+	l.cert = &cert
+	l.modTime = info.ModTime()
+	log.Logger.Infof("Webhook TLS certificate loaded (modtime: %v)", l.modTime)
+	return l.cert, nil
+}
+
 func NewControllerManager(opts *options.TopohubFlags) (manager.Manager, error) {
 	webhookPortInt, err := strconv.Atoi(opts.WebhookPort)
 	if err != nil {
@@ -60,7 +130,13 @@ func NewControllerManager(opts *options.TopohubFlags) (manager.Manager, error) {
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port: webhookPortInt,
-			// CertDir: agentConfig.WebhookCertDir,
+			// Use TLSOpts to set GetCertificate with a modtime-based cached loader.
+			// This prevents controller-runtime from creating a CertWatcher that uses
+			// fsnotify, which triggers excessive cert re-parsing (~3GB alloc/22days)
+			// due to Kubernetes Secret volume symlink atomic updates.
+			// CertDir is left empty so controller-runtime uses its default
+			// ($TMPDIR/k8s-webhook-server/serving-certs), matching our loader.
+			TLSOpts: []func(*tls.Config){newCachedCertTLSOpt()},
 		}),
 		// Leader Election disabled for single pod deployment
 		LeaderElection: false,

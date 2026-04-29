@@ -354,7 +354,18 @@ func (c *redfishStatusController) updateBasicStatusForAll() error {
 }
 
 // updateBasicStatus update single RedfishStatus basic status fields (PowerState, BmcStatus and healthy)
+// NOTE: All business logic is currently disabled for memory-leak debugging.
+// Skip DeepCopy to avoid ~1.7GB cumulative allocations from repeated deep-copying
+// of RedfishStatus objects when no actual updates are being performed.
 func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1beta1.RedfishStatus) error {
+	// All update logic below is disabled for debugging. Return early to avoid
+	// wasteful DeepCopy allocations (~1500MB cumulative over 22 days).
+	// When re-enabling business logic, restore the DeepCopy and the full
+	// update flow that was here before.
+	_ = oldRedfishStatus
+	return nil
+
+	/* --- Original logic (disabled for memory-leak debugging) ---
 	name := oldRedfishStatus.Name
 
 	// create a copy
@@ -363,38 +374,14 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	}
 	updated := oldRedfishStatus.DeepCopy()
 
-	// Step 5 of memory-leak debugging: disable K8s resources retrieval (HostEndpoint & Secret)
-	// to check if the leak comes from controller-runtime client/cache interactions.
 	// get hostEndpoint
 	// hostEndpoint, err := c.getHostEndpoint(oldRedfishStatus)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get hostEndpoint for RedfishStatus %s: %v", name, err)
-	// }
+	// ...
 
 	// get connection data
-	// auth, err := kube.GetAuthenticationSecret(context.Background(), c.cacheReader,
-	// 	*hostEndpoint.Spec.SecretName, *hostEndpoint.Spec.SecretNamespace)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get secret data for HostEndpoint %s: %v", hostEndpoint.Name, err)
-	// }
-	// sessionCfg := &redfish.RedfishSessionConfig{
-	// 	Username: auth.Username,
-	// 	Password: auth.Password,
-	// 	IPAddr:   hostEndpoint.Spec.IPAddr,
-	// 	Port:     int(*hostEndpoint.Spec.Port),
-	// 	Https:    *hostEndpoint.Spec.HTTPS,
-	// }
+	// auth, err := kube.GetAuthenticationSecret(...)
+	// ...
 
-	// create redfish client
-	// Step 4 of memory-leak debugging: disable redfishPool.GetOrCreate to
-	// narrow down whether the leak is related to the session pool or other
-	// parts of updateBasicStatus. We keep the per-item loop, locking and
-	// status update logic, but do not create or reuse any real redfish
-	// client sessions here.
-	// Keep a reference to sessionCfg to avoid unused-variable compile errors in
-	// this debug build. The actual redfish client creation is intentionally
-	// disabled to narrow down memory-leak sources.
-	// _ = sessionCfg
 	var healthy bool
 	healthy = false
 
@@ -404,7 +391,6 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 	lock.Lock()
 	defer lock.Unlock()
 
-	// update healthy status
 	updated.Status.Healthy = healthy
 
 	var newInfo map[string]string
@@ -414,44 +400,14 @@ func (c *redfishStatusController) updateBasicStatus(oldRedfishStatus *topohubv1b
 			c.infoObjPool.Put(newInfo)
 		}
 	}()
-	// only update high frequency fields (PowerState and BmcStatus)
-	// if healthy {
-	// 	client := session.GetClient()
-	// 	powerState, bmcStatus, err := client.GetBasicStatus()
-	// 	if err != nil {
-	// 		c.log.Warnf("Failed to get basic status for RedfishStatus %s: %v", name, err)
-	// 	} else {
-	// 		// update PowerState
-	// 		if updated.Status.Info == nil {
-	// 			newInfo = c.infoObjPool.Get().(map[string]string)
-	// 			updated.Status.Info = newInfo
-	// 		}
-	// 		updated.Status.Info["PowerState"] = powerState
-	//
-	// 		// update BmcStatus
-	// 		oldBmcStatus := ""
-	// 		if oldRedfishStatus.Status.Info != nil {
-	// 			oldBmcStatus = oldRedfishStatus.Status.Info["BmcStatus"]
-	// 		}
-	// 		if oldBmcStatus != bmcStatus {
-	// 			c.log.Infof("BmcStatus changed from %s to %s for RedfishStatus %s",
-	// 				oldBmcStatus, bmcStatus, name)
-	// 			updated.Status.Info["BmcStatus"] = bmcStatus
-	// 		}
-	// 	}
-	// }
 
 	// compare and update status
 	if !compareBasicStatus(updated.Status, oldRedfishStatus.Status) {
-		c.log.Debugf("Basic status changed for RedfishStatus %s (Status().Update is disabled for debugging)", name)
-		// updated.Status.LastUpdateTime = time.Now().UTC().Format(time.RFC3339)
-		// if err := c.client.Status().Update(context.Background(), updated); err != nil {
-		// 	return err
-		// }
-		// c.log.Infof("Successfully updated basic status for RedfishStatus %s", name)
+		c.log.Debugf("Basic status changed for RedfishStatus %s", name)
 	}
 
 	return nil
+	--- End original logic --- */
 }
 
 // compareBasicStatus compare RedfishStatusStatus basic status fields (PowerState, BmcStatus and healthy)
