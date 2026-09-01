@@ -32,11 +32,13 @@ CGO_ENABLED ?= 0
 GO_BUILD_ENV ?= CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH)
 
 GO_BUILD_FLAGS += -mod=vendor
-ifeq ($(DISABLE_RACE),)
+# race detector: TSan shadow memory grows unboundedly in long-running processes,
+# so it is disabled by default. Set ENABLE_RACE=1 for short-lived debug builds.
+ifneq ($(ENABLE_RACE),)
     GO_BUILD_FLAGS += -race 
     GO_BUILD_ENV += CGO_ENABLED=1
 endif
-ifeq ($(DISABLE_LOCKDEBUG),)
+ifneq ($(ENABLE_LOCKDEBUG),)
     GO_BUILD_FLAGS += -tags=lockdebug
 endif
 
