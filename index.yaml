@@ -2,8 +2,28 @@ apiVersion: v1
 entries:
   topohub:
   - apiVersion: v2
+    appVersion: 0.9.0
+    created: "2026-09-30T10:07:39.276451764Z"
+    description: A Helm chart for Topohub
+    digest: d4c187b7709b8496c47fc59182dbf099b5c6969c5e3d6a1d8ea1b6bdfcfaa06e
+    keywords:
+    - kubernetes
+    - bmc
+    - server
+    - infrastructure
+    - switch
+    - network
+    maintainers:
+    - name: infrastructure-io
+      url: https://github.com/infrastructure-io/topohub
+    name: topohub
+    type: application
+    urls:
+    - https://infrastructure-io.github.io/topohub/charts/topohub-0.9.0.tgz
+    version: 0.9.0
+  - apiVersion: v2
     appVersion: 0.8.0
-    created: "2025-12-25T06:11:13.810149259Z"
+    created: "2026-09-30T10:07:39.275879273Z"
     description: A Helm chart for Topohub
     digest: f33cced5750da9ad64994bde0ad517acc530c74329766828ab10727f83e1ae0e
     keywords:
@@ -23,7 +43,7 @@ entries:
     version: 0.8.0
   - apiVersion: v2
     appVersion: 0.7.0
-    created: "2025-12-25T06:11:13.809385149Z"
+    created: "2026-09-30T10:07:39.274960899Z"
     description: A Helm chart for Topohub
     digest: 27bb30112e1796ad990e1ef4c359aed36461ea5cddcf871e474f7448b4c8c856
     keywords:
@@ -43,7 +63,7 @@ entries:
     version: 0.7.0
   - apiVersion: v2
     appVersion: 0.6.0
-    created: "2025-12-25T06:11:13.808394383Z"
+    created: "2026-09-30T10:07:39.274059813Z"
     description: A Helm chart for Topohub
     digest: b8afe6cb8bc3c36b6f2ed63b00f34539076e343d5228ce24ad9236cc0caf44ed
     keywords:
@@ -63,7 +83,7 @@ entries:
     version: 0.6.0
   - apiVersion: v2
     appVersion: 0.5.0
-    created: "2025-12-25T06:11:13.806947106Z"
+    created: "2026-09-30T10:07:39.273479008Z"
     description: A Helm chart for Topohub
     digest: 1fdaa81619f6247d6014217d5baecc1fbf2eff58d4bc2ff5cfd50679ff446e1c
     keywords:
@@ -83,7 +103,7 @@ entries:
     version: 0.5.0
   - apiVersion: v2
     appVersion: 0.4.4
-    created: "2025-12-25T06:11:13.806231528Z"
+    created: "2026-09-30T10:07:39.27294564Z"
     description: A Helm chart for Topohub
     digest: 167896c35ea7447ce3c4344aef200094cb6978a18187bb1f822f646c0b819541
     keywords:
@@ -103,7 +123,7 @@ entries:
     version: 0.4.4
   - apiVersion: v2
     appVersion: 0.4.3
-    created: "2025-12-25T06:11:13.805556986Z"
+    created: "2026-09-30T10:07:39.272443443Z"
     description: A Helm chart for Topohub
     digest: 574239ae0da5af0c5a1f342a2939bcc5f8c37b6e3b813a678b6dc036eb06ef86
     keywords:
@@ -123,7 +143,7 @@ entries:
     version: 0.4.3
   - apiVersion: v2
     appVersion: 0.4.2
-    created: "2025-12-25T06:11:13.804845887Z"
+    created: "2026-09-30T10:07:39.271956932Z"
     description: A Helm chart for Topohub
     digest: c2c683b7259560385c72568cf40560a7de00d4f74895486c6e1b2bad19fa1ef1
     keywords:
@@ -143,7 +163,7 @@ entries:
     version: 0.4.2
   - apiVersion: v2
     appVersion: 0.4.1
-    created: "2025-12-25T06:11:13.80420102Z"
+    created: "2026-09-30T10:07:39.271444609Z"
     description: A Helm chart for Topohub
     digest: d9af33eb698e3a25a15bbf183acc9a50c19bef30d264cc547fb2157d5518bf03
     keywords:
@@ -163,7 +183,7 @@ entries:
     version: 0.4.1
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2025-12-25T06:11:13.803501732Z"
+    created: "2026-09-30T10:07:39.270948952Z"
     description: A Helm chart for Topohub
     digest: 1c95703520a870057550f14b4bfa41f674346120330d67ac96e2aa12e95aa284
     keywords:
@@ -183,7 +203,7 @@ entries:
     version: 0.4.0
   - apiVersion: v2
     appVersion: 0.3.5
-    created: "2025-12-25T06:11:13.802875581Z"
+    created: "2026-09-30T10:07:39.270410567Z"
     description: A Helm chart for Topohub
     digest: 91389b417688c997bf6585e549513b4633813420b1f8a86d11a502003b9b31bd
     keywords:
@@ -203,7 +223,7 @@ entries:
     version: 0.3.5
   - apiVersion: v2
     appVersion: 0.3.4
-    created: "2025-12-25T06:11:13.802199988Z"
+    created: "2026-09-30T10:07:39.269898864Z"
     description: A Helm chart for Topohub
     digest: 0a30a9d8edeeb72054c316d86167673c146ed1b6ca2048179257c0838b6373e0
     keywords:
@@ -223,7 +243,7 @@ entries:
     version: 0.3.4
   - apiVersion: v2
     appVersion: 0.3.3
-    created: "2025-12-25T06:11:13.801514416Z"
+    created: "2026-09-30T10:07:39.269346656Z"
     description: A Helm chart for Topohub
     digest: 4789612260c5f948a2d17ddc3f7227e945b8f6559386537a427661bac6b0ff12
     keywords:
@@ -243,7 +263,7 @@ entries:
     version: 0.3.3
   - apiVersion: v2
     appVersion: 0.3.2
-    created: "2025-12-25T06:11:13.800842128Z"
+    created: "2026-09-30T10:07:39.268133057Z"
     description: A Helm chart for Topohub
     digest: 93f3a330810687d16b2e4323a6302bfa00535d7d819ac1069dece5b8e38b6606
     keywords:
@@ -263,7 +283,7 @@ entries:
     version: 0.3.2
   - apiVersion: v2
     appVersion: 0.3.1
-    created: "2025-12-25T06:11:13.799942659Z"
+    created: "2026-09-30T10:07:39.267666027Z"
     description: A Helm chart for Topohub
     digest: c3bf9f31e9cecbd8a3cfe1787b556f390ddddfda14a99d7fc44c0b0c0bed97fd
     keywords:
@@ -283,7 +303,7 @@ entries:
     version: 0.3.1
   - apiVersion: v2
     appVersion: 0.3.0
-    created: "2025-12-25T06:11:13.798491976Z"
+    created: "2026-09-30T10:07:39.267166204Z"
     description: A Helm chart for Topohub
     digest: ee5b3461cf32d0d8366cabce8bdc880dc43ab27609d7c68accd7510f1ae8c049
     keywords:
@@ -303,7 +323,7 @@ entries:
     version: 0.3.0
   - apiVersion: v2
     appVersion: 0.2.2
-    created: "2025-12-25T06:11:13.797790433Z"
+    created: "2026-09-30T10:07:39.266695378Z"
     description: A Helm chart for Topohub
     digest: cac27261964da3021c2b26b1fa94071ef0d311cd00cf7899520471c1e5e34f9f
     keywords:
@@ -323,7 +343,7 @@ entries:
     version: 0.2.2
   - apiVersion: v2
     appVersion: 0.2.1
-    created: "2025-12-25T06:11:13.796663977Z"
+    created: "2026-09-30T10:07:39.26621705Z"
     description: A Helm chart for Topohub
     digest: fdfdedfb2944b4c20c73717c37f6900b88edd6ecbef494195d3b6786a730325c
     keywords:
@@ -343,7 +363,7 @@ entries:
     version: 0.2.1
   - apiVersion: v2
     appVersion: 0.2.0
-    created: "2025-12-25T06:11:13.795934873Z"
+    created: "2026-09-30T10:07:39.265736138Z"
     description: A Helm chart for Topohub
     digest: 713250439cd58c4b801ef4527372c61b3b56fb70db06394187220df5082f8ddc
     keywords:
@@ -363,7 +383,7 @@ entries:
     version: 0.2.0
   - apiVersion: v2
     appVersion: 0.1.1
-    created: "2025-12-25T06:11:13.795272354Z"
+    created: "2026-09-30T10:07:39.265243166Z"
     description: A Helm chart for Topohub
     digest: 46506ab7d3edbc2d7e726de45e96e9098b1c4c35af914e399920ff268e447b27
     keywords:
@@ -383,7 +403,7 @@ entries:
     version: 0.1.1
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2025-12-25T06:11:13.794571413Z"
+    created: "2026-09-30T10:07:39.264722149Z"
     description: A Helm chart for Topohub
     digest: 0131a4348a15518654c1178b2c821f5ca02b5bf9901370b0c142f78ce80f15ef
     keywords:
@@ -401,4 +421,4 @@ entries:
     urls:
     - https://infrastructure-io.github.io/topohub/charts/topohub-0.1.0.tgz
     version: 0.1.0
-generated: "2025-12-25T06:11:13.793701095Z"
+generated: "2026-09-30T10:07:39.264051728Z"
