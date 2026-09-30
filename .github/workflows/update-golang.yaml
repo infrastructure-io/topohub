@@ -2,9 +2,6 @@ name: Auto Update Golang Version
 
 permissions: write-all
 on:
-  schedule:
-    # Run at 20:00 on the 1st day of every month
-    - cron: "0 20 1 * * "
   workflow_dispatch:
 
 

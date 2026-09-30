@@ -1,5 +1,5 @@
 # Build stage
-FROM docker.io/library/golang:1.24.4 as builder
+FROM docker.io/library/golang:1.24.4 AS builder
 
 # Copy the entire project
 WORKDIR /workspace
@@ -9,10 +9,14 @@ COPY . .
 ENV GOPROXY=https://goproxy.io
 
 ARG TARGETARCH
-ARG DISABLE_RACE
+ARG ENABLE_RACE=0
 
 # Build the agent binary using the project's Makefile
-RUN make build-topohub GOARCH=$TARGETARCH DISABLE_RACE=$DISABLE_RACE
+RUN make build-topohub GOARCH=$TARGETARCH ENABLE_RACE=$ENABLE_RACE && \
+    if [ "$ENABLE_RACE" != "1" ] && go version -m /workspace/bin/topohub | grep -q -- '-race=true'; then \
+        echo "error: production topohub binary was built with the Go race detector" >&2; \
+        exit 1; \
+    fi
 
 # Final stage
 FROM ubuntu:24.04
