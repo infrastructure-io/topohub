@@ -81,16 +81,16 @@ jobs:
     needs: filter_changes
     runs-on: ubuntu-latest
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.24.4
-
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           persist-credentials: false
           ref: ${{ needs.filter_changes.outputs.ref }}
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: GO_VERSION
 
       - name: check crd sdk
         if: ${{ needs.filter_changes.outputs.crd == 'true' }}
@@ -106,16 +106,16 @@ jobs:
     if: ${{ needs.filter_changes.outputs.check == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.24.4
-
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           persist-credentials: false
           ref: ${{ needs.filter_changes.outputs.ref }}
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: GO_VERSION
 
       - name: Check module vendoring
         run: |

@@ -82,8 +82,9 @@ jobs:
       # for auto-cherrypick.yaml, create a label
       - name: Create cherry-pick label
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo ${{ secrets.WELAN_PAT }} | gh auth login --with-token
           branchLabelName="${{ env.LABEL_PREFIX_CHERRYPICK }}release-${{ env.RUN_YBranchName }}"
           mainLabelName="${{ env.LABEL_PREFIX_CHERRYPICK }}main"
           echo "try to create label "

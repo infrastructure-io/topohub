@@ -39,7 +39,7 @@ jobs:
 
       - name: cherry pick
         env:
-          GITHUB_TOKEN: ${{ secrets.WELAN_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JSON: ${{ toJSON(github) }}
         run: |
           set -x
@@ -204,6 +204,8 @@ jobs:
                       --label "${{ env.CHERRYPICK_LABEL }},${INITIAL_LABEL}" \
                       --body "robot cherry pick PR <${PR_URL}> from ${PR_AUTHOR},to branch ${BRANCH},  action <${ACTION_URL}>  , commits $PR_COMMITS " \
                       --base ${BRANCH}
+                  # a PR created by GITHUB_TOKEN does not trigger pull_request workflows, but workflow_dispatch does
+                  gh workflow run auto-pr-ci.yaml --ref ${PR_BRANCH} -f ref=${PR_BRANCH} || echo "error, failed to trigger CI for ${PR_BRANCH}"
               else
                   echo "no changes happened for commits $PR_COMMITS, ignore create pr"
               fi
