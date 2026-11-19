@@ -51,5 +51,14 @@ jobs:
           delete-branch: true
           base: main
           signoff: true
-          token: ${{ secrets.WELAN_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           labels: pr/robot_update
+
+      # a PR created by GITHUB_TOKEN does not trigger pull_request workflows, but workflow_dispatch does
+      - name: Trigger PR CI
+        if: ${{ steps.create_pr.outputs.pull-request-number != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch=$(gh pr view ${{ steps.create_pr.outputs.pull-request-number }} --json headRefName -q .headRefName)
+          gh workflow run auto-pr-ci.yaml --ref "${branch}" -f ref="${branch}"
